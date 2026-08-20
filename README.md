@@ -1,1 +1,276 @@
-# apps_mcn
+# MCN — THE VAULT · V1
+
+> Quiet strength never rushes. The Vault is filling.
+
+Application mobile-first (PWA) de l'univers **Maine Coon Network**. V1 est la fondation
+jouable : un joueur entre sans wallet ni e-mail, ouvre son Coffre Quotidien, joue une
+session de 30 secondes, complète ses missions, progresse dans les six rangs des Gardiens,
+explore le Vault et se compare aux autres.
+
+**Principe directeur, valable pour les quatre versions :**
+MCN The Vault n'est pas un dashboard de staking auquel on a greffé un jeu. C'est un jeu de
+progression sociale bâti autour de l'écosystème MCN, dans lequel la blockchain sera
+intégrée progressivement. Le staking est une mécanique ; **le jeu est le produit**.
+
+---
+
+## Démarrage
+
+Il faut une base PostgreSQL. En local, le plus simple est une **branche de développement
+Neon** (neon.tech → votre projet → *Branches* → *New branch*) : elle est instantanée et
+isolée de la production.
+
+```bash
+npm install
+cp .env.example .env    # puis renseignez DATABASE_URL, DATABASE_URL_UNPOOLED, SESSION_SECRET
+npm run setup           # client Prisma + migrations + contenu
+npm run dev             # http://localhost:3000
+```
+
+| Script | Rôle |
+| --- | --- |
+| `npm run dev` | serveur de développement |
+| `npm run build` / `npm start` | build et exécution en production |
+| `npm run setup` | generate + migrate deploy + seed |
+| `npm run db:migrate` | crée une migration après modification du schéma |
+| `npm run db:seed` | re-sème le contenu (idempotent) |
+| `npm run db:studio` | inspecteur de base Prisma |
+| `npm run typecheck` | `tsc --noEmit` |
+
+`SEED_DEMO="true"` ajoute 12 Gardiens de démonstration pour remplir le classement.
+C'est **opt-in** : la production démarre avec de vrais joueurs uniquement.
+
+Toutes les commandes Prisma passent par [scripts/with-db-env.mjs](scripts/with-db-env.mjs),
+qui normalise les noms de variables de connexion (chaque hébergeur les nomme
+différemment) avant d'appeler Prisma. Il n'affiche jamais les URL elles-mêmes.
+
+---
+
+## Stack
+
+Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Framer Motion ·
+Prisma 6 · PostgreSQL (Neon).
+
+Le schéma évite délibérément les enums natifs, les colonnes `Json` et les tableaux : il
+reste portable vers n'importe quel PostgreSQL, managé ou auto-hébergé.
+
+---
+
+## Déploiement
+
+Hébergé sur **Vercel**, base **Neon**. Chaque `git push` sur `main` déclenche un
+déploiement.
+
+Le build exécute, dans l'ordre : `prisma generate` → `prisma migrate deploy` →
+`seed` → `next build`. Les migrations et le contenu sont donc appliqués automatiquement à
+chaque déploiement. Le seed est idempotent.
+
+Variables d'environnement à définir dans Vercel :
+
+| Nom | Valeur |
+| --- | --- |
+| `DATABASE_URL` | connexion **pooled** Neon (hôte en `-pooler`) — injectée par l'intégration |
+| `DATABASE_URL_UNPOOLED` | connexion **directe** Neon — requise par les migrations |
+| `SESSION_SECRET` | valeur aléatoire forte (le serveur refuse de démarrer sans) |
+| `NEXT_PUBLIC_WALLET_ENABLED` | `false` |
+| `MCN_TOKEN_REWARDS_ENABLED` | `false` |
+| `NEXT_PUBLIC_MCN_CHAIN` | `base` |
+
+Neon exige deux connexions : une *poolée* pour l'application (le serverless ouvre trop de
+connexions sans pooler) et une *directe* pour les migrations, qui ne peuvent pas passer par
+un pooler.
+
+**À revoir en V2 :** le seed tourne à chaque déploiement et réécrit les tables de
+configuration avec les valeurs du code. C'est correct tant que la configuration n'est
+éditable que par le code ; dès que le panneau d'administration V2 permettra de la modifier
+en base, le seed devra devenir une étape ponctuelle et non plus une étape de build.
+
+---
+
+## Ce que contient la V1
+
+**Entrée** — compte invité en un écran (nom + langue), cookie de session signé (HMAC,
+httpOnly). Ni wallet, ni e-mail, ni paiement.
+
+**Six rangs** — ⚜️ Vagabond → 🐾 Gardien → 🛡️ Gardien Royal → ⭐ Gardien d'Élite →
+💎 Gardien du Vault → 👑 Légende. Seuils : 0 / 500 / 2 000 / 6 000 / 15 000 / 40 000 XP.
+Les illustrations livrées sont utilisées telles quelles, jamais recolorées ni permutées.
+
+**Coffre Quotidien évolutif** — un coffre gratuit par jour, différent à chaque rang
+(dessin, palette, ornements, pool de récompenses). Deux règles tenues par le moteur, pas
+par la chance : le coffre **donne toujours quelque chose** (entrées garanties tirées avant
+tout tirage pondéré), et **les probabilités sont affichées** au joueur (bouton
+« Probabilités »), telles que le serveur les utilise.
+
+**Série indulgente** — cycle de 7 jours, avec des *Boucliers de Série* : un jour manqué est
+absorbé au lieu d'effacer des semaines de fidélité. Une série vraiment rompue ne fait que
+remettre le compteur à 1 — aucun XP, objet ou rang n'est jamais retiré.
+
+**Résonance de Cristal** — le mini-jeu. Quatre cristaux, un anneau qui se referme, un
+timing à trouver. ~30 s, jouable au pouce. Combos, cristaux dorés × 2, et une pénalité
+pour les touches dans le vide : le jeu récompense la précision, pas la vitesse de tapotage.
+
+**Missions** — 4 quotidiennes et 3 hebdomadaires, tirées de façon déterministe par joueur
+et par période. La progression n'avance que sur des événements serveur vérifiés.
+
+**Le Vault** — six chambres déverrouillées par rang, six registres de lore, et un
+« Murmure du jour » qui change chaque jour. Le contenu verrouillé affiche une **vraie**
+condition (« Nécessite le rang Gardien Royal »), jamais un teaser fictif.
+
+**Classements** — XP global, meilleure session, semaine en cours, plus longue série.
+Quatre tables volontairement : la persistance, l'adresse et la fidélité doivent pouvoir
+briller séparément. Le joueur voit toujours sa propre ligne, même loin du top 25.
+
+**Profil** — identité, palmarès, collection (badges, cosmétiques, matériaux, fragments,
+clés), activation des boosts, langue, wallet.
+
+**Bilingue FR/EN** — aucun texte d'interface codé en dur.
+[`src/lib/i18n/en.json`](src/lib/i18n/en.json) et [`fr.json`](src/lib/i18n/fr.json).
+Le contenu de jeu (rangs, objets, lore) porte ses deux langues dans ses fichiers de contenu
+et en base.
+
+**PWA** — manifest, icônes, service worker (cache des illustrations uniquement — jamais
+l'état de jeu), installable sur iOS et Android.
+
+---
+
+## Architecture serveur
+
+Tout ce qui touche à la progression est **autoritaire côté serveur**. Le client ne peut
+jamais annoncer un gain.
+
+```
+src/lib/
+  content/     ranks · chests · items · missions · vault   ← source de vérité du design
+  engine/      rewards · chest · game · missions · streak · leaderboard · state
+  game/        pattern.ts   ← partagé mot pour mot entre le client et le serveur
+  web3/        wallet.ts    ← prêt, désactivé
+```
+
+- **`applyRewards`** est le **seul** endroit où un solde change. Un seul chemin à auditer,
+  un seul endroit qui écrit le grand livre d'XP, un seul endroit qui détecte une montée de
+  rang (y compris quand un gain franchit deux seuils d'un coup).
+- **Coffre** : la ligne `ChestOpening` unique `(userId, day)` *est* le verrou. Deux
+  requêtes simultanées ne peuvent pas ouvrir deux fois.
+- **Mini-jeu** : le serveur émet une graine, le client dessine le motif qu'elle produit, et
+  le serveur **reconstruit le même motif** pour recalculer le score. Le client n'envoie que
+  des instants de frappe. S'ajoutent : statut basculé avant notation (anti-rejeu), contrôle
+  d'horloge murale (une session ne peut pas être soumise plus vite qu'elle ne se joue),
+  limitation de débit, plafond d'XP par session et rendements décroissants.
+- **Journalisation** : `XpLedger`, `DailyActivity`, `AnalyticsEvent` alimentent D1/D7/D30
+  et la détection de fraude.
+
+### Limite d'anti-triche, dite franchement
+
+Un attaquant déterminé peut encore forger des instants de frappe plausibles depuis un
+navigateur. Aucune V1 web ne peut l'empêcher totalement. La V1 **borne les dégâts**
+(plafonds, rendements décroissants, limitation de débit, sessions signalées et conservées)
+plutôt que de prétendre faire confiance au client. Le durcissement sérieux appartient à la
+V3, avec le travail blockchain/récompenses.
+
+---
+
+## Web3 : prêt, éteint
+
+`src/lib/web3/wallet.ts` expose les coutures — liaison de wallet, lecture de solde MCN,
+réclamations — et **chacune refuse d'agir** tant que les drapeaux sont à `false` :
+
+```env
+NEXT_PUBLIC_WALLET_ENABLED="false"
+MCN_TOKEN_REWARDS_ENABLED="false"
+```
+
+Le type de récompense `MCN` existe depuis le premier jour dans le `RewardService` : toute
+intention de versement est enregistrée en `RewardGrant` avec le statut `DISABLED`, donc
+auditable le jour où le module s'allume. `linkWallet()` accepte déjà un paramètre de
+signature et refuse plutôt que de stocker une adresse non vérifiée — la V3 n'aura qu'à
+implémenter la vérification, sans changer les appelants.
+
+**Rien de tout cela ne conditionne le jeu.** Un joueur sans wallet ne perd aucune
+fonctionnalité.
+
+---
+
+## Économie (V1)
+
+| Source | Gain |
+| --- | --- |
+| Coffre Quotidien | 60–110 XP (Vagabond) → 3 000–4 500 XP (Légende) |
+| Session de jeu | score / 20, plafonné à 150 XP |
+| Missions | 20–90 XP (quotidiennes), 250–500 XP (hebdomadaires) |
+| Montée de rang | Éclats + badge, et surtout un coffre définitivement meilleur |
+
+Les sessions au-delà de la 5ᵉ du jour rapportent 50 %, puis 20 %, puis 5 %. Le score
+continue de compter au classement. Le coffre représente 10 à 16 % d'un rang : c'est lui
+l'ancre du retour quotidien, pas le grind.
+
+Rythme visé : Gardien au jour 1, Gardien Royal vers le jour 3-4, Élite vers le jour 10,
+Gardien du Vault vers le jour 25, Légende au-delà de deux mois.
+
+---
+
+## Points à traiter
+
+**L'illustration du Gardien d'Élite manque.** Cinq des six images ont été livrées
+(`image3` absente). Le rang 4 affiche donc un blason de remplacement honnête plutôt que
+d'emprunter le portrait d'un autre rang — ce qui casserait la règle « un rang supérieur
+paraît toujours plus fort ». Pour finir : déposer le fichier dans
+`public/ranks/elite-guardian.png` et renseigner `artPath` dans
+[src/lib/content/ranks.ts](src/lib/content/ranks.ts).
+
+**Illustrations lourdes.** Les PNG livrés font 2,3 à 3 Mo. Next les optimise à la volée en
+production, mais des sources en 1200 px de large amélioreraient nettement le premier
+chargement en 4G.
+
+**Hébergement.** Vercel plan Hobby : usage non commercial uniquement. Dès que MCN
+monétise, il faudra le plan Pro. Par ailleurs, le limiteur de débit en mémoire de
+[src/lib/api.ts](src/lib/api.ts) perd son effet en serverless (chaque instance a sa propre
+mémoire) : la protection réelle du mini-jeu repose sur des comptages en base, mais cette
+seconde couche devra passer sur Redis (Upstash) avant une ouverture publique large.
+
+**Frontière du jour en UTC.** Volontaire : si la journée suivait l'horloge de l'appareil,
+changer de fuseau distribuerait des coffres supplémentaires. Effet secondaire assumé — le
+Vendredi du Vault tombe au même instant pour toute la communauté.
+
+**Déconnexion.** `Quitter cet appareil` supprime la session ; la V1 n'a pas encore de
+moyen de se reconnecter à un compte invité. À traiter avec l'authentification e-mail /
+Farcaster / wallet en V2-V3.
+
+---
+
+## Prévu pour la suite
+
+Le schéma et les abstractions accueillent déjà la V2 sans migration destructive :
+
+- `ItemDef` porte un `metaJson` libre → équipements, statistiques d'armes, futurs NFT.
+- Les fragments (`frag-*`) et matériaux se collectionnent déjà → la Forge a sa matière.
+- Rangs, coffres, pools, missions et config vivent **en base**, semés depuis les fichiers
+  de contenu → le panneau d'administration V2 les édite sans redéploiement.
+- `AppConfig` contient la saison courante → système de saisons.
+- `RewardGrant` attend les récompenses MCN de la V3/V4.
+- `CHAMBERS` est déjà verrouillé par rang → les chambres deviennent des salles réelles.
+
+---
+
+## Structure
+
+```
+prisma/          schema.prisma · seed.ts
+public/
+  ranks/         illustrations officielles des rangs
+  icons/         icône de l'application (SVG + PNG)
+  manifest.webmanifest · sw.js
+src/
+  app/
+    page.tsx           entrée / création de compte
+    (game)/            vault · play · missions · explore · ranks · leaderboard · profile
+    api/               session · chest · game · missions · vault · leaderboard · profile · boost · wallet
+  components/          écrans et éléments d'interface
+  lib/
+    content/ engine/ game/ i18n/ web3/
+    auth.ts · db.ts · time.ts · rng.ts · api.ts
+```
+
+---
+
+**ORIA IS WATCHING.**

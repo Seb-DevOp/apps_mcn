@@ -1,0 +1,363 @@
+@import "tailwindcss";
+
+/*
+ * MCN — THE VAULT · visual foundation
+ *
+ * Royal fantasy treasure vault, not a crypto dashboard. Everything is built from
+ * six materials: dark stone, midnight navy, royal blue, antique gold, sapphire
+ * crystal and warm candlelight. No neon, no purple gradients, no dashboard chrome.
+ */
+
+@theme {
+  --color-ink: #05080f;
+  --color-navy-900: #070b1a;
+  --color-navy-800: #0a1128;
+  --color-navy-700: #0e1937;
+  --color-navy-600: #142042;
+  --color-stone: #171d2f;
+  --color-royal: #1b3a8f;
+  --color-royal-bright: #2f5cd0;
+  --color-sapphire: #4f93ff;
+  --color-sapphire-pale: #a9cbff;
+  --color-gold: #c9a24d;
+  --color-gold-bright: #f0d089;
+  --color-candle: #ffcf92;
+  --color-parchment: #e9e3d5;
+
+  --font-display: "Cinzel", "Trajan Pro", "Times New Roman", serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+:root {
+  --ink: #05080f;
+  --navy-900: #070b1a;
+  --navy-800: #0a1128;
+  --navy-700: #0e1937;
+  --stone: #171d2f;
+  --royal: #1b3a8f;
+  --royal-bright: #2f5cd0;
+  --sapphire: #4f93ff;
+  --sapphire-pale: #a9cbff;
+  --gold: #c9a24d;
+  --gold-bright: #f0d089;
+  --candle: #ffcf92;
+  --parchment: #e9e3d5;
+
+  --text: #dfe5f5;
+  --text-dim: #8f9ab8;
+  --text-faint: #5d6688;
+
+  --shell-max: 30rem;
+  --nav-height: 4.5rem;
+
+  color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- The room the whole app sits in -------------------------------------- */
+
+.vault-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(90rem 50rem at 50% -18%, rgba(47, 92, 208, 0.28), transparent 62%),
+    radial-gradient(40rem 40rem at 12% 8%, rgba(255, 207, 146, 0.09), transparent 58%),
+    radial-gradient(40rem 40rem at 88% 14%, rgba(255, 207, 146, 0.07), transparent 58%),
+    linear-gradient(180deg, #0a1026 0%, #070b1a 42%, #05080f 100%);
+}
+
+/* Faint stone grain, so flat panels do not read as plastic. */
+.vault-grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+.shell {
+  width: 100%;
+  max-width: var(--shell-max);
+  margin: 0 auto;
+  padding: 0 1rem;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 1.5rem);
+}
+
+/* --- Type ---------------------------------------------------------------- */
+
+.display {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.85;
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+.gold-text {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --- Panels: dark marble with a thin gilded edge -------------------------- */
+
+.panel {
+  position: relative;
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(23, 32, 62, 0.92), rgba(10, 17, 40, 0.94));
+  border: 1px solid rgba(201, 162, 77, 0.18);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 18px 40px -24px rgba(0, 0, 0, 0.9);
+}
+
+.panel-gilded {
+  border-color: rgba(201, 162, 77, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(201, 162, 77, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 20px 44px -26px rgba(0, 0, 0, 0.95);
+}
+
+.panel-sapphire {
+  border-color: rgba(79, 147, 255, 0.35);
+  box-shadow:
+    0 0 26px -8px rgba(79, 147, 255, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.05) inset;
+}
+
+/* Gothic arch top used on hero panels. */
+.arch::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px auto -1px;
+  height: 3.5rem;
+  border-radius: 1rem 1rem 40% 40% / 1rem 1rem 100% 100%;
+  background: linear-gradient(180deg, rgba(79, 147, 255, 0.16), transparent);
+  pointer-events: none;
+}
+
+/* --- Buttons ------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 3.25rem;
+  padding: 0 1.25rem;
+  border-radius: 0.85rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.18s ease, box-shadow 0.18s ease;
+  user-select: none;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.995);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-gold {
+  color: #26190a;
+  background: linear-gradient(180deg, #f3d68f 0%, #d3ab57 52%, #a97f31 100%);
+  border-color: rgba(255, 236, 190, 0.55);
+  box-shadow:
+    0 0 24px -6px rgba(240, 208, 137, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  font-weight: 700;
+}
+
+.btn-royal {
+  color: #eaf1ff;
+  background: linear-gradient(180deg, #2f5cd0 0%, #1b3a8f 100%);
+  border-color: rgba(169, 203, 255, 0.35);
+  box-shadow: 0 0 22px -8px rgba(79, 147, 255, 0.6);
+}
+
+.btn-ghost {
+  color: var(--text);
+  background: rgba(23, 32, 62, 0.6);
+  border-color: rgba(201, 162, 77, 0.22);
+}
+
+/* --- Progress ------------------------------------------------------------ */
+
+.track {
+  position: relative;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: rgba(5, 8, 15, 0.75);
+  border: 1px solid rgba(201, 162, 77, 0.2);
+  overflow: hidden;
+}
+
+.track-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1b3a8f, #4f93ff 70%, #a9cbff);
+  box-shadow: 0 0 14px rgba(79, 147, 255, 0.65);
+}
+
+/* --- Crystal / candle ambience ------------------------------------------- */
+
+@keyframes crystal-pulse {
+  0%, 100% { opacity: 0.75; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+.crystal-pulse {
+  animation: crystal-pulse 3.4s ease-in-out infinite;
+}
+
+@keyframes candle-flicker {
+  0%, 100% { opacity: 0.85; }
+  25% { opacity: 0.62; }
+  50% { opacity: 1; }
+  75% { opacity: 0.72; }
+}
+
+.candle {
+  animation: candle-flicker 4.5s ease-in-out infinite;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+@keyframes shine-sweep {
+  0% { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(240%) skewX(-18deg); }
+}
+
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 240, 205, 0.22),
+    transparent
+  );
+  width: 42%;
+  animation: shine-sweep 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* --- Bottom navigation --------------------------------------------------- */
+
+.nav-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: 100%;
+  max-width: var(--shell-max);
+  height: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  background: linear-gradient(180deg, rgba(10, 17, 40, 0.86), rgba(5, 8, 15, 0.98));
+  backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(201, 162, 77, 0.22);
+  z-index: 40;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+  color: var(--text-dim);
+  padding: 0.4rem 0;
+  transition: color 0.16s ease;
+}
+
+.nav-item[data-active="true"] {
+  color: var(--gold-bright);
+}
+
+.nav-item[data-active="true"] .nav-icon {
+  filter: drop-shadow(0 0 8px rgba(240, 208, 137, 0.55));
+}
+
+/* --- Utility ------------------------------------------------------------- */
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

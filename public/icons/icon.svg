@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="room" cx="50%" cy="34%" r="72%">
+      <stop offset="0%" stop-color="#1c3a86"/>
+      <stop offset="58%" stop-color="#0b1633"/>
+      <stop offset="100%" stop-color="#05080f"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f7e0a6"/>
+      <stop offset="52%" stop-color="#d3ab57"/>
+      <stop offset="100%" stop-color="#8f6b26"/>
+    </linearGradient>
+    <linearGradient id="gem" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#bcdcff"/>
+      <stop offset="55%" stop-color="#4f93ff"/>
+      <stop offset="100%" stop-color="#12336f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#room)"/>
+
+  <!-- gothic arch of the Vault door -->
+  <path d="M136 392V236a120 120 0 0 1 240 0v156Z" fill="none" stroke="url(#gold)" stroke-width="12"/>
+  <path d="M120 400h272" stroke="url(#gold)" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- crown -->
+  <path d="M176 168l-10-56 44 30 46-62 46 62 44-30-10 56Z" fill="url(#gold)"/>
+
+  <!-- sapphire crystal at the heart of the Vault -->
+  <path d="M256 214l40 52-40 88-40-88Z" fill="url(#gem)" stroke="#eadfae" stroke-width="5" stroke-linejoin="round"/>
+
+  <!-- paw mark -->
+  <circle cx="212" cy="330" r="11" fill="#f0d089" opacity="0.9"/>
+  <circle cx="300" cy="330" r="11" fill="#f0d089" opacity="0.9"/>
+</svg>

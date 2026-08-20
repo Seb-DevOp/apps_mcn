@@ -1,0 +1,50 @@
+{
+  "name": "mcn-the-vault",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "next dev",
+    "build": "node scripts/with-db-env.mjs prisma generate && node scripts/with-db-env.mjs prisma migrate deploy && node scripts/with-db-env.mjs tsx prisma/seed.ts && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node scripts/with-db-env.mjs prisma migrate dev",
+    "db:deploy": "node scripts/with-db-env.mjs prisma migrate deploy",
+    "db:seed": "node scripts/with-db-env.mjs tsx prisma/seed.ts",
+    "db:studio": "node scripts/with-db-env.mjs prisma studio",
+    "setup": "node scripts/with-db-env.mjs prisma generate && node scripts/with-db-env.mjs prisma migrate deploy && node scripts/with-db-env.mjs tsx prisma/seed.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Seb-DevOp/apps_mcn.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Seb-DevOp/apps_mcn/issues"
+  },
+  "homepage": "https://github.com/Seb-DevOp/apps_mcn#readme",
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "clsx": "^2.1.1",
+    "framer-motion": "^13.1.1",
+    "next": "^15.5.23",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sharp": "^0.35.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "postcss": "^8.5.26",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3"
+  },
+  "private": true
+}

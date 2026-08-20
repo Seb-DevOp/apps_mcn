@@ -1,0 +1,325 @@
+// MCN — THE VAULT · V1 data model
+// Written to stay portable: no native enums, no Json columns, no arrays.
+//
+// Neon (and every serverless Postgres) needs two connections: a pooled one for the
+// running app, and a direct one for migrations, which cannot run through a pooler.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ---------------------------------------------------------------------------
+// PLAYERS
+// ---------------------------------------------------------------------------
+
+model User {
+  id         String   @id @default(cuid())
+  handle     String   @unique // public name inside the Kingdom
+  locale     String   @default("en") // "en" | "fr"
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  // Progression (server-authoritative — never written from the client)
+  xp      Int    @default(0)
+  shards  Int    @default(0)
+  rankKey String @default("wanderer")
+
+  // Streak
+  currentStreak   Int     @default(0)
+  bestStreak      Int     @default(0)
+  totalActiveDays Int     @default(0)
+  lastActiveDay   String? // "YYYY-MM-DD" in the player local day
+  streakShields   Int     @default(1) // forgiving streak: absorbs one missed day
+  lastChestDay    String?
+
+  // Web3 (prepared, inert while MCN_TOKEN_REWARDS_ENABLED=false)
+  walletAddress  String?
+  walletChain    String?
+  walletLinkedAt DateTime?
+
+  isAdmin Boolean @default(false)
+
+  sessions      Session[]
+  inventory     InventoryItem[]
+  chestOpenings ChestOpening[]
+  missions      UserMission[]
+  gameSessions  GameSession[]
+  scores        ScoreEntry[]
+  xpLedger      XpLedger[]
+  events        AnalyticsEvent[]
+  activity      DailyActivity[]
+  boosts        UserBoost[]
+  grants        RewardGrant[]
+
+  @@index([xp])
+  @@index([currentStreak])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// CONFIGURATION (seeded — the V2 admin panel edits these rows, not the code)
+// ---------------------------------------------------------------------------
+
+model RankConfig {
+  key          String @id // wanderer | guardian | royal-guardian | elite-guardian | vault-keeper | legend
+  order        Int    @unique
+  emoji        String
+  nameEn       String
+  nameFr       String
+  minXp        Int
+  artPath      String
+  accentColor  String
+  taglineEn    String
+  taglineFr    String
+  chestTypeKey String
+}
+
+model ChestType {
+  key      String            @id
+  rankKey  String            @unique
+  tier     Int
+  nameEn   String
+  nameFr   String
+  descEn   String
+  descFr   String
+  entries  RewardPoolEntry[]
+  openings ChestOpening[]
+}
+
+model RewardPoolEntry {
+  id           String    @id @default(cuid())
+  chestTypeKey String
+  chestType    ChestType @relation(fields: [chestTypeKey], references: [key], onDelete: Cascade)
+
+  rewardType String // XP | SHARD | ITEM | BOOST | COSMETIC | BADGE
+  itemKey    String? // FK-by-key into ItemDef when rewardType is ITEM/BOOST/COSMETIC/BADGE
+  minQty     Int     @default(1)
+  maxQty     Int     @default(1)
+  weight     Int     @default(100) // relative weight — exposed to players for transparency
+  rarity     String  @default("COMMON") // COMMON | UNCOMMON | RARE | EPIC | MYTHIC | LEGENDARY
+  guaranteed Boolean @default(false) // rolled on every open, outside the weighted draw
+
+  @@index([chestTypeKey])
+}
+
+model ItemDef {
+  key       String  @id
+  type      String // MATERIAL | FRAGMENT | COSMETIC | BOOST | BADGE | EQUIPMENT | KEY
+  rarity    String  @default("COMMON")
+  nameEn    String
+  nameFr    String
+  descEn    String  @default("")
+  descFr    String  @default("")
+  icon      String  @default("crystal")
+  stackable Boolean @default(true)
+  // Free-form JSON string: boost multipliers, future equipment stats, future NFT metadata.
+  metaJson  String  @default("{}")
+
+  inventory InventoryItem[]
+}
+
+model MissionDef {
+  key          String  @id
+  scope        String // DAILY | WEEKLY
+  goalType     String // OPEN_CHEST | PLAY_GAME | EARN_XP | GAME_SCORE | COLLECT_SHARDS | KEEP_STREAK | VISIT_VAULT | COLLECT_ITEMS
+  goalTarget   Int
+  nameEn       String
+  nameFr       String
+  rewardsJson  String  @default("[]") // [{type,itemKey,qty}]
+  minRankOrder Int     @default(0)
+  weight       Int     @default(100)
+  active       Boolean @default(true)
+}
+
+model AppConfig {
+  key       String   @id
+  valueJson String
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// PLAYER STATE
+// ---------------------------------------------------------------------------
+
+model InventoryItem {
+  id       String   @id @default(cuid())
+  userId   String
+  itemKey  String
+  quantity Int      @default(0)
+  firstAt  DateTime @default(now())
+  lastAt   DateTime @updatedAt
+
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item ItemDef @relation(fields: [itemKey], references: [key], onDelete: Cascade)
+
+  @@unique([userId, itemKey])
+  @@index([userId])
+}
+
+model UserBoost {
+  id         String   @id @default(cuid())
+  userId     String
+  boostKey   String
+  statKey    String // XP | SHARD | SCORE
+  multiplier Float    @default(1.25)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model ChestOpening {
+  id           String   @id @default(cuid())
+  userId       String
+  chestTypeKey String
+  day          String // "YYYY-MM-DD" — one free chest per local day
+  streakDay    Int      @default(1) // 1..7 position in the streak cycle
+  rewardsJson  String
+  createdAt    DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chestType ChestType @relation(fields: [chestTypeKey], references: [key])
+
+  @@unique([userId, day]) // hard server-side guarantee: one daily chest, no double claim
+  @@index([userId])
+}
+
+model UserMission {
+  id          String    @id @default(cuid())
+  userId      String
+  missionKey  String
+  scope       String // DAILY | WEEKLY
+  periodKey   String // "2026-08-20" or "2026-W34"
+  progress    Int       @default(0)
+  target      Int
+  completedAt DateTime?
+  claimedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionKey, periodKey])
+  @@index([userId, scope, periodKey])
+}
+
+// ---------------------------------------------------------------------------
+// MINI-GAME (server-authoritative: the server owns the seed AND the scoring)
+// ---------------------------------------------------------------------------
+
+model GameSession {
+  id      String @id @default(cuid())
+  userId  String
+  gameKey String @default("crystal-resonance")
+  seed    String // drives the spawn pattern; the client only renders it
+  targets Int
+  status  String @default("OPEN") // OPEN | SCORED | REJECTED | EXPIRED
+
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  submittedAt DateTime?
+
+  score            Int     @default(0)
+  accuracy         Float   @default(0)
+  bestCombo        Int     @default(0)
+  xpAwarded        Int     @default(0)
+  shardsAwarded    Int     @default(0)
+  clientDurationMs Int     @default(0)
+  invalidReason    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model ScoreEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  gameKey   String
+  score     Int
+  weekKey   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([gameKey, score])
+  @@index([weekKey, score])
+}
+
+// ---------------------------------------------------------------------------
+// AUDIT / ANALYTICS / FUTURE REWARDS
+// ---------------------------------------------------------------------------
+
+model XpLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  source    String // CHEST | GAME | MISSION | STREAK | RANKUP | ADMIN
+  refId     String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model DailyActivity {
+  id              String  @id @default(cuid())
+  userId          String
+  day             String
+  gamesPlayed     Int     @default(0)
+  xpEarned        Int     @default(0)
+  chestOpened     Boolean @default(false)
+  missionsClaimed Int     @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+  @@index([day])
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  propsJson String   @default("{}")
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([name, createdAt])
+}
+
+// Prepared for V3/V4. Nothing writes MCN rows while the feature flag is off.
+model RewardGrant {
+  id         String   @id @default(cuid())
+  userId     String
+  rewardType String // XP | ITEM | COSMETIC | BADGE | VAULT_SHARD | MCN
+  itemKey    String?
+  amount     String   @default("0") // string-encoded to stay safe for token decimals
+  status     String   @default("PENDING") // PENDING | APPROVED | CLAIMED | FAILED | DISABLED
+  txHash     String?
+  chain      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
