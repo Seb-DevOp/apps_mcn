@@ -10,6 +10,8 @@ import { LOCALES, LOCALE_LABEL } from "@/lib/i18n";
 import type { WalletCapabilities } from "@/lib/web3/wallet";
 import { useI18n } from "./I18nProvider";
 import { RankPortrait } from "./RankVisuals";
+import { AccountSecurity } from "./AccountSecurity";
+import type { AccountStatus } from "@/lib/auth/account";
 import { ItemIcon, ShardIcon, XpIcon, StreakIcon, TrophyIcon } from "./ui/Icons";
 
 export interface ProfileProps {
@@ -27,6 +29,7 @@ export interface ProfileProps {
   inventory: { itemKey: string; quantity: number }[];
   activeBoosts: { boostKey: string; expiresAt: string }[];
   wallet: { capabilities: WalletCapabilities; address: string | null };
+  account: AccountStatus;
 }
 
 /**
@@ -36,7 +39,7 @@ export interface ProfileProps {
  * rather than to the game. The wallet section sits here too — visible, honest
  * about being switched off, and never in the way of playing.
  */
-export function ProfileView({ player, stats, inventory, activeBoosts, wallet }: ProfileProps) {
+export function ProfileView({ player, stats, inventory, activeBoosts, wallet, account }: ProfileProps) {
   const { t, L } = useI18n();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -181,6 +184,8 @@ export function ProfileView({ player, stats, inventory, activeBoosts, wallet }: 
           {t("profile.forgeSoon")}
         </p>
       </section>
+
+      <AccountSecurity initial={account} />
 
       {/* --- Wallet -------------------------------------------------------- */}
       <section className="panel mt-6 p-4">

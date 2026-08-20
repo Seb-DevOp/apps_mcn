@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getCollection } from "@/lib/engine/state";
 import { walletCapabilities } from "@/lib/web3/wallet";
+import { getAccountStatus } from "@/lib/auth/account";
 import { ProfileView } from "@/components/ProfileView";
 
 export const dynamic = "force-dynamic";
@@ -11,13 +12,14 @@ export default async function ProfilePage() {
   const user = await getSessionUser();
   if (!user) redirect("/");
 
-  const [collection, best, chestsOpened] = await Promise.all([
+  const [collection, best, chestsOpened, account] = await Promise.all([
     getCollection(user.id),
     prisma.scoreEntry.aggregate({
       where: { userId: user.id, gameKey: "crystal-resonance" },
       _max: { score: true },
     }),
     prisma.chestOpening.count({ where: { userId: user.id } }),
+    getAccountStatus(user.id),
   ]);
 
   const inventory = [
@@ -46,6 +48,7 @@ export default async function ProfilePage() {
         expiresAt: boost.expiresAt.toISOString(),
       }))}
       wallet={{ capabilities: walletCapabilities(), address: user.walletAddress }}
+      account={account}
     />
   );
 }

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { createTranslator, LOCALES, LOCALE_LABEL, type Locale } from "@/lib/i18n";
 import { McnCrest } from "./ui/Icons";
+import { SignIn } from "./SignIn";
 
 /**
  * The entrance.
@@ -18,6 +19,7 @@ export function Onboarding({ suggested }: { suggested: string }) {
   const router = useRouter();
   const [locale, setLocale] = useState<Locale>("en");
   const [handle, setHandle] = useState(suggested);
+  const [mode, setMode] = useState<"CREATE" | "SIGNIN">("CREATE");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +77,9 @@ export function Onboarding({ suggested }: { suggested: string }) {
         </div>
       </motion.header>
 
+      {mode === "SIGNIN" ? (
+        <SignIn locale={locale} onBack={() => setMode("CREATE")} />
+      ) : (
       <motion.section
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -129,8 +134,17 @@ export function Onboarding({ suggested }: { suggested: string }) {
 
           {error && <p className="mt-3 text-center text-sm text-red-300">{error}</p>}
           <p className="dim mt-4 text-center text-xs">{t("onboarding.noWallet")}</p>
+
+          <button
+            type="button"
+            onClick={() => setMode("SIGNIN")}
+            className="mt-4 w-full text-center text-xs text-[var(--sapphire-pale)] underline underline-offset-4"
+          >
+            {t("auth.haveAccount")}
+          </button>
         </div>
       </motion.section>
+      )}
 
       <motion.footer
         initial={{ opacity: 0 }}

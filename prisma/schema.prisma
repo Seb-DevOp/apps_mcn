@@ -38,6 +38,14 @@ model User {
   streakShields   Int     @default(1) // forgiving streak: absorbs one missed day
   lastChestDay    String?
 
+  // --- Identity -------------------------------------------------------
+  // A guest account has none of these. Claiming one is what makes progress
+  // survive a lost phone, a cleared browser or a new device.
+  email           String?   @unique
+  emailVerifiedAt DateTime?
+  passwordHash    String? // scrypt, salted, encoded in the value itself
+  claimedAt       DateTime? // the moment the account stopped being anonymous
+
   // Web3 (prepared, inert while MCN_TOKEN_REWARDS_ENABLED=false)
   walletAddress  String?
   walletChain    String?
@@ -57,6 +65,10 @@ model User {
   boosts        UserBoost[]
   grants        RewardGrant[]
   equipment     UserEquipment[]
+  credentials   Credential[]
+  recoveryCodes RecoveryCode[]
+  emailTokens   EmailToken[]
+  identities    LinkedIdentity[]
 
   @@index([xp])
   @@index([currentStreak])
@@ -69,6 +81,83 @@ model Session {
   expiresAt DateTime
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// AUTHENTICATION
+// ---------------------------------------------------------------------------
+
+/// A WebAuthn passkey. The private half never leaves the player's device.
+model Credential {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    String
+  counter      Int       @default(0)
+  transports   String    @default("")
+  deviceLabel  String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Short-lived WebAuthn challenge. Stored server-side so a replayed one is refused.
+model AuthChallenge {
+  id        String   @id @default(cuid())
+  userId    String?
+  challenge String   @unique
+  kind      String // REGISTER | AUTHENTICATE
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+/// One-time account recovery code. Only the hash is ever stored.
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Email verification and password reset. Only the hash is stored, never the token.
+model EmailToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  kind      String // VERIFY | RESET
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
+}
+
+/// External identities. Farcaster and wallet plug in here in V3 — the table and
+/// the service exist now so nothing has to be migrated when they are switched on.
+model LinkedIdentity {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String // FARCASTER | WALLET
+  externalId String
+  metaJson   String   @default("{}")
+  linkedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalId])
   @@index([userId])
 }
 

@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { prisma } from "./db";
+import { prisma } from "../db";
 
 /**
  * Guest-first authentication.
@@ -115,8 +115,19 @@ export async function createGuestSession(rawHandle: string, locale: string) {
     data: { handle, locale: locale === "fr" ? "fr" : "en" },
   });
 
+  await startSessionFor(user.id);
+  return user;
+}
+
+/**
+ * Issues a session cookie for an existing account.
+ *
+ * Used by every sign-in path — passkey, password, recovery code — so there is one
+ * place where a session comes into being. Only callable from a route handler.
+ */
+export async function startSessionFor(userId: string) {
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
-  const session = await prisma.session.create({ data: { userId: user.id, expiresAt } });
+  const session = await prisma.session.create({ data: { userId, expiresAt } });
 
   const store = await cookies();
   store.set(COOKIE_NAME, pack(session.id), {
@@ -127,7 +138,7 @@ export async function createGuestSession(rawHandle: string, locale: string) {
     expires: expiresAt,
   });
 
-  return user;
+  return session;
 }
 
 export async function destroySession() {

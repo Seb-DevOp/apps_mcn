@@ -1,4 +1,4 @@
-# MCN — THE VAULT · V1 + V2.1 + V2.2
+# MCN — THE VAULT · V1 + V2.1 + V2.2 + comptes
 
 > Quiet strength never rushes. The Vault is filling.
 
@@ -187,6 +187,42 @@ Les probabilités de butin d'équipement sont affichées dans la même feuille q
 
 **Boutique en Éclats du Vault uniquement.** Aucun argent réel en V2 : l'abstraction de
 paiement reste inerte, comme le wallet. Conforme au découpage V4 = économie MCN.
+
+---
+
+## Authentification
+
+Un joueur entre toujours en invité, sans rien fournir. Tant qu'il n'a pas revendiqué
+son compte, sa progression ne vit que dans le cookie d'un navigateur — et l'écran le lui
+dit en toutes lettres. Trois méthodes, dans l'ordre où elles servent réellement :
+
+**Passkey** — empreinte, Face ID ou code d'écran. Rien à retenir, et la plateforme la
+synchronise via iCloud ou Google : elle survit à la perte du téléphone. La clé privée ne
+quitte jamais l'appareil, donc il n'existe de notre côté aucun secret à voler. Vérification
+déléguée à  : l'attestation WebAuthn est typiquement le code qui paraît
+juste et ne l'est pas.
+
+**Codes de secours** — six codes à usage unique, le plancher sous tout le reste. Seuls les
+hachages sont stockés : lire la base ne donne aucun accès.
+
+**E-mail + mot de passe** — la voie familière. Hachage scrypt (bibliothèque standard de
+Node : ni binaire natif à faire échouer au build, ni dépendance tierce sur le chemin qui
+protège les comptes). La connexion fait le même travail que l'adresse existe ou non, donc
+le temps de réponse ne révèle pas quels comptes existent.
+
+**Farcaster et wallet** — table, service et points d'entrée écrits, et **refusés** tant que
+les drapeaux sont à . Lier une identité externe non vérifiée, c'est une prise de
+contrôle de compte qui attend : le comportement honnête est de dire non. Ni l'un ni l'autre
+ne sera jamais nécessaire pour jouer ou conserver sa progression.
+
+**L'envoi d'e-mails est inerte** tant que  et  ne sont pas
+définis, et l'interface le dit plutôt que de prétendre avoir envoyé un message. C'est
+tenable parce que passkey et codes de secours couvrent déjà « j'ai perdu l'accès » :
+l'e-mail est le confort, pas le plancher.
+
+Garde-fous vérifiés : retirer sa seule méthode d'accès est refusé · un code de secours ne
+sert qu'une fois · les tentatives sont limitées par source *et* par adresse · une adresse
+inconnue et une adresse connue reçoivent exactement la même réponse.
 
 ---
 

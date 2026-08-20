@@ -74,7 +74,8 @@ const env = { ...process.env, DATABASE_URL: pooled.value };
 env.DATABASE_URL_UNPOOLED = direct ? direct.value : pooled.value;
 
 // Never print the URLs themselves — only which variable each one came from.
-console.log(
+// On stderr: a caller piping the wrapped command's stdout must get only its output.
+console.error(
   `[db-env] pooled ← ${pooled.name} · direct ← ${direct ? direct.name : pooled.name}`,
 );
 
