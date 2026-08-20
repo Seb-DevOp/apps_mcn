@@ -33,8 +33,23 @@ function firstSet(names) {
   return null;
 }
 
+/**
+ * Neon's pooler is PgBouncer in transaction mode: it does not support the
+ * advisory locks Prisma Migrate needs, so running migrations through it fails.
+ * When only a pooled URL is available, derive the direct host from it — on Neon
+ * the two differ by the "-pooler" suffix alone.
+ */
+function deriveDirect(url) {
+  return url.includes("-pooler") ? url.replace("-pooler", "") : null;
+}
+
 const pooled = firstSet(POOLED);
-const direct = firstSet(DIRECT);
+let direct = firstSet(DIRECT.filter((name) => !POOLED.includes(name)));
+
+if (!direct && pooled) {
+  const derived = deriveDirect(pooled.value);
+  if (derived) direct = { name: `${pooled.name} (pooler suffix removed)`, value: derived };
+}
 
 if (!pooled) {
   console.error(
