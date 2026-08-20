@@ -199,7 +199,7 @@ dit en toutes lettres. Trois méthodes, dans l'ordre où elles servent réelleme
 **Passkey** — empreinte, Face ID ou code d'écran. Rien à retenir, et la plateforme la
 synchronise via iCloud ou Google : elle survit à la perte du téléphone. La clé privée ne
 quitte jamais l'appareil, donc il n'existe de notre côté aucun secret à voler. Vérification
-déléguée à  : l'attestation WebAuthn est typiquement le code qui paraît
+déléguée à `@simplewebauthn` : l'attestation WebAuthn est typiquement le code qui paraît
 juste et ne l'est pas.
 
 **Codes de secours** — six codes à usage unique, le plancher sous tout le reste. Seuls les
@@ -211,11 +211,11 @@ protège les comptes). La connexion fait le même travail que l'adresse existe o
 le temps de réponse ne révèle pas quels comptes existent.
 
 **Farcaster et wallet** — table, service et points d'entrée écrits, et **refusés** tant que
-les drapeaux sont à . Lier une identité externe non vérifiée, c'est une prise de
+les drapeaux sont à `false`. Lier une identité externe non vérifiée, c'est une prise de
 contrôle de compte qui attend : le comportement honnête est de dire non. Ni l'un ni l'autre
 ne sera jamais nécessaire pour jouer ou conserver sa progression.
 
-**L'envoi d'e-mails est inerte** tant que  et  ne sont pas
+**L'envoi d'e-mails est inerte** tant que `RESEND_API_KEY` et `EMAIL_FROM` ne sont pas
 définis, et l'interface le dit plutôt que de prétendre avoir envoyé un message. C'est
 tenable parce que passkey et codes de secours couvrent déjà « j'ai perdu l'accès » :
 l'e-mail est le confort, pas le plancher.
