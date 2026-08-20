@@ -7,12 +7,11 @@ import { listIdentities, identityStatus } from "./identity";
 import { emailEnabled } from "./email";
 
 /**
- * Claiming an account.
+ * Living with an account.
  *
- * A player starts as a guest and never has to stop being one. Claiming is the
- * moment their progress stops depending on one browser's cookie — and it is
- * always an upgrade of the account they are already playing, never a new one, so
- * nothing is ever migrated or lost.
+ * Registration happens once, at the door (see ./register). Everything here is
+ * what comes afterwards: signing back in, changing the address or the password,
+ * and telling the profile screen how recoverable the account actually is.
  */
 
 export type ClaimError =
@@ -22,25 +21,28 @@ export type ClaimError =
   | "PASSWORD_TOO_LONG"
   | "PASSWORD_TOO_COMMON";
 
-export async function setEmailAndPassword(
+/**
+ * Changing the address on an account.
+ *
+ * The current password is required whenever the account has one. Without that
+ * check, anyone holding a session cookie could point the account at their own
+ * inbox and reset the password from there — a session becoming a permanent
+ * takeover.
+ */
+export async function changeEmail(
   userId: string,
+  currentPassword: string,
   email: string,
-  password: string,
-): Promise<{ ok: true } | { ok: false; error: ClaimError }> {
+): Promise<{ ok: true } | { ok: false; error: ClaimError | "WRONG_PASSWORD" | "NO_PASSWORD" }> {
   const normalized = normalizeEmail(email);
   if (!isEmailShaped(normalized)) return { ok: false, error: "EMAIL_INVALID" };
 
-  const strength = checkPassword(password);
-  if (!strength.ok) {
-    return {
-      ok: false,
-      error:
-        strength.reason === "TOO_LONG"
-          ? "PASSWORD_TOO_LONG"
-          : strength.reason === "TOO_COMMON"
-            ? "PASSWORD_TOO_COMMON"
-            : "PASSWORD_TOO_SHORT",
-    };
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  // Accounts created before registration became mandatory have no password.
+  // There is nothing to prove ownership against, so the current-password check is
+  // skipped for them — the session is the only credential they have ever had.
+  if (user.passwordHash && !(await verifyPassword(currentPassword, user.passwordHash))) {
+    return { ok: false, error: "WRONG_PASSWORD" };
   }
 
   const taken = await prisma.user.findFirst({
@@ -48,19 +50,17 @@ export async function setEmailAndPassword(
   });
   if (taken) return { ok: false, error: "EMAIL_TAKEN" };
 
-  const passwordHash = await hashPassword(password);
   await prisma.user.update({
     where: { id: userId },
     data: {
       email: normalized,
-      passwordHash,
       // A new address is unverified until it is proved, whatever the old one was.
       emailVerifiedAt: null,
     },
   });
 
   await markClaimed(userId);
-  await track("account.claimed", userId, { method: "PASSWORD" });
+  await track("account.emailChanged", userId, {});
   return { ok: true };
 }
 
@@ -73,24 +73,30 @@ export async function markClaimed(userId: string) {
 }
 
 /**
- * Password sign-in.
- *
- * Always does the same work whether the address exists or not, so response time
- * cannot be used to discover which addresses have accounts.
+ * A dummy hash of the right shape, so a missing account costs the same time as a
+ * real one and response timing never reveals which names or addresses exist.
  */
-export async function signInWithPassword(
-  email: string,
+const DECOY_HASH =
+  "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+/**
+ * Password sign-in by name or address.
+ *
+ * Players remember the name they chose far more reliably than which address they
+ * used, so either works. An "@" is the only thing that decides which column to
+ * look in — names cannot contain one.
+ */
+export async function signInWithIdentifier(
+  identifier: string,
   password: string,
 ): Promise<string | null> {
-  const normalized = normalizeEmail(email);
-  const user = await prisma.user.findUnique({ where: { email: normalized } });
+  const value = identifier.trim();
 
-  const stored =
-    user?.passwordHash ??
-    // A dummy hash of the same shape, so a missing account costs the same time.
-    "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  const user = value.includes("@")
+    ? await prisma.user.findUnique({ where: { email: normalizeEmail(value) } })
+    : await prisma.user.findUnique({ where: { handle: value.slice(0, 40) } });
 
-  const valid = await verifyPassword(password, stored);
+  const valid = await verifyPassword(password, user?.passwordHash ?? DECOY_HASH);
   if (!valid || !user?.passwordHash) return null;
 
   await track("account.signin", user.id, { method: "PASSWORD" });
@@ -109,8 +115,10 @@ export async function changePassword(
   next: string,
 ): Promise<{ ok: true } | { ok: false; error: ClaimError | "WRONG_PASSWORD" | "NO_PASSWORD" }> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  if (!user.passwordHash) return { ok: false, error: "NO_PASSWORD" };
-  if (!(await verifyPassword(current, user.passwordHash))) {
+  // Accounts created before registration became mandatory have no password.
+  // There is nothing to prove ownership against, so the current-password check is
+  // skipped for them — the session is the only credential they have ever had.
+  if (user.passwordHash && !(await verifyPassword(current, user.passwordHash))) {
     return { ok: false, error: "WRONG_PASSWORD" };
   }
 
@@ -131,6 +139,7 @@ export async function changePassword(
     where: { id: userId },
     data: { passwordHash: await hashPassword(next) },
   });
+  await markClaimed(userId);
   return { ok: true };
 }
 
@@ -158,7 +167,12 @@ export async function getAccountStatus(userId: string) {
     listIdentities(userId),
   ]);
 
-  const methods = passkeys.length + (user.passwordHash ? 1 : 0);
+  // Every account has a password now, so the question is no longer "can they get
+  // back in at all" but "what happens the day they forget it". With no passkey,
+  // no codes and no email delivery, the answer is nothing — and that is worth
+  // saying out loud.
+  const canRecover =
+    passkeys.length > 0 || codesLeft > 0 || (Boolean(user.email) && emailEnabled());
 
   return {
     claimed: Boolean(user.claimedAt),
@@ -172,8 +186,8 @@ export async function getAccountStatus(userId: string) {
       lastUsedAt: key.lastUsedAt?.toISOString() ?? null,
     })),
     recoveryCodesLeft: codesLeft,
-    /** True while the account still lives and dies with this browser's cookie. */
-    atRisk: methods === 0 && codesLeft === 0,
+    /** True when a forgotten password would leave no way back in. */
+    atRisk: !canRecover,
     emailDeliveryEnabled: emailEnabled(),
     identities: identities.map((row) => ({
       provider: row.provider,

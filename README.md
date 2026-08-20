@@ -100,8 +100,8 @@ en base, le seed devra devenir une étape ponctuelle et non plus une étape de b
 
 ## Ce que contient la V1
 
-**Entrée** — compte invité en un écran (nom + langue), cookie de session signé (HMAC,
-httpOnly). Ni wallet, ni e-mail, ni paiement.
+**Entrée** — inscription obligatoire : pseudo, e-mail, mot de passe saisi deux fois.
+Cookie de session signé (HMAC, httpOnly). Ni wallet ni paiement, jamais.
 
 **Six rangs** — ⚜️ Vagabond → 🐾 Gardien → 🛡️ Gardien Royal → ⭐ Gardien d'Élite →
 💎 Gardien du Vault → 👑 Légende. Seuils : 0 / 500 / 2 000 / 6 000 / 15 000 / 40 000 XP.
@@ -192,9 +192,13 @@ paiement reste inerte, comme le wallet. Conforme au découpage V4 = économie MC
 
 ## Authentification
 
-Un joueur entre toujours en invité, sans rien fournir. Tant qu'il n'a pas revendiqué
-son compte, sa progression ne vit que dans le cookie d'un navigateur — et l'écran le lui
-dit en toutes lettres. Trois méthodes, dans l'ordre où elles servent réellement :
+**L'inscription est obligatoire** : pseudo, e-mail et mot de passe confirmé. Il n'existe
+aucun compte anonyme, donc le rang, la série et la collection appartiennent à une personne
+dès le premier coffre plutôt qu'au cookie d'un navigateur. À la connexion, **le pseudo ou
+l'e-mail** fonctionnent indifféremment : un joueur se souvient bien mieux du nom qu'il a
+choisi que de l'adresse qu'il a utilisée.
+
+Deux méthodes s'ajoutent ensuite, depuis le profil :
 
 **Passkey** — empreinte, Face ID ou code d'écran. Rien à retenir, et la plateforme la
 synchronise via iCloud ou Google : elle survit à la perte du téléphone. La clé privée ne
@@ -219,6 +223,12 @@ ne sera jamais nécessaire pour jouer ou conserver sa progression.
 définis, et l'interface le dit plutôt que de prétendre avoir envoyé un message. C'est
 tenable parce que passkey et codes de secours couvrent déjà « j'ai perdu l'accès » :
 l'e-mail est le confort, pas le plancher.
+
+**Compromis assumé, à surveiller :** le brief initial demandait de ne pas exiger d'e-mail
+pour jouer, et un mur d'inscription coûte toujours une part des visiteurs au premier écran.
+C'est un choix produit explicite. Tant que l'envoi d'e-mails n'est pas branché, un mot de
+passe oublié est sans retour : le profil le dit et pousse vers une passkey ou des codes de
+secours.
 
 Garde-fous vérifiés : retirer sa seule méthode d'accès est refusé · un code de secours ne
 sert qu'une fois · les tentatives sont limitées par source *et* par adresse · une adresse

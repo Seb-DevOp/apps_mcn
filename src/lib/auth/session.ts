@@ -100,25 +100,6 @@ export function normalizeHandle(input: string): string {
     .slice(0, 18);
 }
 
-/** Creates the player and their session cookie. Only callable from a route handler. */
-export async function createGuestSession(rawHandle: string, locale: string) {
-  let handle = normalizeHandle(rawHandle) || suggestHandle();
-
-  // Handles are unique; fall back to a suffix rather than rejecting the player.
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const taken = await prisma.user.findUnique({ where: { handle } });
-    if (!taken) break;
-    handle = `${normalizeHandle(rawHandle).slice(0, 13) || "Guardian"}${crypto.randomInt(100, 10000)}`;
-  }
-
-  const user = await prisma.user.create({
-    data: { handle, locale: locale === "fr" ? "fr" : "en" },
-  });
-
-  await startSessionFor(user.id);
-  return user;
-}
-
 /**
  * Issues a session cookie for an existing account.
  *

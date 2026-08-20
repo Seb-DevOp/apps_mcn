@@ -1,16 +1,17 @@
 import { z } from "zod";
 import { ok, fail, withUser, rateLimit } from "@/lib/api";
-import { setEmailAndPassword, changePassword } from "@/lib/auth/account";
+import { changeEmail, changePassword } from "@/lib/auth/account";
 
 /**
- * Attaching or changing a password on the account currently being played.
- * Signing in with one lives in /api/auth/signin, which needs no session.
+ * Changing the address or the password on the account currently being played.
+ * Both require the current password: a stolen session must not become a
+ * permanent takeover. Signing in lives in /api/auth/signin.
  */
 const Schema = z.discriminatedUnion("action", [
   z.object({
-    action: z.literal("claim"),
+    action: z.literal("email"),
+    current: z.string().min(1).max(200),
     email: z.string().min(3).max(254),
-    password: z.string().min(1).max(200),
   }),
   z.object({
     action: z.literal("change"),
@@ -27,8 +28,8 @@ export async function POST(request: Request) {
     if (!body.success) return fail("INVALID_BODY", 400);
 
     const result =
-      body.data.action === "claim"
-        ? await setEmailAndPassword(user.id, body.data.email, body.data.password)
+      body.data.action === "email"
+        ? await changeEmail(user.id, body.data.current, body.data.email)
         : await changePassword(user.id, body.data.current, body.data.next);
 
     if (!result.ok) return fail(result.error, 400);

@@ -32,6 +32,7 @@ export function AccountSecurity({ initial }: { initial: AccountStatus }) {
 
   const [email, setEmail] = useState(initial.email ?? "");
   const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
 
   useEffect(() => {
     setSupportsPasskeys(browserSupportsWebAuthn());
@@ -51,6 +52,7 @@ export function AccountSecurity({ initial }: { initial: AccountStatus }) {
       "PASSWORD_TOO_LONG",
       "PASSWORD_TOO_COMMON",
       "WRONG_PASSWORD",
+      "NO_PASSWORD",
       "LAST_METHOD",
       "RATE_LIMITED",
     ];
@@ -100,19 +102,39 @@ export function AccountSecurity({ initial }: { initial: AccountStatus }) {
     setBusy(null);
   }
 
-  async function saveEmailPassword() {
-    setBusy("password");
+  async function saveEmail() {
+    setBusy("email");
     setError(null);
+    setNotice(null);
     const data = await fetch("/api/auth/password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "claim", email, password }),
+      body: JSON.stringify({ action: "email", current: currentPassword, email }),
+    }).then((r) => r.json());
+
+    if (!data.ok) setError(explain(data.error));
+    else {
+      setNotice(t("auth.emailChanged"));
+      await refresh();
+    }
+    setBusy(null);
+  }
+
+  async function savePassword() {
+    setBusy("password");
+    setError(null);
+    setNotice(null);
+    const data = await fetch("/api/auth/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "change", current: currentPassword, next: password }),
     }).then((r) => r.json());
 
     if (!data.ok) setError(explain(data.error));
     else {
       setPassword("");
-      setNotice(t("auth.passwordSaved"));
+      setCurrentPassword("");
+      setNotice(t("auth.passwordChanged"));
       await refresh();
     }
     setBusy(null);
@@ -229,10 +251,26 @@ export function AccountSecurity({ initial }: { initial: AccountStatus }) {
         </button>
       </div>
 
-      {/* --- Email + password ---------------------------------------------- */}
+      {/* --- Email and password: both changes need the current password ----- */}
       <div className="panel mt-3 p-4">
         <p className="display text-sm text-[var(--parchment)]">{t("auth.passwordTitle")}</p>
-        <p className="dim mt-1 text-xs leading-relaxed">{t("auth.passwordBody")}</p>
+        <p className="dim mt-1 text-xs leading-relaxed">{t("auth.credentialsBody")}</p>
+
+        <p className="mt-3 rounded-lg border border-[rgba(201,162,77,0.2)] bg-[rgba(5,8,15,0.4)] px-3 py-2 text-xs text-[var(--parchment)]">
+          {status.email}
+          {status.emailVerified && <span className="ml-2 text-[#8fd8b6]">✓</span>}
+        </p>
+
+        {status.hasPassword && (
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={currentPassword}
+          onChange={(event) => setCurrentPassword(event.target.value)}
+          placeholder={t("auth.currentPasswordPlaceholder")}
+          className="mt-3 min-h-12 w-full rounded-xl border border-[rgba(201,162,77,0.28)] bg-[rgba(5,8,15,0.6)] px-4 text-[var(--parchment)] outline-none transition focus:border-[rgba(79,147,255,0.6)]"
+        />
+        )}
 
         <input
           type="email"
@@ -240,26 +278,34 @@ export function AccountSecurity({ initial }: { initial: AccountStatus }) {
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder={t("auth.emailPlaceholder")}
-          className="mt-3 min-h-12 w-full rounded-xl border border-[rgba(201,162,77,0.28)] bg-[rgba(5,8,15,0.6)] px-4 text-[var(--parchment)] outline-none transition focus:border-[rgba(79,147,255,0.6)]"
+          placeholder={t("auth.newEmailPlaceholder")}
+          className="mt-2 min-h-12 w-full rounded-xl border border-[rgba(201,162,77,0.28)] bg-[rgba(5,8,15,0.6)] px-4 text-[var(--parchment)] outline-none transition focus:border-[rgba(79,147,255,0.6)]"
         />
+        <button
+          type="button"
+          onClick={saveEmail}
+          disabled={busy === "email" || (status.hasPassword && !currentPassword) || email === status.email || email.length < 3}
+          className="btn btn-ghost mt-2 w-full !min-h-10 !text-[0.68rem]"
+        >
+          {t("auth.changeEmail")}
+        </button>
+
         <input
           type="password"
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder={t("auth.passwordPlaceholder")}
-          className="mt-2 min-h-12 w-full rounded-xl border border-[rgba(201,162,77,0.28)] bg-[rgba(5,8,15,0.6)] px-4 text-[var(--parchment)] outline-none transition focus:border-[rgba(79,147,255,0.6)]"
+          placeholder={t("auth.newPasswordPlaceholder")}
+          className="mt-3 min-h-12 w-full rounded-xl border border-[rgba(201,162,77,0.28)] bg-[rgba(5,8,15,0.6)] px-4 text-[var(--parchment)] outline-none transition focus:border-[rgba(79,147,255,0.6)]"
         />
         <p className="dim mt-1.5 text-[0.65rem]">{t("auth.passwordRule")}</p>
-
         <button
           type="button"
-          onClick={saveEmailPassword}
-          disabled={busy === "password" || email.length < 3 || password.length < 10}
-          className="btn btn-royal mt-3 w-full !min-h-11 !text-xs"
+          onClick={savePassword}
+          disabled={busy === "password" || (status.hasPassword && !currentPassword) || password.length < 10}
+          className="btn btn-royal mt-2 w-full !min-h-11 !text-xs"
         >
-          {status.hasPassword ? t("auth.passwordUpdate") : t("auth.passwordSave")}
+          {t("auth.changePassword")}
         </button>
 
         {status.email && !status.emailVerified && (

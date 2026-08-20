@@ -24,7 +24,7 @@ export function SignIn({ locale, onBack }: { locale: Locale; onBack: () => void 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
 
@@ -77,7 +77,7 @@ export function SignIn({ locale, onBack }: { locale: Locale; onBack: () => void 
     const data = await fetch("/api/auth/signin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method: "password", email, password }),
+      body: JSON.stringify({ method: "password", identifier, password }),
     }).then((r) => r.json());
 
     if (!data.ok) setError(t(data.error === "RATE_LIMITED" ? "auth.error.RATE_LIMITED" : "auth.signInFailed"));
@@ -100,12 +100,17 @@ export function SignIn({ locale, onBack }: { locale: Locale; onBack: () => void 
   }
 
   async function requestReset() {
+    // A reset can only ever go to an address, so a name is not enough here.
+    if (!identifier.includes("@")) {
+      setNotice(t("auth.resetNeedsEmail"));
+      return;
+    }
     setBusy(true);
     setError(null);
     const data = await fetch("/api/auth/email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reset-request", email }),
+      body: JSON.stringify({ action: "reset-request", email: identifier }),
     }).then((r) => r.json());
 
     setNotice(data.deliveryEnabled ? t("auth.resetSent") : t("auth.resetUnavailable"));
@@ -166,12 +171,10 @@ export function SignIn({ locale, onBack }: { locale: Locale; onBack: () => void 
         {method === "PASSWORD" && (
           <>
             <input
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder={t("auth.emailPlaceholder")}
+              autoComplete="username"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder={t("auth.identifierPlaceholder")}
               className="mt-4 min-h-12 w-full rounded-xl border border-[rgba(201,162,77,0.28)] bg-[rgba(5,8,15,0.6)] px-4 text-[var(--parchment)] outline-none focus:border-[rgba(79,147,255,0.6)]"
             />
             <input
@@ -185,7 +188,7 @@ export function SignIn({ locale, onBack }: { locale: Locale; onBack: () => void 
             <button
               type="button"
               onClick={withPassword}
-              disabled={busy || !email || !password}
+              disabled={busy || !identifier || !password}
               className="btn btn-gold mt-3 w-full"
             >
               {t("auth.signInAction")}
@@ -193,7 +196,7 @@ export function SignIn({ locale, onBack }: { locale: Locale; onBack: () => void 
             <button
               type="button"
               onClick={requestReset}
-              disabled={busy || !email}
+              disabled={busy || !identifier}
               className="mt-3 w-full text-center text-[0.68rem] text-[var(--sapphire-pale)] underline underline-offset-4"
             >
               {t("auth.forgot")}

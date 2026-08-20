@@ -1,12 +1,20 @@
 import { z } from "zod";
-import { createGuestSession, destroySession, getSessionUser } from "@/lib/auth";
+import { destroySession, getSessionUser } from "@/lib/auth";
+import { registerAccount } from "@/lib/auth/register";
 import { ok, fail, rateLimit } from "@/lib/api";
-import { track } from "@/lib/engine/rewards";
-import { ensureMissions } from "@/lib/engine/missions";
-import { grantStarterEquipment } from "@/lib/engine/loadout";
 
-const CreateSchema = z.object({
-  handle: z.string().max(40).optional().default(""),
+/**
+ * Creating an account.
+ *
+ * Registration is required to enter: name, address and password. Nothing about
+ * the account is anonymous, so a player's progress belongs to them from the first
+ * chest rather than to one browser's cookie.
+ */
+const RegisterSchema = z.object({
+  handle: z.string().min(1).max(40),
+  email: z.string().min(3).max(254),
+  password: z.string().min(1).max(200),
+  passwordConfirm: z.string().min(1).max(200),
   locale: z.enum(["en", "fr"]).optional().default("en"),
 });
 
@@ -19,16 +27,13 @@ export async function POST(request: Request) {
     return fail("RATE_LIMITED", 429);
   }
 
-  const body = CreateSchema.safeParse(await request.json().catch(() => ({})));
+  const body = RegisterSchema.safeParse(await request.json().catch(() => ({})));
   if (!body.success) return fail("INVALID_BODY", 400);
 
-  const user = await createGuestSession(body.data.handle, body.data.locale);
-  await ensureMissions(user.id, user.rankKey);
-  // A new Guardian opens the Armory to a loadout, not an empty room.
-  await grantStarterEquipment(user.id);
-  await track("player.created", user.id, { locale: user.locale });
+  const result = await registerAccount(body.data);
+  if (!result.ok) return fail("INVALID_FIELDS", 400, { errors: result.errors });
 
-  return ok({ handle: user.handle });
+  return ok({ handle: result.handle });
 }
 
 export async function DELETE() {
