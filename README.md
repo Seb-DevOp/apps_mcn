@@ -1,4 +1,4 @@
-# MCN — THE VAULT · V1 + V2.1
+# MCN — THE VAULT · V1 + V2.1 + V2.2
 
 > Quiet strength never rushes. The Vault is filling.
 
@@ -177,6 +177,14 @@ reprendre le rang qu'il vient d'accorder.
 plafond par statistique. Aucune combinaison d'équipement, de niveaux et de boosters ne
 peut dérégler l'économie ni rendre le mini-jeu trivial.
 
+**La Forge (V2.2)** — deux routes vers la même arme : les Éclats l'achètent aujourd'hui,
+les fragments la méritent avec le temps. Les recettes sont dérivées de la rareté, donc
+toute arme ajoutée au catalogue est forgeable immédiatement. Les coffres d'Élite, du
+Gardien du Vault et de Légende peuvent lâcher de l'équipement — un doublon **se démonte
+automatiquement en fragments**, jamais perdu. Démonter une pièce rend toujours strictement
+moins qu'elle n'a coûté : la Forge ne peut pas servir de blanchisserie à matériaux.
+Les probabilités de butin d'équipement sont affichées dans la même feuille que le reste.
+
 **Boutique en Éclats du Vault uniquement.** Aucun argent réel en V2 : l'abstraction de
 paiement reste inerte, comme le wallet. Conforme au découpage V4 = économie MCN.
 
@@ -290,7 +298,6 @@ Farcaster / wallet en V2-V3.
 
 Reste de la V2, dans l'ordre de dépendance :
 
-- **V2.2 Forge et doublons** — recettes, fragments → équipement, doublons convertis.
 - **V2.3 Profondeur du Vault** — chambres en salles réelles, mystères 24h/48h/7j, Clés.
 - **V2.4 Communauté et événements** — Vault communautaire, Vendredi du Vault, saisons.
 - **V2.5 Boutique et administration** — Armurerie Royale étendue, panneau d'administration.

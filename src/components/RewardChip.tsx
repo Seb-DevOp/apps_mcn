@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ITEM_BY_KEY, RARITY_STYLE, type Rarity } from "@/lib/content/items";
+import { EQUIPMENT_BY_KEY } from "@/lib/content/equipment";
 import { useI18n } from "./I18nProvider";
 import { ItemIcon, ShardIcon, XpIcon } from "./ui/Icons";
 
@@ -21,8 +22,10 @@ export interface RewardLike {
  */
 export function RewardChip({ reward, index = 0 }: { reward: RewardLike; index?: number }) {
   const { t, L } = useI18n();
-  const def = reward.itemKey ? ITEM_BY_KEY[reward.itemKey] : undefined;
-  const rarity: Rarity = reward.rarity ?? def?.rarity ?? "COMMON";
+  // Equipment lives in its own catalogue, not the inventory one.
+  const equip = reward.type === "EQUIPMENT" && reward.itemKey ? EQUIPMENT_BY_KEY[reward.itemKey] : undefined;
+  const def = !equip && reward.itemKey ? ITEM_BY_KEY[reward.itemKey] : undefined;
+  const rarity: Rarity = reward.rarity ?? equip?.rarity ?? def?.rarity ?? "COMMON";
   const style = RARITY_STYLE[rarity];
 
   const label =
@@ -30,9 +33,11 @@ export function RewardChip({ reward, index = 0 }: { reward: RewardLike; index?: 
       ? t("reward.xp")
       : reward.type === "SHARD"
         ? t("reward.shard")
-        : def
-          ? L(def.nameEn, def.nameFr)
-          : t("reward.item");
+        : equip
+          ? L(equip.nameEn, equip.nameFr)
+          : def
+            ? L(def.nameEn, def.nameFr)
+            : t("reward.item");
 
   return (
     <motion.div
@@ -55,7 +60,7 @@ export function RewardChip({ reward, index = 0 }: { reward: RewardLike; index?: 
         ) : reward.type === "SHARD" ? (
           <ShardIcon size={20} />
         ) : (
-          <ItemIcon icon={def?.icon ?? "crystal"} size={20} />
+          <ItemIcon icon={equip?.icon ?? def?.icon ?? "crystal"} size={20} />
         )}
       </span>
 

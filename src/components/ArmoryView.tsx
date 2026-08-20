@@ -111,13 +111,7 @@ export function ArmoryView({ initial }: { initial: ArmoryState }) {
   const detail = open ? byKey.get(open) : null;
 
   return (
-    <main className="pt-5">
-      <header className="text-center">
-        <p className="eyebrow">{t("app.subtitle")}</p>
-        <h1 className="display gold-text mt-0.5 text-2xl">{t("armory.title")}</h1>
-        <p className="dim mt-1 text-xs italic">{t("armory.subtitle")}</p>
-      </header>
-
+    <>
       {/* --- Loadout ------------------------------------------------------- */}
       <section className="panel panel-gilded mt-4 p-4">
         <div className="flex items-center justify-between">
@@ -226,7 +220,7 @@ export function ArmoryView({ initial }: { initial: ArmoryState }) {
           />
         )}
       </AnimatePresence>
-    </main>
+    </>
   );
 }
 

@@ -4,6 +4,8 @@ import { dayKey } from "@/lib/time";
 import { rankForXp, RANK_BY_KEY, RANKS } from "@/lib/content/ranks";
 import { RANK_BADGE, ITEM_BY_KEY, type Rarity } from "@/lib/content/items";
 import { getEquippedStats } from "./loadout";
+import { EQUIPMENT_BY_KEY } from "@/lib/content/equipment";
+import { duplicateYield } from "@/lib/content/forge";
 
 /**
  * RewardService — the single place where a player's balance can change.
@@ -18,7 +20,15 @@ import { getEquippedStats } from "./loadout";
 
 const RANKS_BY_ORDER = RANKS.slice().sort((a, b) => a.order - b.order);
 
-export type RewardType = "XP" | "SHARD" | "ITEM" | "BOOST" | "COSMETIC" | "BADGE" | "MCN";
+export type RewardType =
+  | "XP"
+  | "SHARD"
+  | "ITEM"
+  | "BOOST"
+  | "COSMETIC"
+  | "BADGE"
+  | "EQUIPMENT"
+  | "MCN";
 
 export interface Reward {
   type: RewardType;
@@ -140,6 +150,39 @@ export async function applyRewards(
       const amount = Math.round(reward.qty * shardMultiplier);
       shardsGained += amount;
       granted.push({ ...reward, qty: amount });
+      continue;
+    }
+
+    // Equipment is not an inventory row: it is an owned instance with a level.
+    // A second copy is never wasted — it comes apart into the fragments it was
+    // made of, which is what keeps collecting worthwhile after the set is full.
+    if (reward.type === "EQUIPMENT") {
+      const equip = EQUIPMENT_BY_KEY[reward.itemKey ?? ""];
+      if (!equip) continue;
+
+      const alreadyOwned = await tx.userEquipment.findUnique({
+        where: { userId_defKey: { userId, defKey: equip.key } },
+      });
+
+      if (!alreadyOwned) {
+        await tx.userEquipment.create({ data: { userId, defKey: equip.key } });
+        granted.push({ ...reward, rarity: equip.rarity });
+        continue;
+      }
+
+      for (const line of duplicateYield(equip)) {
+        await tx.inventoryItem.upsert({
+          where: { userId_itemKey: { userId, itemKey: line.itemKey } },
+          create: { userId, itemKey: line.itemKey, quantity: line.quantity },
+          update: { quantity: { increment: line.quantity } },
+        });
+        granted.push({
+          type: "ITEM",
+          itemKey: line.itemKey,
+          qty: line.quantity,
+          rarity: ITEM_BY_KEY[line.itemKey]?.rarity,
+        });
+      }
       continue;
     }
 

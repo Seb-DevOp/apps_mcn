@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import { CHEST_BY_KEY } from "@/lib/content/chests";
 import { ITEM_BY_KEY, RARITY_STYLE, type Rarity } from "@/lib/content/items";
+import { EQUIPMENT_BY_KEY } from "@/lib/content/equipment";
+import { CHEST_EQUIPMENT_DROPS, EQUIPMENT_DROP_DENOMINATOR } from "@/lib/content/forge";
 import { useI18n } from "./I18nProvider";
 
 /**
@@ -20,6 +22,7 @@ export function ChestOdds({ chestKey, onClose }: { chestKey: string; onClose: ()
   const guaranteed = chest.entries.filter((e) => e.guaranteed);
   const pool = chest.entries.filter((e) => !e.guaranteed && e.weight > 0);
   const totalWeight = pool.reduce((sum, e) => sum + e.weight, 0);
+  const equipmentTable = CHEST_EQUIPMENT_DROPS[chestKey] ?? [];
 
   function labelFor(itemKey: string | undefined, rewardType: string) {
     if (rewardType === "XP") return t("reward.xp");
@@ -74,6 +77,39 @@ export function ChestOdds({ chestKey, onClose }: { chestKey: string; onClose: ()
             />
           ))}
         </ul>
+
+        {/* Equipment sits outside the weighted pool, so it gets its own honest line. */}
+        {equipmentTable.length > 0 && (
+          <>
+            <p className="eyebrow mt-5">{t("chest.equipmentTitle")}</p>
+            <p className="mt-1 text-xs text-[var(--sapphire-pale)]">
+              {t("chest.equipmentChance", {
+                percent: (
+                  (equipmentTable.reduce((sum, e) => sum + e.weight, 0) /
+                    EQUIPMENT_DROP_DENOMINATOR) *
+                  100
+                ).toFixed(1),
+              })}
+            </p>
+            <ul className="mt-2 space-y-2">
+              {equipmentTable.map((entry) => {
+                const def = EQUIPMENT_BY_KEY[entry.defKey];
+                if (!def) return null;
+                return (
+                  <OddsRow
+                    key={entry.defKey}
+                    label={L(def.nameEn, def.nameFr)}
+                    range="1"
+                    chance={t("chest.chance", {
+                      percent: ((entry.weight / EQUIPMENT_DROP_DENOMINATOR) * 100).toFixed(1),
+                    })}
+                    rarity={def.rarity}
+                  />
+                );
+              })}
+            </ul>
+          </>
+        )}
 
         <button type="button" onClick={onClose} className="btn btn-ghost mt-5 w-full">
           {t("common.close")}

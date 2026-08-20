@@ -4,6 +4,8 @@ import { randomInt, weightedPick } from "@/lib/rng";
 import { RANK_BY_KEY } from "@/lib/content/ranks";
 import { CHEST_BY_KEY, streakCycleDay, type ChestDef } from "@/lib/content/chests";
 import { ITEM_BY_KEY, type Rarity } from "@/lib/content/items";
+import { EQUIPMENT_BY_KEY } from "@/lib/content/equipment";
+import { CHEST_EQUIPMENT_DROPS, EQUIPMENT_DROP_DENOMINATOR } from "@/lib/content/forge";
 import { applyRewards, type Reward } from "./rewards";
 import { progressMissions, progressFromRewards } from "./missions";
 import { touchStreak, type StreakUpdate } from "./streak";
@@ -70,12 +72,37 @@ function rollChest(chest: ChestDef, bonusDraws: number, xpMultiplier: number): R
     });
   }
 
+  // 3. The rare chance that the Vault itself hands over a weapon.
+  const equipment = rollEquipment(chest.key);
+  if (equipment) rewards.push(equipment);
+
   // Safety net: if a pool were ever misconfigured, still hand out XP.
   if (rewards.length === 0) {
     rewards.push({ type: "XP", qty: Math.max(10, Math.round(20 * xpMultiplier)), rarity: "COMMON" });
   }
 
   return mergeRewards(rewards);
+}
+
+/**
+ * Equipment drops from the three highest chests only. A duplicate is handled
+ * downstream by the reward engine, which breaks it into fragments.
+ */
+function rollEquipment(chestKey: string): Reward | null {
+  const table = CHEST_EQUIPMENT_DROPS[chestKey];
+  if (!table || table.length === 0) return null;
+
+  const roll = randomInt(0, EQUIPMENT_DROP_DENOMINATOR - 1);
+  let cursor = 0;
+  for (const entry of table) {
+    cursor += entry.weight;
+    if (roll < cursor) {
+      const def = EQUIPMENT_BY_KEY[entry.defKey];
+      if (!def) return null;
+      return { type: "EQUIPMENT", itemKey: def.key, qty: 1, rarity: def.rarity };
+    }
+  }
+  return null;
 }
 
 /** Two draws of the same thing read better as one line: "Sapphire Shard ×3". */
