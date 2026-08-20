@@ -15,6 +15,14 @@ export async function POST() {
     }
     // The seed is public by necessity — the client has to render the pattern.
     // It is useless on its own: the server re-derives and re-scores the same run.
-    return ok({ sessionId: result.sessionId, seed: result.seed, targets: result.targets });
+    // The modifiers are sent so the run *looks* like it plays; the server reads
+    // the worn equipment again at submission and never trusts these values back.
+    return ok({
+      sessionId: result.sessionId,
+      seed: result.seed,
+      targets: result.targets,
+      modifiers: result.modifiers,
+      ability: result.ability ?? null,
+    });
   });
 }

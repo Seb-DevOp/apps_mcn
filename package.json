@@ -4,6 +4,8 @@
   "description": "",
   "scripts": {
     "dev": "next dev",
+    "dev:db": "node scripts/dev-db.mjs start",
+    "dev:db:stop": "node scripts/dev-db.mjs stop",
     "build": "node scripts/with-db-env.mjs prisma generate && node scripts/with-db-env.mjs prisma migrate deploy && node scripts/with-db-env.mjs tsx prisma/seed.ts && next build",
     "start": "next start",
     "lint": "next lint",
@@ -40,8 +42,10 @@
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "embedded-postgres": "^18.4.0-beta.17",
     "postcss": "^8.5.26",
     "prisma": "^6.19.3",
+    "puppeteer-core": "^25.8.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
     "typescript": "^5.9.3"

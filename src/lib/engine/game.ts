@@ -8,10 +8,12 @@ import {
   DEFAULT_TARGETS,
   HIT_WINDOW_MS,
   type SubmittedHit,
+  type RunModifiers,
 } from "@/lib/game/pattern";
 import { applyRewards, track, type Reward } from "./rewards";
 import { progressMissions, progressFromRewards } from "./missions";
 import { touchStreak } from "./streak";
+import { getEquippedStats, getEquippedAbility } from "./loadout";
 
 /**
  * Mini-game sessions.
@@ -49,6 +51,9 @@ export interface StartResult {
   seed?: string;
   targets?: number;
   retryAfterSeconds?: number;
+  /** Mirrors what the server will apply, so the run looks like it plays. */
+  modifiers?: { precisionMs: number; comboGuard: number; scoreBonus: number };
+  ability?: { key: string; nameEn: string; nameFr: string; durationMs: number } | null;
 }
 
 export async function startRun(userId: string): Promise<StartResult> {
@@ -73,7 +78,30 @@ export async function startRun(userId: string): Promise<StartResult> {
     },
   });
 
-  return { ok: true, sessionId: session.id, seed, targets: DEFAULT_TARGETS };
+  const [gear, ability] = await Promise.all([
+    getEquippedStats(prisma, userId),
+    getEquippedAbility(userId),
+  ]);
+
+  return {
+    ok: true,
+    sessionId: session.id,
+    seed,
+    targets: DEFAULT_TARGETS,
+    modifiers: {
+      precisionMs: gear.precisionMs,
+      comboGuard: gear.comboGuard,
+      scoreBonus: gear.scoreBonus,
+    },
+    ability: ability
+      ? {
+          key: ability.key,
+          nameEn: ability.nameEn,
+          nameFr: ability.nameFr,
+          durationMs: ability.durationMs,
+        }
+      : null,
+  };
 }
 
 export interface SubmitResult {
@@ -101,6 +129,7 @@ export async function submitRun(
   hits: SubmittedHit[],
   clientDurationMs: number,
   strays = 0,
+  abilityAtMs: number | null = null,
 ): Promise<SubmitResult> {
   const session = await prisma.gameSession.findFirst({ where: { id: sessionId, userId } });
   if (!session) return { ok: false, error: "NOT_FOUND" };
@@ -147,13 +176,36 @@ export async function submitRun(
     clean.push({ i, dt });
   }
 
-  const raw = scoreRun(pattern, clean);
+  // Modifiers come from the equipment actually worn, read now, server-side.
+  // The client's only say is *when* it triggered its ability.
+  const gear = await getEquippedStats(prisma, userId);
+  const equippedAbility = await getEquippedAbility(userId);
+
+  const modifiers: RunModifiers = {
+    precisionMs: gear.precisionMs,
+    comboGuard: gear.comboGuard,
+    scoreBonus: gear.scoreBonus,
+  };
+  if (
+    equippedAbility &&
+    typeof abilityAtMs === "number" &&
+    abilityAtMs >= 0 &&
+    abilityAtMs <= pattern.durationMs
+  ) {
+    modifiers.ability = {
+      atMs: abilityAtMs,
+      durationMs: equippedAbility.durationMs,
+      effect: equippedAbility.effect,
+    };
+  }
+
+  const raw = scoreRun(pattern, clean, modifiers);
   // Stray taps cost points: the run should reward timing, not tapping speed.
   const strayPenalty = Math.min(raw.score, Math.max(0, Math.round(strays)) * 25);
   const breakdown = { ...raw, score: raw.score - strayPenalty };
 
   // Impossible scores are refused outright; merely excellent ones are kept and flagged.
-  if (breakdown.score > theoreticalMax(pattern)) {
+  if (breakdown.score > theoreticalMax(pattern, modifiers)) {
     await prisma.gameSession.update({
       where: { id: session.id },
       data: { status: "REJECTED", invalidReason: "IMPOSSIBLE_SCORE" },

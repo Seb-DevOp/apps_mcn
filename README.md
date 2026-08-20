@@ -1,4 +1,4 @@
-# MCN — THE VAULT · V1
+# MCN — THE VAULT · V1 + V2.1
 
 > Quiet strength never rushes. The Vault is filling.
 
@@ -16,20 +16,27 @@ intégrée progressivement. Le staking est une mécanique ; **le jeu est le prod
 
 ## Démarrage
 
-Il faut une base PostgreSQL. En local, le plus simple est une **branche de développement
-Neon** (neon.tech → votre projet → *Branches* → *New branch*) : elle est instantanée et
-isolée de la production.
+Il faut une base PostgreSQL. Le dépôt en embarque une : `npm run dev:db` démarre un
+PostgreSQL portable (téléchargé au premier lancement, hors du projet pour qu'aucun dossier
+synchronisé n'y touche). Aucun Docker, aucune installation système, aucun accès à Neon
+partagé.
 
 ```bash
 npm install
-cp .env.example .env    # puis renseignez DATABASE_URL, DATABASE_URL_UNPOOLED, SESSION_SECRET
+npm run dev:db          # démarre la base locale et affiche sa DATABASE_URL
+cp .env.example .env    # renseignez DATABASE_URL, DATABASE_URL_UNPOOLED, SESSION_SECRET
 npm run setup           # client Prisma + migrations + contenu
 npm run dev             # http://localhost:3000
 ```
 
+Une **branche de développement Neon** (neon.tech → votre projet → *Branches* → *New
+branch*) fait aussi l'affaire si vous préférez travailler contre la même infrastructure
+qu'en production.
+
 | Script | Rôle |
 | --- | --- |
 | `npm run dev` | serveur de développement |
+| `npm run dev:db` / `dev:db:stop` | PostgreSQL portable local |
 | `npm run build` / `npm start` | build et exécution en production |
 | `npm run setup` | generate + migrate deploy + seed |
 | `npm run db:migrate` | crée une migration après modification du schéma |
@@ -39,6 +46,10 @@ npm run dev             # http://localhost:3000
 
 `SEED_DEMO="true"` ajoute 12 Gardiens de démonstration pour remplir le classement.
 C'est **opt-in** : la production démarre avec de vrais joueurs uniquement.
+
+`puppeteer-core` est une dépendance de développement : il pilote le navigateur déjà
+installé sur la machine pour prendre des captures des écrans et vérifier le rendu réel.
+Il n'entre jamais dans le build.
 
 Toutes les commandes Prisma passent par [scripts/with-db-env.mjs](scripts/with-db-env.mjs),
 qui normalise les noms de variables de connexion (chaque hébergeur les nomme
@@ -131,6 +142,43 @@ et en base.
 
 **PWA** — manifest, icônes, service worker (cache des illustrations uniquement — jamais
 l'état de jeu), installable sur iOS et Android.
+
+---
+
+## Ce que contient la V2.1 — l'épine dorsale équipement
+
+**33 pièces d'équipement** : 21 armes réparties sur les quatre classes du brief
+(Sceptres, Arcs, Épées, Épées Magiques) plus armures, capes, reliques et accessoires.
+Cinq emplacements, six raretés, cinq niveaux par pièce.
+
+**Une règle de conception appliquée sans exception : chaque statistique fait réellement
+quelque chose.** MCN n'a pas de combat — « Puissance », « Défense » et « Stabilité »
+seraient de la décoration, alors que le brief exige qu'une arme soit utile et qu'aucune
+progression ne soit factice. Les quatre classes tirent donc leur identité d'effets réels :
+
+| Classe | Identité | Effets |
+| --- | --- | --- |
+| Sceptres | progression | +XP, +Éclats |
+| Arcs | adresse | fenêtre de timing élargie, +score |
+| Épées | régularité | absorbe les notes manquées, +score |
+| Épées Magiques | économie | +Éclats, tirages de coffre supplémentaires |
+
+Les statistiques de combat arriveront le jour où un mini-jeu de combat existera.
+
+**Capacités actives** — une activation par session, au moment choisi par le joueur.
+Le client dit *quand*, le serveur rejoue la même fenêtre sur le même motif : le bonus ne
+peut être ni réclamé deux fois ni étiré.
+
+**Améliorations** — Éclats + matériaux, jamais d'XP. Le rang dérive de l'XP total :
+dépenser de l'XP rétrograderait le joueur, et un système de progression ne doit jamais
+reprendre le rang qu'il vient d'accorder.
+
+**Plafonds** — un plafond global (×2,5) sur les multiplicateurs de récompense, plus un
+plafond par statistique. Aucune combinaison d'équipement, de niveaux et de boosters ne
+peut dérégler l'économie ni rendre le mini-jeu trivial.
+
+**Boutique en Éclats du Vault uniquement.** Aucun argent réel en V2 : l'abstraction de
+paiement reste inerte, comme le wallet. Conforme au découpage V4 = économie MCN.
 
 ---
 
@@ -240,7 +288,14 @@ Farcaster / wallet en V2-V3.
 
 ## Prévu pour la suite
 
-Le schéma et les abstractions accueillent déjà la V2 sans migration destructive :
+Reste de la V2, dans l'ordre de dépendance :
+
+- **V2.2 Forge et doublons** — recettes, fragments → équipement, doublons convertis.
+- **V2.3 Profondeur du Vault** — chambres en salles réelles, mystères 24h/48h/7j, Clés.
+- **V2.4 Communauté et événements** — Vault communautaire, Vendredi du Vault, saisons.
+- **V2.5 Boutique et administration** — Armurerie Royale étendue, panneau d'administration.
+
+Le schéma accueille déjà tout cela sans migration destructive :
 
 - `ItemDef` porte un `metaJson` libre → équipements, statistiques d'armes, futurs NFT.
 - Les fragments (`frag-*`) et matériaux se collectionnent déjà → la Forge a sa matière.

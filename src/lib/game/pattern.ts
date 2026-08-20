@@ -77,12 +77,38 @@ export function buildPattern(seed: string, targetCount: number = DEFAULT_TARGETS
 
 export type HitTier = "PERFECT" | "GREAT" | "GOOD" | "MISS";
 
-export function tierFor(deltaMs: number): HitTier {
+/**
+ * Equipment widens the timing window. `precisionMs` is added to every tier, so a
+ * well-geared player is genuinely easier on the thumb rather than just richer.
+ */
+export function tierFor(deltaMs: number, precisionMs = 0): HitTier {
   const d = Math.abs(deltaMs);
-  if (d <= PERFECT_MS) return "PERFECT";
-  if (d <= GREAT_MS) return "GREAT";
-  if (d <= HIT_WINDOW_MS) return "GOOD";
+  if (d <= PERFECT_MS + precisionMs) return "PERFECT";
+  if (d <= GREAT_MS + precisionMs) return "GREAT";
+  if (d <= HIT_WINDOW_MS + precisionMs) return "GOOD";
   return "MISS";
+}
+
+/**
+ * What the player's gear contributes to a run.
+ *
+ * The server recomputes these from the equipped items — never from anything the
+ * client sends — and replays the ability over the same window, so a run cannot be
+ * inflated by claiming bonuses that were not worn.
+ */
+export interface RunModifiers {
+  /** Added to every timing tier. */
+  precisionMs?: number;
+  /** Missed notes absorbed before the combo breaks. */
+  comboGuard?: number;
+  /** Multiplies the final score. */
+  scoreBonus?: number;
+  /** One activation per run, at a moment the player chooses. */
+  ability?: {
+    atMs: number;
+    durationMs: number;
+    effect: { precisionMs?: number; comboGuard?: number; scoreBonus?: number };
+  };
 }
 
 export interface SubmittedHit {
@@ -106,24 +132,45 @@ export interface ScoreBreakdown {
  * Authoritative scoring. Given the pattern and the taps, this is the only
  * function that decides what a run was worth — it runs on the server.
  */
-export function scoreRun(pattern: Pattern, hits: SubmittedHit[]): ScoreBreakdown {
+export function scoreRun(
+  pattern: Pattern,
+  hits: SubmittedHit[],
+  modifiers: RunModifiers = {},
+): ScoreBreakdown {
   const byIndex = new Map<number, number>();
   for (const hit of hits) {
     // A target can only be tapped once; a duplicate index is ignored, not stacked.
     if (!byIndex.has(hit.i)) byIndex.set(hit.i, hit.dt);
   }
 
+  const ability = modifiers.ability;
+  const abilityCovers = (atMs: number) =>
+    ability !== undefined && atMs >= ability.atMs && atMs <= ability.atMs + ability.durationMs;
+
   let score = 0;
   let combo = 0;
   let bestCombo = 0;
+  let guardsLeft = modifiers.comboGuard ?? 0;
   const counts = { perfect: 0, great: 0, good: 0, missed: 0 };
 
   for (const target of pattern.targets) {
+    const boosted = abilityCovers(target.at);
+    const precision =
+      (modifiers.precisionMs ?? 0) + (boosted ? (ability!.effect.precisionMs ?? 0) : 0);
+
     const dt = byIndex.get(target.i);
-    const tier = dt === undefined ? "MISS" : tierFor(dt);
+    const tier = dt === undefined ? "MISS" : tierFor(dt, precision);
 
     if (tier === "MISS") {
-      combo = 0;
+      // Sword-class gear absorbs a miss instead of letting it break the chain.
+      const guarded = boosted && (ability!.effect.comboGuard ?? 0) > 0;
+      if (guarded) {
+        // held by the ability — costs nothing
+      } else if (guardsLeft > 0) {
+        guardsLeft -= 1;
+      } else {
+        combo = 0;
+      }
       counts.missed += 1;
       continue;
     }
@@ -135,13 +182,16 @@ export function scoreRun(pattern: Pattern, hits: SubmittedHit[]): ScoreBreakdown
       tier === "PERFECT" ? POINTS.perfect : tier === "GREAT" ? POINTS.great : POINTS.good;
     const comboMultiplier = Math.min(1 + combo * 0.02, 2);
     const kindMultiplier = target.kind === "GOLD" ? 2 : 1;
+    const abilityMultiplier = boosted ? 1 + (ability!.effect.scoreBonus ?? 0) : 1;
 
-    score += base * comboMultiplier * kindMultiplier;
+    score += base * comboMultiplier * kindMultiplier * abilityMultiplier;
 
     if (tier === "PERFECT") counts.perfect += 1;
     else if (tier === "GREAT") counts.great += 1;
     else counts.good += 1;
   }
+
+  score *= 1 + (modifiers.scoreBonus ?? 0);
 
   const landed = counts.perfect + counts.great + counts.good;
   return {
@@ -152,13 +202,27 @@ export function scoreRun(pattern: Pattern, hits: SubmittedHit[]): ScoreBreakdown
   };
 }
 
-/** Ceiling for a flawless run — used to reject impossible submissions outright. */
-export function theoreticalMax(pattern: Pattern): number {
+/**
+ * Ceiling for a flawless run — used to reject impossible submissions outright.
+ * It has to include the player's gear, otherwise a legitimately equipped run
+ * would be thrown away as a forgery.
+ */
+export function theoreticalMax(pattern: Pattern, modifiers: RunModifiers = {}): number {
+  const ability = modifiers.ability;
   let score = 0;
   let combo = 0;
   for (const target of pattern.targets) {
     combo += 1;
-    score += POINTS.perfect * Math.min(1 + combo * 0.02, 2) * (target.kind === "GOLD" ? 2 : 1);
+    const covered =
+      ability !== undefined &&
+      target.at >= ability.atMs &&
+      target.at <= ability.atMs + ability.durationMs;
+    const abilityMultiplier = covered ? 1 + (ability!.effect.scoreBonus ?? 0) : 1;
+    score +=
+      POINTS.perfect *
+      Math.min(1 + combo * 0.02, 2) *
+      (target.kind === "GOLD" ? 2 : 1) *
+      abilityMultiplier;
   }
-  return Math.round(score);
+  return Math.round(score * (1 + (modifiers.scoreBonus ?? 0)));
 }

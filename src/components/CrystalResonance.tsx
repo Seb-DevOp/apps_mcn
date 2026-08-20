@@ -13,6 +13,7 @@ import {
   type Pattern,
   type HitTier,
 } from "@/lib/game/pattern";
+import { ABILITIES, type AbilityKey } from "@/lib/content/equipment";
 import { useI18n } from "./I18nProvider";
 import { RankUpOverlay } from "./RankUpOverlay";
 import { XpIcon, ShardIcon } from "./ui/Icons";
@@ -34,6 +35,19 @@ import { XpIcon, ShardIcon } from "./ui/Icons";
 
 const APPROACH_MS = 1150;
 
+interface GearModifiers {
+  precisionMs: number;
+  comboGuard: number;
+  scoreBonus: number;
+}
+
+interface RunAbility {
+  key: string;
+  nameEn: string;
+  nameFr: string;
+  durationMs: number;
+}
+
 interface RunState {
   pattern: Pattern;
   startedAt: number;
@@ -43,6 +57,13 @@ interface RunState {
   bestCombo: number;
   score: number;
   effects: { lane: number; born: number; tier: HitTier }[];
+  /** Read from the equipment the server says is worn — never chosen here. */
+  modifiers: GearModifiers;
+  guardsLeft: number;
+  /** Targets whose window has closed, already counted as missed. */
+  resolved: Set<number>;
+  abilityAtMs: number | null;
+  abilityKey: AbilityKey | null;
 }
 
 type Phase = "intro" | "running" | "submitting" | "results" | "error";
@@ -63,7 +84,7 @@ interface Results {
 }
 
 export function CrystalResonance({ bestScore }: { bestScore: number }) {
-  const { t } = useI18n();
+  const { t, L } = useI18n();
   const router = useRouter();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -76,6 +97,8 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
   const [results, setResults] = useState<Results | null>(null);
   const [rankUp, setRankUp] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string>("common.error");
+  const [ability, setAbility] = useState<RunAbility | null>(null);
+  const [abilityState, setAbilityState] = useState<"READY" | "ACTIVE" | "SPENT">("READY");
 
   // --- Submission ---------------------------------------------------------
 
@@ -95,6 +118,7 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
           sessionId,
           hits,
           strays: run.strays,
+          abilityAtMs: run.abilityAtMs === null ? null : Math.round(run.abilityAtMs),
           durationMs: Math.round(performance.now() - run.startedAt),
         }),
       });
@@ -115,6 +139,33 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
       setPhase("error");
     }
   }, [router]);
+
+  /**
+   * The ability's effect at this instant, or null. Uses the same table the server
+   * replays with, so what the player sees is what will be scored.
+   */
+  const abilityEffectAt = useCallback((run: RunState, nowMs: number) => {
+    if (run.abilityAtMs === null || !run.abilityKey) return null;
+    const def = ABILITIES[run.abilityKey];
+    if (nowMs < run.abilityAtMs || nowMs > run.abilityAtMs + def.durationMs) return null;
+    return def.effect;
+  }, []);
+
+  /** Timing window at this instant, including gear and any running ability. */
+  const precisionAt = useCallback(
+    (run: RunState, nowMs: number) =>
+      run.modifiers.precisionMs + (abilityEffectAt(run, nowMs)?.precisionMs ?? 0),
+    [abilityEffectAt],
+  );
+
+  const triggerAbility = useCallback(() => {
+    const run = runRef.current;
+    if (!run || !run.abilityKey || run.abilityAtMs !== null) return;
+    run.abilityAtMs = performance.now() - run.startedAt;
+    setAbilityState("ACTIVE");
+    if (navigator.vibrate) navigator.vibrate(24);
+    setTimeout(() => setAbilityState("SPENT"), ABILITIES[run.abilityKey].durationMs);
+  }, []);
 
   // --- Draw loop ----------------------------------------------------------
 
@@ -153,11 +204,33 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
       drawCrystal(ctx, x, crystalY, 17, "rgba(120,160,225,0.5)", "rgba(20,32,64,0.85)");
     }
 
+    const precision = precisionAt(run, now);
+
+    // Targets whose window has closed. Resolving them here is what keeps the live
+    // combo honest — a note you let pass should break the chain on screen, not
+    // only in the server's recount.
+    let comboBroken = false;
+    for (const target of run.pattern.targets) {
+      if (run.resolved.has(target.i) || run.hits.has(target.i)) continue;
+      if (now <= target.at + HIT_WINDOW_MS + precision) continue;
+      run.resolved.add(target.i);
+      const guardedByAbility = (abilityEffectAt(run, now)?.comboGuard ?? 0) > 0;
+      if (guardedByAbility) {
+        // held by the ability
+      } else if (run.guardsLeft > 0) {
+        run.guardsLeft -= 1;
+      } else if (run.combo !== 0) {
+        run.combo = 0;
+        comboBroken = true;
+      }
+    }
+    if (comboBroken) setHud({ score: run.score, combo: 0, tier: "MISS" });
+
     // Approaching targets.
     for (const target of run.pattern.targets) {
       if (run.hits.has(target.i)) continue;
       const delta = target.at - now;
-      if (delta > APPROACH_MS || delta < -HIT_WINDOW_MS) continue;
+      if (delta > APPROACH_MS || delta < -(HIT_WINDOW_MS + precision)) continue;
 
       const x = laneWidth * target.lane + laneWidth / 2;
       const progress = 1 - Math.max(0, delta) / APPROACH_MS;
@@ -212,7 +285,7 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
       return;
     }
     frameRef.current = requestAnimationFrame(draw);
-  }, [submit]);
+  }, [submit, precisionAt, abilityEffectAt]);
 
   // --- Input --------------------------------------------------------------
 
@@ -220,13 +293,14 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
     const run = runRef.current;
     if (!run) return;
     const now = performance.now() - run.startedAt;
+    const precision = precisionAt(run, now);
 
     // Closest untouched target in this lane, within the hit window.
     let chosen: { i: number; dt: number } | null = null;
     for (const target of run.pattern.targets) {
       if (target.lane !== lane || run.hits.has(target.i)) continue;
       const dt = now - target.at;
-      if (Math.abs(dt) > HIT_WINDOW_MS) continue;
+      if (Math.abs(dt) > HIT_WINDOW_MS + precision) continue;
       if (!chosen || Math.abs(dt) < Math.abs(chosen.dt)) chosen = { i: target.i, dt };
     }
 
@@ -239,7 +313,7 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
       return;
     }
 
-    const tier = tierFor(chosen.dt);
+    const tier = tierFor(chosen.dt, precision);
     run.hits.set(chosen.i, chosen.dt);
     run.combo += 1;
     run.bestCombo = Math.max(run.bestCombo, run.combo);
@@ -247,7 +321,10 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
     const target = run.pattern.targets[chosen.i];
     const base = tier === "PERFECT" ? POINTS.perfect : tier === "GREAT" ? POINTS.great : POINTS.good;
     run.score += Math.round(
-      base * Math.min(1 + run.combo * 0.02, 2) * (target.kind === "GOLD" ? 2 : 1),
+      base *
+        Math.min(1 + run.combo * 0.02, 2) *
+        (target.kind === "GOLD" ? 2 : 1) *
+        (1 + run.modifiers.scoreBonus + (abilityEffectAt(run, now)?.scoreBonus ?? 0)),
     );
     run.effects.push({ lane, born: now, tier });
     setHud({ score: run.score, combo: run.combo, tier });
@@ -298,6 +375,11 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
       }
 
       sessionRef.current = data.sessionId;
+      const modifiers: GearModifiers = data.modifiers ?? {
+        precisionMs: 0,
+        comboGuard: 0,
+        scoreBonus: 0,
+      };
       runRef.current = {
         pattern: buildPattern(data.seed, data.targets),
         startedAt: performance.now(),
@@ -307,7 +389,14 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
         bestCombo: 0,
         score: 0,
         effects: [],
+        modifiers,
+        guardsLeft: modifiers.comboGuard,
+        resolved: new Set<number>(),
+        abilityAtMs: null,
+        abilityKey: (data.ability?.key as AbilityKey) ?? null,
       };
+      setAbility(data.ability ?? null);
+      setAbilityState("READY");
       setPhase("running");
       frameRef.current = requestAnimationFrame(draw);
     } catch {
@@ -373,6 +462,38 @@ export function CrystalResonance({ bestScore }: { bestScore: number }) {
               </motion.p>
             )}
           </AnimatePresence>
+
+          {/* Weapon ability — one activation per run, spent when the player chooses. */}
+          {phase === "running" && ability && (
+            <button
+              type="button"
+              onClick={triggerAbility}
+              disabled={abilityState !== "READY"}
+              className="absolute inset-x-4 bottom-3 min-h-11 rounded-xl border text-xs uppercase tracking-[0.14em] transition disabled:opacity-60"
+              style={{
+                fontFamily: "var(--font-display)",
+                borderColor:
+                  abilityState === "ACTIVE"
+                    ? "rgba(240,208,137,0.85)"
+                    : "rgba(79,147,255,0.45)",
+                background:
+                  abilityState === "ACTIVE"
+                    ? "rgba(201,162,77,0.22)"
+                    : abilityState === "SPENT"
+                      ? "rgba(5,8,15,0.5)"
+                      : "rgba(79,147,255,0.16)",
+                color:
+                  abilityState === "ACTIVE" ? "var(--gold-bright)" : "var(--sapphire-pale)",
+              }}
+            >
+              {L(ability.nameEn, ability.nameFr)} ·{" "}
+              {abilityState === "READY"
+                ? t("game.abilityReady")
+                : abilityState === "ACTIVE"
+                  ? t("game.abilityActive")
+                  : t("game.abilityUsed")}
+            </button>
+          )}
 
           {/* Intro / error curtain */}
           {(phase === "intro" || phase === "error" || phase === "submitting") && !results && (

@@ -3,6 +3,7 @@ import { createGuestSession, destroySession, getSessionUser } from "@/lib/auth";
 import { ok, fail, rateLimit } from "@/lib/api";
 import { track } from "@/lib/engine/rewards";
 import { ensureMissions } from "@/lib/engine/missions";
+import { grantStarterEquipment } from "@/lib/engine/loadout";
 
 const CreateSchema = z.object({
   handle: z.string().max(40).optional().default(""),
@@ -23,6 +24,8 @@ export async function POST(request: Request) {
 
   const user = await createGuestSession(body.data.handle, body.data.locale);
   await ensureMissions(user.id, user.rankKey);
+  // A new Guardian opens the Armory to a loadout, not an empty room.
+  await grantStarterEquipment(user.id);
   await track("player.created", user.id, { locale: user.locale });
 
   return ok({ handle: user.handle });

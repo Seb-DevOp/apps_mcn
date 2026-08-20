@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./I18nProvider";
-import { VaultIcon, PlayIcon, MissionsIcon, ExploreIcon, ProfileIcon } from "./ui/Icons";
+import { VaultIcon, PlayIcon, MissionsIcon, ArmoryIcon, ProfileIcon } from "./ui/Icons";
 
 /**
  * Five destinations, thumb-height, always reachable.
@@ -13,7 +13,9 @@ const ITEMS = [
   { href: "/vault", labelKey: "nav.vault", Icon: VaultIcon },
   { href: "/play", labelKey: "nav.play", Icon: PlayIcon },
   { href: "/missions", labelKey: "nav.missions", Icon: MissionsIcon },
-  { href: "/explore", labelKey: "nav.explore", Icon: ExploreIcon },
+  // The Vault itself is reached from the hub; the Armory earns a permanent slot
+  // in V2 because it is somewhere a player goes most days.
+  { href: "/armory", labelKey: "nav.armory", Icon: ArmoryIcon },
   { href: "/profile", labelKey: "nav.profile", Icon: ProfileIcon },
 ];
 

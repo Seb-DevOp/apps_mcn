@@ -7,6 +7,8 @@ const SubmitSchema = z.object({
   durationMs: z.number().int().min(0).max(3_600_000),
   /** Taps into empty lanes. Reported by the client and penalised server-side. */
   strays: z.number().int().min(0).max(2000).optional().default(0),
+  /** When the weapon ability was triggered, in ms from the start of the run. */
+  abilityAtMs: z.number().int().min(0).max(600000).nullable().optional().default(null),
   hits: z
     .array(
       z.object({
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
       body.data.hits,
       body.data.durationMs,
       body.data.strays,
+      body.data.abilityAtMs ?? null,
     );
     if (!result.ok) return fail(result.error ?? "FAILED", 409);
     return ok(result);

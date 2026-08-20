@@ -69,6 +69,18 @@ export function ExploreIcon({ size = 22, className }: IconProps) {
   );
 }
 
+export function ArmoryIcon({ size = 22, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* a blade resting on its pedestal */}
+      <path d="M12 2.5 14 6v8h-4V6l2-3.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M8.5 14h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M12 14v4" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M6.5 21h11l-1.5-3h-8L6.5 21Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function ProfileIcon({ size = 22, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>

@@ -8,6 +8,7 @@ import { whisperForDay, CHAMBERS, LORE } from "@/lib/content/vault";
 import { ITEM_BY_KEY } from "@/lib/content/items";
 import { ensureMissions, MISSIONS_PER_PERIOD } from "./missions";
 import { chestStatus } from "./chest";
+import { EQUIPMENT_BY_KEY, statsAtLevel, sumStats, capStats } from "@/lib/content/equipment";
 
 /**
  * One assembled snapshot of everything the Vault hub needs.
@@ -36,7 +37,7 @@ export async function getPlayerState(user: User) {
     orderBy: { createdAt: "asc" },
   } as const;
 
-  const [chest, foundMissions, bestScore, chestsOpened] = await Promise.all([
+  const [chest, foundMissions, bestScore, chestsOpened, worn] = await Promise.all([
     chestStatus(user.id),
     prisma.userMission.findMany(missionQuery),
     prisma.scoreEntry.aggregate({
@@ -44,6 +45,7 @@ export async function getPlayerState(user: User) {
       _max: { score: true },
     }),
     prisma.chestOpening.count({ where: { userId: user.id } }),
+    prisma.userEquipment.findMany({ where: { userId: user.id, equippedSlot: { not: null } } }),
   ]);
 
   // Assigning missions is a seven-statement transaction. It only needs to happen
@@ -130,6 +132,22 @@ export async function getPlayerState(user: User) {
       loreFound,
       loreTotal: LORE.length,
       isVaultFriday: isVaultFriday(),
+    },
+    loadout: {
+      count: worn.length,
+      weapon: (() => {
+        const row = worn.find((w) => w.equippedSlot === "WEAPON");
+        const def = row ? EQUIPMENT_BY_KEY[row.defKey] : undefined;
+        return def ? { nameEn: def.nameEn, nameFr: def.nameFr, icon: def.icon, rarity: def.rarity, level: row!.level } : null;
+      })(),
+      stats: capStats(
+        sumStats(
+          worn.flatMap((row) => {
+            const def = EQUIPMENT_BY_KEY[row.defKey];
+            return def ? [statsAtLevel(def, row.level)] : [];
+          }),
+        ),
+      ),
     },
     stats: {
       bestScore: bestScore._max.score ?? 0,

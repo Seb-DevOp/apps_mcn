@@ -10,3 +10,6 @@ prisma/dev.db*
 .DS_Store
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# portable dev database
+.devdb/

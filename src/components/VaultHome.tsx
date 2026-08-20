@@ -4,11 +4,36 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import type { PlayerState } from "@/lib/engine/state";
 import { RANK_BY_KEY } from "@/lib/content/ranks";
+import { RARITY_STYLE } from "@/lib/content/items";
+import type { EquipStats } from "@/lib/content/equipment";
 import { useI18n } from "./I18nProvider";
 import { RankPortrait, XpProgress } from "./RankVisuals";
 import { DailyChest } from "./DailyChest";
 import { StreakStrip } from "./StreakStrip";
-import { McnCrest, ShardIcon, XpIcon, TrophyIcon, PlayIcon, ExploreIcon } from "./ui/Icons";
+import {
+  McnCrest,
+  ShardIcon,
+  XpIcon,
+  TrophyIcon,
+  PlayIcon,
+  ExploreIcon,
+  ItemIcon,
+} from "./ui/Icons";
+
+const ACTIVE_STATS: (keyof EquipStats)[] = [
+  "xpBonus",
+  "shardBonus",
+  "scoreBonus",
+  "precisionMs",
+  "comboGuard",
+  "chestFortune",
+];
+
+function formatBonus(key: keyof EquipStats, value: number): string {
+  if (key === "precisionMs") return `+${Math.round(value)}ms`;
+  if (key === "comboGuard" || key === "chestFortune") return `+${Math.round(value)}`;
+  return `+${Math.round(value * 100)}%`;
+}
 
 /**
  * The hub.
@@ -133,6 +158,41 @@ export function VaultHome({ state }: { state: PlayerState }) {
               {t("home.playCta")}
             </span>
             <span className="dim block text-xs">{t("home.playSub")}</span>
+          </span>
+          <span className="text-[var(--gold)]">›</span>
+        </section>
+      </Link>
+
+      {/* --- Loadout: what you are carrying, and what it is doing for you ---- */}
+      <Link href="/armory" className="mt-3 block">
+        <section className="panel flex items-center gap-3 p-4">
+          <span
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border"
+            style={{
+              borderColor: state.loadout.weapon
+                ? `${RARITY_STYLE[state.loadout.weapon.rarity].color}66`
+                : "rgba(201,162,77,0.2)",
+              color: state.loadout.weapon
+                ? RARITY_STYLE[state.loadout.weapon.rarity].color
+                : "var(--text-dim)",
+              background: "rgba(5,8,15,0.5)",
+            }}
+          >
+            <ItemIcon icon={state.loadout.weapon?.icon ?? "sword"} size={22} />
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="eyebrow block">{t("home.loadoutCta")}</span>
+            <span className="display block truncate text-sm text-[var(--parchment)]">
+              {state.loadout.weapon
+                ? L(state.loadout.weapon.nameEn, state.loadout.weapon.nameFr)
+                : t("armory.emptySlot")}
+            </span>
+            <span className="dim block text-[0.68rem]">
+              {ACTIVE_STATS.filter((key) => (state.loadout.stats[key] ?? 0) !== 0)
+                .map((key) => `${t(`stat.${key}`)} ${formatBonus(key, state.loadout.stats[key])}`)
+                .join(" · ") || t("armory.noBonuses")}
+            </span>
           </span>
           <span className="text-[var(--gold)]">›</span>
         </section>

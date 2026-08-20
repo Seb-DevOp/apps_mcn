@@ -13,6 +13,17 @@
  */
 
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+
+// Prisma loads .env itself, but this wrapper runs before it and has to resolve the
+// connection variables first. Hosted environments have no .env file — hence the guard.
+if (existsSync(".env")) {
+  try {
+    process.loadEnvFile(".env");
+  } catch {
+    // Malformed or unreadable .env: fall through to the real environment.
+  }
+}
 
 /** Pooled connection — what the running application uses. */
 const POOLED = ["DATABASE_URL", "POSTGRES_PRISMA_URL", "POSTGRES_URL"];

@@ -14,6 +14,7 @@ import { RANKS } from "../src/lib/content/ranks";
 import { CHESTS } from "../src/lib/content/chests";
 import { ITEMS } from "../src/lib/content/items";
 import { DAILY_MISSIONS, WEEKLY_MISSIONS } from "../src/lib/content/missions";
+import { EQUIPMENT } from "../src/lib/content/equipment";
 
 const prisma = new PrismaClient();
 
@@ -96,6 +97,32 @@ async function seedChests() {
     entries += chest.entries.length;
   }
   console.log(`  chests: ${CHESTS.length} (${entries} reward entries)`);
+}
+
+async function seedEquipment() {
+  for (const item of EQUIPMENT) {
+    const data = {
+      slot: item.slot,
+      weaponClass: item.weaponClass ?? null,
+      rarity: item.rarity,
+      nameEn: item.nameEn,
+      nameFr: item.nameFr,
+      descEn: item.descEn,
+      descFr: item.descFr,
+      icon: item.icon,
+      baseStatsJson: JSON.stringify(item.base),
+      maxLevel: item.maxLevel,
+      shardPrice: item.shardPrice,
+      requiredRankOrder: item.requiredRankOrder,
+      abilityKey: item.ability ?? null,
+    };
+    await prisma.equipmentDef.upsert({
+      where: { key: item.key },
+      create: { key: item.key, ...data },
+      update: data,
+    });
+  }
+  console.log(`  equipment: ${EQUIPMENT.length}`);
 }
 
 async function seedMissions() {
@@ -195,14 +222,44 @@ async function seedDemoGuardians() {
   if (created > 0) console.log(`  demo guardians: ${created}`);
 }
 
+/**
+ * Players who joined before V2 have no equipment, because the starter gear is
+ * granted at sign-up. Without this they would open the Armory to an empty
+ * loadout while a brand-new account starts with one — so they get it too.
+ * Idempotent: anyone who already owns a piece is skipped.
+ */
+async function backfillStarterEquipment() {
+  const { EQUIPMENT_BY_KEY, STARTER_EQUIPMENT } = await import("../src/lib/content/equipment");
+  const withoutGear = await prisma.user.findMany({
+    where: { equipment: { none: {} } },
+    select: { id: true },
+  });
+  if (withoutGear.length === 0) return;
+
+  for (const user of withoutGear) {
+    for (const defKey of STARTER_EQUIPMENT) {
+      const def = EQUIPMENT_BY_KEY[defKey];
+      if (!def) continue;
+      await prisma.userEquipment.upsert({
+        where: { userId_defKey: { userId: user.id, defKey } },
+        create: { userId: user.id, defKey, equippedSlot: def.slot },
+        update: {},
+      });
+    }
+  }
+  console.log(`  starter gear backfilled: ${withoutGear.length} player(s)`);
+}
+
 async function main() {
   console.log("Seeding MCN — THE VAULT");
   await seedRanks();
   await seedItems();
   await seedChests();
+  await seedEquipment();
   await seedMissions();
   await seedConfig();
   await seedDemoGuardians();
+  await backfillStarterEquipment();
   console.log("Done. The Vault is filling.");
 }
 

@@ -56,6 +56,7 @@ model User {
   activity      DailyActivity[]
   boosts        UserBoost[]
   grants        RewardGrant[]
+  equipment     UserEquipment[]
 
   @@index([xp])
   @@index([currentStreak])
@@ -144,6 +145,49 @@ model MissionDef {
   minRankOrder Int     @default(0)
   weight       Int     @default(100)
   active       Boolean @default(true)
+}
+
+// ---------------------------------------------------------------------------
+// EQUIPMENT (V2)
+// ---------------------------------------------------------------------------
+
+model EquipmentDef {
+  key               String  @id
+  slot              String // WEAPON | ARMOR | RELIC | CLOAK | ACCESSORY
+  weaponClass       String? // SCEPTER | BOW | SWORD | MAGIC_SWORD
+  rarity            String
+  nameEn            String
+  nameFr            String
+  descEn            String
+  descFr            String
+  icon              String
+  // Level-1 statistics; the level curve lives in code and is applied on read.
+  baseStatsJson     String
+  maxLevel          Int     @default(5)
+  shardPrice        Int
+  requiredRankOrder Int     @default(0)
+  abilityKey        String?
+
+  owned UserEquipment[]
+}
+
+model UserEquipment {
+  id           String   @id @default(cuid())
+  userId       String
+  defKey       String
+  level        Int      @default(1)
+  // null means owned but not worn. Postgres treats NULLs as distinct, so the
+  // unique index below allows many unequipped items and exactly one per slot.
+  equippedSlot String?
+  acquiredAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  def  EquipmentDef @relation(fields: [defKey], references: [key], onDelete: Cascade)
+
+  @@unique([userId, defKey])
+  @@unique([userId, equippedSlot])
+  @@index([userId])
 }
 
 model AppConfig {

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { dayKey } from "@/lib/time";
 import { rankForXp, RANK_BY_KEY, RANKS } from "@/lib/content/ranks";
 import { RANK_BADGE, ITEM_BY_KEY, type Rarity } from "@/lib/content/items";
+import { getEquippedStats } from "./loadout";
 
 /**
  * RewardService — the single place where a player's balance can change.
@@ -45,18 +46,36 @@ export function mcnRewardsEnabled(): boolean {
   return process.env.MCN_TOKEN_REWARDS_ENABLED === "true";
 }
 
-/** Active multiplier for a stat, from the player's running boosts. Capped to stay sane. */
-export async function activeMultiplier(
+/**
+ * Hard ceiling on how much anything can multiply a reward.
+ *
+ * Boosters and equipment stack, but never without limit: a geared player with two
+ * boosters running is meaningfully faster, not exponentially richer. This one
+ * number is what keeps the economy from drifting as V2 adds more gear.
+ */
+const MAX_REWARD_MULTIPLIER = 2.5;
+
+/**
+ * Reward multipliers for XP and Shards, from temporary boosts *and* worn
+ * equipment. Both are read from the database — nothing the client says can raise
+ * them — and both are gathered in one pass to keep the hot path short.
+ */
+export async function rewardMultipliers(
   tx: Prisma.TransactionClient,
   userId: string,
-  statKey: "XP" | "SHARD" | "SCORE",
-): Promise<number> {
-  const boosts = await tx.userBoost.findMany({
-    where: { userId, statKey, expiresAt: { gt: new Date() } },
-  });
-  if (boosts.length === 0) return 1;
-  const combined = boosts.reduce((m, b) => m * b.multiplier, 1);
-  return Math.min(combined, 2.5);
+): Promise<{ xp: number; shard: number }> {
+  const [boosts, gear] = await Promise.all([
+    tx.userBoost.findMany({ where: { userId, expiresAt: { gt: new Date() } } }),
+    getEquippedStats(tx, userId),
+  ]);
+
+  const boostFor = (statKey: "XP" | "SHARD") =>
+    boosts.filter((b) => b.statKey === statKey).reduce((m, b) => m * b.multiplier, 1);
+
+  return {
+    xp: Math.min(boostFor("XP") * (1 + gear.xpBonus), MAX_REWARD_MULTIPLIER),
+    shard: Math.min(boostFor("SHARD") * (1 + gear.shardBonus), MAX_REWARD_MULTIPLIER),
+  };
 }
 
 interface ApplyOptions {
@@ -81,8 +100,11 @@ export async function applyRewards(
 ): Promise<ApplyResult> {
   const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
 
-  const xpMultiplier = options.applyBoosts ? await activeMultiplier(tx, userId, "XP") : 1;
-  const shardMultiplier = options.applyBoosts ? await activeMultiplier(tx, userId, "SHARD") : 1;
+  const multipliers = options.applyBoosts
+    ? await rewardMultipliers(tx, userId)
+    : { xp: 1, shard: 1 };
+  const xpMultiplier = multipliers.xp;
+  const shardMultiplier = multipliers.shard;
 
   const granted: Reward[] = [];
   let xpGained = 0;
@@ -214,13 +236,5 @@ function rankUpGiftFor(order: number): Reward[] {
   return rewards;
 }
 
-/** Fire-and-forget analytics. Never blocks or fails a gameplay action. */
-export async function track(name: string, userId: string | null, props: Record<string, unknown> = {}) {
-  try {
-    await prisma.analyticsEvent.create({
-      data: { userId, name, propsJson: JSON.stringify(props) },
-    });
-  } catch {
-    // Analytics must never break a player's session.
-  }
-}
+// Analytics lives in ./analytics so the loadout engine can use it too.
+export { track } from "./analytics";

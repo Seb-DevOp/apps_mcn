@@ -7,6 +7,7 @@ import { ITEM_BY_KEY, type Rarity } from "@/lib/content/items";
 import { applyRewards, type Reward } from "./rewards";
 import { progressMissions, progressFromRewards } from "./missions";
 import { touchStreak, type StreakUpdate } from "./streak";
+import { getEquippedStats } from "./loadout";
 
 /**
  * The Daily Chest.
@@ -106,6 +107,9 @@ export async function openDailyChest(userId: string): Promise<ChestResult> {
       const chest = CHEST_BY_KEY[rank.chestTypeKey];
       const cycle = streakCycleDay(streak.currentStreak);
 
+      // Relics and magic swords buy extra draws from the same transparent pool.
+      const gear = await getEquippedStats(tx, userId);
+
       // Claim the day before rolling: the unique constraint is the lock.
       await tx.chestOpening.create({
         data: {
@@ -117,7 +121,7 @@ export async function openDailyChest(userId: string): Promise<ChestResult> {
         },
       });
 
-      const rolled = rollChest(chest, cycle.bonusDraws, cycle.xpMultiplier);
+      const rolled = rollChest(chest, cycle.bonusDraws + gear.chestFortune, cycle.xpMultiplier);
 
       // First chest ever earns a badge — a small, permanent memory of day one.
       const chestCount = await tx.chestOpening.count({ where: { userId } });
