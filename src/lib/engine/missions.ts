@@ -16,6 +16,9 @@ import { applyRewards, type Reward } from "./rewards";
 const DAILY_SLOTS = 4;
 const WEEKLY_SLOTS = 3;
 
+/** How many missions a fully-assigned player holds for the current day + week. */
+export const MISSIONS_PER_PERIOD = DAILY_SLOTS + WEEKLY_SLOTS;
+
 /**
  * Mission selection is deterministic per player per period.
  *

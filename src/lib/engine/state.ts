@@ -6,7 +6,7 @@ import { CHEST_BY_KEY, streakCycleDay, STREAK_CYCLE } from "@/lib/content/chests
 import { MISSION_BY_KEY } from "@/lib/content/missions";
 import { whisperForDay, CHAMBERS, LORE } from "@/lib/content/vault";
 import { ITEM_BY_KEY } from "@/lib/content/items";
-import { ensureMissions } from "./missions";
+import { ensureMissions, MISSIONS_PER_PERIOD } from "./missions";
 import { chestStatus } from "./chest";
 
 /**
@@ -30,20 +30,30 @@ export interface MissionView {
 }
 
 export async function getPlayerState(user: User) {
-  await ensureMissions(user.id, user.rankKey);
+  const periods = [dayKey(), weekKey()];
+  const missionQuery = {
+    where: { userId: user.id, periodKey: { in: periods } },
+    orderBy: { createdAt: "asc" },
+  } as const;
 
-  const [chest, missions, bestScore, chestsOpened] = await Promise.all([
+  const [chest, foundMissions, bestScore, chestsOpened] = await Promise.all([
     chestStatus(user.id),
-    prisma.userMission.findMany({
-      where: { userId: user.id, periodKey: { in: [dayKey(), weekKey()] } },
-      orderBy: { createdAt: "asc" },
-    }),
+    prisma.userMission.findMany(missionQuery),
     prisma.scoreEntry.aggregate({
       where: { userId: user.id, gameKey: "crystal-resonance" },
       _max: { score: true },
     }),
     prisma.chestOpening.count({ where: { userId: user.id } }),
   ]);
+
+  // Assigning missions is a seven-statement transaction. It only needs to happen
+  // on the first visit of a new day or week — running it on every page view cost
+  // seconds of round trips on a hosted database for no change at all.
+  let missions = foundMissions;
+  if (missions.length < MISSIONS_PER_PERIOD) {
+    await ensureMissions(user.id, user.rankKey);
+    missions = await prisma.userMission.findMany(missionQuery);
+  }
 
   const progress = rankProgress(user.xp);
   const rank = RANK_BY_KEY[user.rankKey] ?? progress.current;
