@@ -236,6 +236,31 @@ inconnue et une adresse connue reçoivent exactement la même réponse.
 
 ---
 
+## Rétention des données
+
+Trois tables grossissent à chaque action et ne valent plus rien après quelques mois :
+les événements analytics bruts, les sessions de jeu terminées et le grand livre d'XP.
+Laissées seules, ce sont elles qui remplissent une base — pas les joueurs.
+
+Une purge tourne chaque nuit à 4 h via Vercel Cron (`/api/cron/purge`, protégée par
+`CRON_SECRET` — sans ce secret la route refuse tout, y compris Vercel elle-même). Elle est
+aussi lançable à la main : `npm run db:purge`.
+
+| Table | Conservation |
+| --- | --- |
+| `AnalyticsEvent` | 90 jours |
+| `GameSession` | 90 jours |
+| `XpLedger` | 180 jours |
+| `ScoreEntry` | 8 semaines **+ le meilleur score de chaque joueur, quel que soit son âge** |
+| `Session` · `AuthChallenge` · `EmailToken` | supprimées dès expiration |
+
+**La règle qui gouverne tout :** une purge ne doit jamais changer un nombre qu'un joueur
+peut voir. Sont donc intouchés `ChestOpening` (coffres ouverts), `DailyActivity` (jours
+actifs et courbes de rétention), `User`, l'inventaire et l'équipement. Le test vérifie
+explicitement qu'un meilleur score vieux de 300 jours survit à la purge.
+
+---
+
 ## Architecture serveur
 
 Tout ce qui touche à la progression est **autoritaire côté serveur**. Le client ne peut

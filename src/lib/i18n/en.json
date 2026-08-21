@@ -322,5 +322,12 @@
   "auth.error.HANDLE_TOO_LONG": "At most 18 characters.",
   "auth.error.HANDLE_TAKEN": "That name is already taken in the Kingdom.",
   "auth.error.PASSWORD_MISMATCH": "The two passwords do not match.",
-  "auth.error.NO_PASSWORD": "This account has no password yet."
+  "auth.error.NO_PASSWORD": "This account has no password yet.",
+  "install.title": "Keep the Vault on your home screen",
+  "install.bodyAndroid": "Install it like an app: its own icon, full screen, no browser bar. Nothing to download from a store.",
+  "install.bodyIos": "Add it to your home screen and it opens like an app — its own icon, full screen, no browser bar.",
+  "install.iosStep1": "Tap the Share button at the bottom of Safari.",
+  "install.iosStep2": "Choose \"Add to Home Screen\".",
+  "install.action": "Install",
+  "install.later": "Not now"
 }

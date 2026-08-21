@@ -322,5 +322,12 @@
   "auth.error.HANDLE_TOO_LONG": "18 caractères maximum.",
   "auth.error.HANDLE_TAKEN": "Ce pseudo est déjà pris dans le Royaume.",
   "auth.error.PASSWORD_MISMATCH": "Les deux mots de passe ne correspondent pas.",
-  "auth.error.NO_PASSWORD": "Ce compte n'a pas encore de mot de passe."
+  "auth.error.NO_PASSWORD": "Ce compte n'a pas encore de mot de passe.",
+  "install.title": "Gardez le Vault sur votre écran d'accueil",
+  "install.bodyAndroid": "Installez-le comme une application : sa propre icône, plein écran, sans barre de navigateur. Rien à télécharger depuis un store.",
+  "install.bodyIos": "Ajoutez-le à votre écran d'accueil et il s'ouvre comme une application — sa propre icône, plein écran, sans barre de navigateur.",
+  "install.iosStep1": "Touchez le bouton Partager, en bas de Safari.",
+  "install.iosStep2": "Choisissez « Sur l'écran d'accueil ».",
+  "install.action": "Installer",
+  "install.later": "Plus tard"
 }

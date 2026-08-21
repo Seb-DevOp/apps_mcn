@@ -9,6 +9,7 @@ import type { EquipStats } from "@/lib/content/equipment";
 import { useI18n } from "./I18nProvider";
 import { RankPortrait, XpProgress } from "./RankVisuals";
 import { DailyChest } from "./DailyChest";
+import { InstallPrompt } from "./InstallPrompt";
 import { StreakStrip } from "./StreakStrip";
 import {
   McnCrest,
@@ -246,6 +247,8 @@ export function VaultHome({ state }: { state: PlayerState }) {
           </span>
         </Link>
       </div>
+
+      <InstallPrompt />
 
       <p className="eyebrow mt-6 text-center">{t("app.oriaWatching")}</p>
     </main>
