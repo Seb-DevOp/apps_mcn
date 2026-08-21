@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "network.mainecoon.vault",
+      "sha256_cert_fingerprints": [
+        "A8:CB:AC:17:CD:A3:BE:BD:8C:D1:4B:79:14:01:55:B9:A9:2B:F2:FE:47:3E:34:67:44:A9:2C:35:A1:9B:65:82"
+      ]
+    }
+  }
+]
