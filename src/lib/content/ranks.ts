@@ -5,9 +5,9 @@
  * do not swap one rank's art onto another, and never let a lower rank read as
  * more prestigious than a higher one.
  *
- * `elite-guardian` artwork has not been delivered yet — `artPath` is null and
- * the UI falls back to a crest placeholder. Drop the file at
- * /public/ranks/elite-guardian.png and set artPath below to finish it.
+ * All six are delivered. If a future rank ever arrives without art, leave its
+ * `artPath` null: the UI falls back to a crest placeholder rather than borrowing
+ * another rank's portrait, which would break the hierarchy above.
  */
 
 export type RankKey =
@@ -90,7 +90,7 @@ export const RANKS: RankDef[] = [
     nameEn: "Elite Guardian",
     nameFr: "Gardien d'Élite",
     minXp: 6000,
-    artPath: null, // artwork pending
+    artPath: "/ranks/elite-guardian.png",
     accentColor: "#3b73e8",
     taglineEn: "Few are trusted this far.",
     taglineFr: "Peu reçoivent une telle confiance.",
