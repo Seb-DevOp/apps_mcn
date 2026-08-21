@@ -29,6 +29,8 @@
   },
   "homepage": "https://github.com/Seb-DevOp/apps_mcn#readme",
   "dependencies": {
+    "@farcaster/miniapp-sdk": "^0.3.0",
+    "@farcaster/quick-auth": "^0.0.8",
     "@prisma/client": "^6.19.3",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
@@ -53,5 +55,10 @@
     "tsx": "^4.23.12",
     "typescript": "^5.9.3"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "@farcaster/quick-auth": {
+      "typescript": "$typescript"
+    }
+  }
 }

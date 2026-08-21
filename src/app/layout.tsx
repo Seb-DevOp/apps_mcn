@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { MiniAppReady } from "@/components/MiniAppReady";
 
 export const metadata: Metadata = {
   title: "MCN — The Vault",
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="vault-grain" aria-hidden />
         {children}
         <ServiceWorker />
+        <MiniAppReady />
       </body>
     </html>
   );

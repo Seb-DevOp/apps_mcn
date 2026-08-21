@@ -329,5 +329,8 @@
   "install.iosStep1": "Touchez le bouton Partager, en bas de Safari.",
   "install.iosStep2": "Choisissez « Sur l'écran d'accueil ».",
   "install.action": "Installer",
-  "install.later": "Plus tard"
+  "install.later": "Plus tard",
+  "farcaster.signingIn": "Reconnaissance en cours…",
+  "farcaster.failed": "La connexion Farcaster n a pas fonctionné. Vous pouvez créer un compte ci-dessous.",
+  "auth.providerLinked": "Lié"
 }

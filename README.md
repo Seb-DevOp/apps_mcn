@@ -1,4 +1,4 @@
-# MCN — THE VAULT · V1 + V2.1 + V2.2 + comptes
+# MCN — THE VAULT · V1 + V2.1 + V2.2 + comptes + Mini App Farcaster
 
 > Quiet strength never rushes. The Vault is filling.
 
@@ -233,6 +233,45 @@ secours.
 Garde-fous vérifiés : retirer sa seule méthode d'accès est refusé · un code de secours ne
 sert qu'une fois · les tentatives sont limitées par source *et* par adresse · une adresse
 inconnue et une adresse connue reçoivent exactement la même réponse.
+
+---
+
+## Mini App Farcaster
+
+L'application tourne telle quelle dans un client Farcaster. Trois pièces :
+
+**Le manifeste** — `/.well-known/farcaster.json`, servi par une route plutôt qu'un
+fichier statique : la preuve de propriété du domaine est une signature produite par le
+compte propriétaire, et elle a sa place dans les variables d'environnement, pas dans le
+dépôt. Sans elle le manifeste reste valide et l'app fonctionne ; elle ne peut simplement
+pas être publiée. L'en-tête `x-mcn-manifest-signed` dit dans quel état on se trouve.
+
+**La carte de partage** — balise `fc:miniapp` sur la page d'entrée (plus `fc:frame`,
+l'ancien nom, pour les clients qui n'ont pas suivi). Un lien partagé dans un cast devient
+une carte lançable, avec l'image 3:2 de `public/share/embed.png`.
+
+**L'authentification** — un joueur qui ouvre la Mini App est déjà identifié : son FID
+crée un compte réel et persistant, sans formulaire. C'est un choix assumé face à
+l'inscription obligatoire du web : imposer pseudo + e-mail + mot de passe à quelqu'un que
+Farcaster a déjà authentifié détruirait le seul avantage du canal. Ces joueurs peuvent
+ajouter une adresse et un mot de passe plus tard depuis leur profil.
+
+**Seul le jeton est digne de confiance.** `sdk.context.user` est transmis par le client
+et la documentation Farcaster précise qu'il peut ne pas avoir été autorisé par
+l'utilisateur : le pseudo qu'il contient ne sert qu'à proposer un nom d'affichage. Le FID
+sur lequel le serveur agit vient du JWT vérifié par `@farcaster/quick-auth`, et de rien
+d'autre.
+
+Variables à définir dans Vercel pour activer le canal :
+
+| Nom | Rôle |
+| --- | --- |
+| `FARCASTER_AUTH_ENABLED` | `true` pour ouvrir la connexion par FID |
+| `FARCASTER_HEADER` · `FARCASTER_PAYLOAD` · `FARCASTER_SIGNATURE` | la signature de propriété du domaine |
+| `APP_ORIGIN` | domaine définitif — sert aussi de domaine de vérification du jeton |
+
+Tant que `FARCASTER_AUTH_ENABLED` vaut `false`, la route refuse tout en 503 et
+l'application se comporte exactement comme sur le web.
 
 ---
 

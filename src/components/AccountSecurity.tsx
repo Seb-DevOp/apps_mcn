@@ -256,10 +256,12 @@ export function AccountSecurity({ initial }: { initial: AccountStatus }) {
         <p className="display text-sm text-[var(--parchment)]">{t("auth.passwordTitle")}</p>
         <p className="dim mt-1 text-xs leading-relaxed">{t("auth.credentialsBody")}</p>
 
-        <p className="mt-3 rounded-lg border border-[rgba(201,162,77,0.2)] bg-[rgba(5,8,15,0.4)] px-3 py-2 text-xs text-[var(--parchment)]">
-          {status.email}
-          {status.emailVerified && <span className="ml-2 text-[#8fd8b6]">✓</span>}
-        </p>
+        {status.email && (
+          <p className="mt-3 rounded-lg border border-[rgba(201,162,77,0.2)] bg-[rgba(5,8,15,0.4)] px-3 py-2 text-xs text-[var(--parchment)]">
+            {status.email}
+            {status.emailVerified && <span className="ml-2 text-[#8fd8b6]">✓</span>}
+          </p>
+        )}
 
         {status.hasPassword && (
         <input
@@ -336,7 +338,11 @@ export function AccountSecurity({ initial }: { initial: AccountStatus }) {
                 {t(`auth.provider.${provider.provider}`)}
               </span>
               <span className="text-[0.6rem] uppercase tracking-[0.14em] text-[var(--text-dim)]">
-                {provider.enabled ? t("auth.providerOn") : t("common.soon")}
+                {status.identities.find((row) => row.provider === provider.provider)
+                  ? t("auth.providerLinked")
+                  : provider.enabled
+                    ? t("auth.providerOn")
+                    : t("common.soon")}
               </span>
             </li>
           ))}

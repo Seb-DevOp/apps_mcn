@@ -329,5 +329,8 @@
   "install.iosStep1": "Tap the Share button at the bottom of Safari.",
   "install.iosStep2": "Choose \"Add to Home Screen\".",
   "install.action": "Install",
-  "install.later": "Not now"
+  "install.later": "Not now",
+  "farcaster.signingIn": "Recognising you…",
+  "farcaster.failed": "Farcaster sign-in did not work. You can still create an account below.",
+  "auth.providerLinked": "Linked"
 }

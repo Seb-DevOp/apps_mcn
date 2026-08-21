@@ -49,7 +49,10 @@ export type LinkResult =
  * Proof of ownership, whatever the provider.
  *
  * V3 fills these in:
- *   FARCASTER — verify a Sign-In With Farcaster message against the claimed fid.
+ *   FARCASTER — signing in is already live and lives in ./farcaster, which
+ *               verifies a Quick Auth token. This path stays shut: it is for
+ *               attaching an identity to an account that is already signed in,
+ *               which needs its own proof and has no caller yet.
  *   WALLET    — recover the signer from `proof` over a server-issued nonce and
  *               require it to equal `externalId`.
  *

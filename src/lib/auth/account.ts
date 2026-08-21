@@ -172,7 +172,11 @@ export async function getAccountStatus(userId: string) {
   // no codes and no email delivery, the answer is nothing — and that is worth
   // saying out loud.
   const canRecover =
-    passkeys.length > 0 || codesLeft > 0 || (Boolean(user.email) && emailEnabled());
+    passkeys.length > 0 ||
+    codesLeft > 0 ||
+    // A linked Farcaster identity is a way back in on any device.
+    identities.length > 0 ||
+    (Boolean(user.email) && emailEnabled());
 
   return {
     claimed: Boolean(user.claimedAt),
