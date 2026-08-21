@@ -13,3 +13,6 @@ tsconfig.tsbuildinfo
 
 # portable dev database
 .devdb/
+
+# built Android artefacts and the test signing key — never in git
+/dist
