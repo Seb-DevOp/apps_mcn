@@ -101,6 +101,12 @@ model IdleProfile {
   highestLevel Int   @default(1)
   /// Health left on the enemy currently being fought.
   enemyHp      Float @default(0)
+  /// Health left on the cat. Zero means "never fought yet" and is read as full,
+  /// which is also how rows written before combat existed are carried over.
+  hp           Float @default(0)
+  /// Seconds still owed to picking itself up after a defeat.
+  recoverFor   Float @default(0)
+  defeats      Int   @default(0)
 
   /// Doubles rather than integers: idle currencies outgrow a 32-bit column
   /// within hours, and 15 significant digits is far more than this needs.
@@ -131,6 +137,7 @@ model IdleItem {
   shape  String
 
   power     Float
+  vitality  Float @default(0)
   goldBonus Float @default(0)
 
   /// Null when owned but not worn. Postgres treats NULLs as distinct, so the

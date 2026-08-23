@@ -11,9 +11,14 @@ import {
   itemStats,
   shapeFor,
   rarityWeights,
+  floorStart,
   BASE_DROP_CHANCE,
   OFFLINE_CAP_SECONDS,
   MIN_KILL_SECONDS,
+  BASE_MAX_HP,
+  BASE_REGEN_SHARE,
+  MAX_REGEN_SHARE,
+  RECOVERY_SECONDS,
   type Slot,
   type Rarity,
 } from "@/lib/content/idle";
@@ -30,8 +35,14 @@ import { track } from "./analytics";
  * unforgeable clock, and no background jobs to keep alive on a serverless host.
  */
 
-/** A tick resolves at most this many kills. Reached only in absurd cases. */
-const MAX_KILLS_PER_TICK = 3000;
+/**
+ * A tick resolves at most this many steps — a fight or a recovery each.
+ *
+ * Generous on purpose: a cat that keeps dying spends two steps per attempt, so a
+ * tight cap would silently stop simulating a long absence part-way through. The
+ * loop body is a handful of multiplications, so the guard costs nothing.
+ */
+const MAX_STEPS_PER_TICK = 25_000;
 /** And keeps at most this many drops, so one long absence cannot flood the table. */
 const MAX_DROPS_PER_TICK = 25;
 
@@ -52,10 +63,15 @@ export interface Upgrades {
   fervour: number;
   instinct: number;
   fortune: number;
+  hide: number;
+  mending: number;
 }
 
 export interface DerivedStats {
   power: number;
+  maxHp: number;
+  /** Health returned per second. Also the reason weak enemies stop mattering. */
+  regen: number;
   goldMultiplier: number;
   dropChance: number;
   passiveGoldPerSecond: number;
@@ -64,12 +80,20 @@ export interface DerivedStats {
 interface ItemRow {
   slot: string;
   power: number;
+  vitality: number;
   goldBonus: number;
   equippedSlot: string | null;
 }
 
 export function parseUpgrades(json: string): Upgrades {
-  const base: Upgrades = { claws: 0, fervour: 0, instinct: 0, fortune: 0 };
+  const base: Upgrades = {
+    claws: 0,
+    fervour: 0,
+    instinct: 0,
+    fortune: 0,
+    hide: 0,
+    mending: 0,
+  };
   try {
     const parsed = JSON.parse(json) as Partial<Upgrades>;
     for (const key of Object.keys(base) as (keyof Upgrades)[]) {
@@ -93,9 +117,14 @@ export function derive(items: ItemRow[], upgrades: Upgrades, highestLevel: numbe
   const worn = items.filter((item) => item.equippedSlot);
 
   const flatPower = worn.reduce((sum, item) => sum + item.power, 0);
+
+  // Fervour compounds rather than adding percentages. It has to: enemy health is
+  // exponential in the level, and an upgrade whose total effect is linear in the
+  // number bought can never catch an exponential, however much gold is poured
+  // into it. Compounding is what makes the wall a purchase instead of a ceiling.
   const power =
     (BASE_POWER + flatPower + upgrades.claws * UPGRADE_BY_KEY.claws.perLevel) *
-    (1 + upgrades.fervour * UPGRADE_BY_KEY.fervour.perLevel);
+    Math.pow(1 + UPGRADE_BY_KEY.fervour.perLevel, upgrades.fervour);
 
   const goldMultiplier =
     (1 + upgrades.instinct * UPGRADE_BY_KEY.instinct.perLevel) *
@@ -106,11 +135,26 @@ export function derive(items: ItemRow[], upgrades: Upgrades, highestLevel: numbe
     BASE_DROP_CHANCE + upgrades.fortune * UPGRADE_BY_KEY.fortune.perLevel,
   );
 
+  // Same reasoning as Fervour, on the other axis: incoming damage is exponential,
+  // so survival has to be too.
+  const maxHp =
+    (BASE_MAX_HP + worn.reduce((sum, item) => sum + item.vitality, 0)) *
+    Math.pow(1 + UPGRADE_BY_KEY.hide.perLevel, upgrades.hide);
+
+  const regen =
+    maxHp *
+    Math.min(
+      MAX_REGEN_SHARE,
+      BASE_REGEN_SHARE + upgrades.mending * UPGRADE_BY_KEY.mending.perLevel,
+    );
+
   const passiveGoldPerSecond =
     levelInfo(highestLevel).goldReward * STALLED_INCOME_SHARE * goldMultiplier;
 
   return {
     power: Math.max(1, power),
+    maxHp: Math.max(1, maxHp),
+    regen,
     goldMultiplier,
     dropChance,
     passiveGoldPerSecond,
@@ -123,6 +167,7 @@ export interface Drop {
   rarity: Rarity;
   shape: string;
   power: number;
+  vitality: number;
   goldBonus: number;
   /** True when it beat what the cat was wearing and went straight on. */
   equipped: boolean;
@@ -136,6 +181,8 @@ export interface TickReport {
   kills: number;
   bossKills: number;
   levelsCleared: number;
+  /** How many times the cat was carried back to the start of its floor. */
+  defeats: number;
   drops: Drop[];
 }
 
@@ -156,31 +203,77 @@ function rollRarity(floor: number): Rarity {
  */
 export function simulate(
   seconds: number,
-  state: { level: number; enemyHp: number; highestLevel: number },
+  state: {
+    level: number;
+    enemyHp: number;
+    hp: number;
+    recoverFor: number;
+    highestLevel: number;
+  },
   stats: DerivedStats,
-): TickReport & { level: number; enemyHp: number; highestLevel: number } {
-  let { level, enemyHp, highestLevel } = state;
+): TickReport & {
+  level: number;
+  enemyHp: number;
+  hp: number;
+  recoverFor: number;
+  highestLevel: number;
+} {
+  let { level, enemyHp, hp, recoverFor, highestLevel } = state;
   let remaining = seconds;
   let goldEarned = stats.passiveGoldPerSecond * seconds;
   let kills = 0;
   let bossKills = 0;
   let levelsCleared = 0;
+  let defeats = 0;
   const drops: Drop[] = [];
 
-  for (let guard = 0; guard < MAX_KILLS_PER_TICK && remaining > 0; guard++) {
+  const clampHp = (value: number) => Math.min(stats.maxHp, Math.max(0.0001, value));
+  hp = clampHp(hp > 0 ? hp : stats.maxHp);
+
+  for (let guard = 0; guard < MAX_STEPS_PER_TICK && remaining > 0; guard++) {
+    // Lying down after a loss. Healing happens here too, unopposed.
+    if (recoverFor > 0) {
+      const spent = Math.min(remaining, recoverFor);
+      recoverFor -= spent;
+      remaining -= spent;
+      hp = clampHp(hp + stats.regen * spent);
+      continue;
+    }
+
     const info = levelInfo(level);
     if (enemyHp <= 0) enemyHp = info.enemyHp;
 
     const timeToKill = Math.max(MIN_KILL_SECONDS, enemyHp / stats.power);
 
-    if (remaining < timeToKill) {
-      // Not enough time to finish this one: chip away and stop.
+    // Regeneration and the enemy's damage are one net rate. Positive means the
+    // cat is winning the exchange of blows and cannot lose this fight at all.
+    const netHealth = stats.regen - info.enemyDamage;
+    const timeToFall = netHealth < 0 ? hp / -netHealth : Number.POSITIVE_INFINITY;
+
+    const decidedAt = Math.min(timeToKill, timeToFall);
+
+    if (remaining < decidedAt) {
+      // The tick runs out mid-fight: carry the wound and the enemy's wound over.
       enemyHp = Math.max(0.0001, enemyHp - stats.power * remaining);
+      hp = clampHp(hp + netHealth * remaining);
       remaining = 0;
       break;
     }
 
+    if (timeToFall < timeToKill) {
+      // Beaten. Back to the first chamber of this floor, full health, but the
+      // clock has been spent and the floor has to be walked again.
+      remaining -= timeToFall;
+      defeats += 1;
+      level = floorStart(level);
+      enemyHp = 0;
+      hp = stats.maxHp;
+      recoverFor = RECOVERY_SECONDS;
+      continue;
+    }
+
     remaining -= timeToKill;
+    hp = clampHp(hp + netHealth * timeToKill);
     goldEarned += info.goldReward * stats.goldMultiplier;
     kills += 1;
     if (info.isBoss) bossKills += 1;
@@ -196,6 +289,7 @@ export function simulate(
         rarity,
         shape: shapeFor(slot, info.floor),
         power: rolled.power,
+        vitality: rolled.vitality,
         goldBonus: rolled.goldBonus,
         equipped: false,
       });
@@ -214,9 +308,12 @@ export function simulate(
     kills,
     bossKills,
     levelsCleared,
+    defeats,
     drops,
     level,
     enemyHp,
+    hp,
+    recoverFor,
     highestLevel,
   };
 }
@@ -229,7 +326,7 @@ async function loadOrCreate(tx: Prisma.TransactionClient, userId: string) {
   const existing = await tx.idleProfile.findUnique({ where: { userId } });
   if (existing) return existing;
   return tx.idleProfile.create({
-    data: { userId, enemyHp: levelInfo(1).enemyHp },
+    data: { userId, enemyHp: levelInfo(1).enemyHp, hp: BASE_MAX_HP },
   });
 }
 
@@ -261,6 +358,7 @@ export async function getIdleState(userId: string) {
           kills: 0,
           bossKills: 0,
           levelsCleared: 0,
+          defeats: 0,
           drops: [],
         } as TickReport,
       };
@@ -269,12 +367,21 @@ export async function getIdleState(userId: string) {
     const stats = derive(items, upgrades, profile.highestLevel);
     const result = simulate(
       seconds,
-      { level: profile.level, enemyHp: profile.enemyHp, highestLevel: profile.highestLevel },
+      {
+        level: profile.level,
+        enemyHp: profile.enemyHp,
+        hp: profile.hp,
+        recoverFor: profile.recoverFor,
+        highestLevel: profile.highestLevel,
+      },
       stats,
     );
 
-    // Store the drops, equipping anything that beats what is worn. An idle game
-    // that requires manual sorting after every absence is not idle.
+    // Store the drops, equipping anything that beats what is worn. Comparing on
+    // power alone is enough: within one slot, power and vitality are generated
+    // from the same floor and rarity, so they never disagree about which piece is
+    // the better one. An idle game that needs manual sorting after every absence
+    // is not idle.
     const wornBySlot = new Map(items.filter((i) => i.equippedSlot).map((i) => [i.slot, i]));
     for (const drop of result.drops) {
       const worn = wornBySlot.get(drop.slot);
@@ -292,6 +399,7 @@ export async function getIdleState(userId: string) {
           rarity: drop.rarity,
           shape: drop.shape,
           power: drop.power,
+          vitality: drop.vitality,
           goldBonus: drop.goldBonus,
           equippedSlot: better ? drop.slot : null,
         },
@@ -306,6 +414,9 @@ export async function getIdleState(userId: string) {
         level: result.level,
         highestLevel: result.highestLevel,
         enemyHp: result.enemyHp,
+        hp: result.hp,
+        recoverFor: result.recoverFor,
+        defeats: profile.defeats + result.defeats,
         gold: profile.gold + result.goldEarned,
         totalGold: profile.totalGold + result.goldEarned,
         kills: profile.kills + result.kills,
@@ -326,7 +437,19 @@ export async function getIdleState(userId: string) {
 }
 
 function view(
-  profile: { level: number; highestLevel: number; enemyHp: number; gold: number; totalGold: number; kills: number; bossKills: number; upgradesJson: string },
+  profile: {
+    level: number;
+    highestLevel: number;
+    enemyHp: number;
+    hp: number;
+    recoverFor: number;
+    defeats: number;
+    gold: number;
+    totalGold: number;
+    kills: number;
+    bossKills: number;
+    upgradesJson: string;
+  },
   items: (ItemRow & { id: string; floor: number; rarity: string; shape: string; foundAt: Date })[],
   report: TickReport,
 ) {
@@ -334,23 +457,44 @@ function view(
   const stats = derive(items, upgrades, profile.highestLevel);
   const info = levelInfo(profile.level);
   const enemyHp = profile.enemyHp > 0 ? profile.enemyHp : info.enemyHp;
+  const hp = Math.min(stats.maxHp, profile.hp > 0 ? profile.hp : stats.maxHp);
+
+  const secondsToKill = Math.max(MIN_KILL_SECONDS, enemyHp / stats.power);
+  const netHealth = stats.regen - info.enemyDamage;
+  const secondsToFall = netHealth < 0 ? hp / -netHealth : Number.POSITIVE_INFINITY;
 
   return {
     level: info,
     enemyHp,
     enemyHpMax: info.enemyHp,
+    hp,
     highestLevel: profile.highestLevel,
     gold: profile.gold,
     totalGold: profile.totalGold,
     kills: profile.kills,
     bossKills: profile.bossKills,
+    defeats: profile.defeats,
+    recoverFor: profile.recoverFor,
     stats,
     /** Seconds to kill the current enemy at the current power — the wall, made visible. */
-    secondsToKill: Math.max(MIN_KILL_SECONDS, enemyHp / stats.power),
+    secondsToKill,
+    /**
+     * Seconds before the cat falls, or Infinity when it heals faster than it is
+     * hurt. Comparing the two numbers is the whole verdict on a fight, so the
+     * screen can name the problem instead of leaving the player to guess.
+     */
+    secondsToFall,
+    outcome:
+      secondsToFall < secondsToKill
+        ? ("LOSING" as const)
+        : secondsToKill > 90
+          ? ("SLOW" as const)
+          : ("WINNING" as const),
     upgrades: UPGRADES.map((def) => ({
       key: def.key,
       level: upgrades[def.key as keyof Upgrades],
       cost: upgradeCost(def, upgrades[def.key as keyof Upgrades]),
+      maxed: def.maxLevel !== undefined && upgrades[def.key as keyof Upgrades] >= def.maxLevel,
       affordable: profile.gold >= upgradeCost(def, upgrades[def.key as keyof Upgrades]),
       nameEn: def.nameEn,
       nameFr: def.nameFr,
@@ -365,6 +509,7 @@ function view(
       rarity: item.rarity as Rarity,
       shape: item.shape,
       power: item.power,
+      vitality: item.vitality,
       goldBonus: item.goldBonus,
       equipped: Boolean(item.equippedSlot),
     })),
@@ -379,7 +524,12 @@ export type IdleState = Awaited<ReturnType<typeof getIdleState>>;
 // Actions
 // ---------------------------------------------------------------------------
 
-export type IdleError = "UNKNOWN_UPGRADE" | "NOT_ENOUGH_GOLD" | "NOT_FOUND" | "ALREADY_EQUIPPED";
+export type IdleError =
+  | "UNKNOWN_UPGRADE"
+  | "NOT_ENOUGH_GOLD"
+  | "MAXED"
+  | "NOT_FOUND"
+  | "ALREADY_EQUIPPED";
 
 export async function buyUpgrade(userId: string, key: string) {
   const def = UPGRADE_BY_KEY[key];
@@ -394,6 +544,9 @@ export async function buyUpgrade(userId: string, key: string) {
     const level = upgrades[key as keyof Upgrades];
     const cost = upgradeCost(def, level);
 
+    if (def.maxLevel !== undefined && level >= def.maxLevel) {
+      return { ok: false as const, error: "MAXED" as const };
+    }
     if (profile.gold < cost) return { ok: false as const, error: "NOT_ENOUGH_GOLD" as const };
 
     upgrades[key as keyof Upgrades] = level + 1;

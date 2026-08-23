@@ -339,7 +339,6 @@
   "idle.guardian": "Le Gardien",
   "idle.enemyHp": "Ennemi",
   "idle.guardianHp": "Gardien",
-  "idle.stalled": "Trop fort pour l'instant. L'or continue de tomber — dépense-le.",
   "idle.gold": "Or",
   "idle.power": "Puissance",
   "idle.deepest": "Étage atteint",
@@ -367,5 +366,18 @@
   "idle.resume": "Reprendre",
   "idle.durationHm": "{h}h {m}min",
   "idle.durationM": "{m}min",
-  "idle.durationS": "{s}s"
+  "idle.durationS": "{s}s",
+  "idle.catHp": "Le chat",
+  "idle.health": "Vie",
+  "idle.regen": "Guérison",
+  "idle.incoming": "Subi",
+  "idle.fallen": "Le chat est tombé",
+  "idle.fallenBack": "Ramené à la première salle de l'étage {n}.",
+  "idle.risingIn": "Debout dans {s}s",
+  "idle.losing": "Il frappe plus vite que le chat ne guérit. Plus de vie, ou plus de puissance.",
+  "idle.losingBoss": "Ce Gardien tue le chat avant de tomber. Achète de la vie, ou frappe plus fort.",
+  "idle.slow": "Ça traîne. L'or continue de tomber — dépense-le.",
+  "idle.awayDefeats": "Vaincu {n} fois pendant ton absence.",
+  "idle.defeatsTotal": "{n} défaites en tout",
+  "idle.maxed": "Au max"
 }

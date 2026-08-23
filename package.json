@@ -15,7 +15,8 @@
     "db:seed": "node scripts/with-db-env.mjs tsx prisma/seed.ts",
     "db:studio": "node scripts/with-db-env.mjs prisma studio",
     "setup": "node scripts/with-db-env.mjs prisma generate && node scripts/with-db-env.mjs prisma migrate deploy && node scripts/with-db-env.mjs tsx prisma/seed.ts",
-    "db:purge": "node scripts/with-db-env.mjs tsx scripts/purge.mjs"
+    "db:purge": "node scripts/with-db-env.mjs tsx scripts/purge.mjs",
+    "balance": "tsx scripts/idle-balance.ts"
   },
   "repository": {
     "type": "git",

@@ -53,6 +53,8 @@ export interface LevelInfo {
   position: number;
   isBoss: boolean;
   enemyHp: number;
+  /** Damage the enemy deals per second. The cat can lose. */
+  enemyDamage: number;
   goldReward: number;
 }
 
@@ -68,6 +70,19 @@ const GOLD_GROWTH = 1.16;
 const BOSS_HP_MULTIPLIER = 7;
 const BOSS_GOLD_MULTIPLIER = 9;
 
+/**
+ * Enemies hit back.
+ *
+ * Without this the game has no failure state at all: watching the clock would be
+ * a winning strategy, and nothing the player buys would ever be the difference
+ * between passing and not passing. Damage grows a little slower than enemy health
+ * so that raw power stalls first and survival stalls second — two different walls
+ * asking for two different purchases.
+ */
+const DMG_BASE = 0.9;
+const DMG_GROWTH = 1.17;
+const BOSS_DMG_MULTIPLIER = 2.6;
+
 export function levelInfo(level: number): LevelInfo {
   const n = Math.max(1, Math.floor(level));
   const floor = Math.floor((n - 1) / LEVELS_PER_FLOOR) + 1;
@@ -76,6 +91,7 @@ export function levelInfo(level: number): LevelInfo {
 
   const hp = HP_BASE * Math.pow(HP_GROWTH, n - 1) * (isBoss ? BOSS_HP_MULTIPLIER : 1);
   const gold = GOLD_BASE * Math.pow(GOLD_GROWTH, n - 1) * (isBoss ? BOSS_GOLD_MULTIPLIER : 1);
+  const damage = DMG_BASE * Math.pow(DMG_GROWTH, n - 1) * (isBoss ? BOSS_DMG_MULTIPLIER : 1);
 
   return {
     level: n,
@@ -83,6 +99,7 @@ export function levelInfo(level: number): LevelInfo {
     position,
     isBoss,
     enemyHp: Math.round(hp),
+    enemyDamage: Math.round(damage * 10) / 10,
     goldReward: Math.round(gold),
   };
 }
@@ -92,11 +109,16 @@ export function floorOf(level: number): number {
   return levelInfo(level).floor;
 }
 
+/** The first chamber of the floor a level belongs to — where a beaten cat wakes up. */
+export function floorStart(level: number): number {
+  return (floorOf(level) - 1) * LEVELS_PER_FLOOR + 1;
+}
+
 // ---------------------------------------------------------------------------
 // Upgrades: the gold sink
 // ---------------------------------------------------------------------------
 
-export type UpgradeKey = "claws" | "instinct" | "fervour" | "fortune";
+export type UpgradeKey = "claws" | "instinct" | "fervour" | "fortune" | "hide" | "mending";
 
 export interface UpgradeDef {
   key: UpgradeKey;
@@ -108,6 +130,12 @@ export interface UpgradeDef {
   costGrowth: number;
   /** What one level adds. Interpreted by `derivedStats`. */
   perLevel: number;
+  /**
+   * Where the upgrade stops, when leaving it uncapped would end the game.
+   * Healing is the case: bought without limit it eventually exceeds any possible
+   * incoming damage, and an immortal cat has no failure state left to play against.
+   */
+  maxLevel?: number;
   icon: string;
 }
 
@@ -127,12 +155,35 @@ export const UPGRADES: UpgradeDef[] = [
     key: "fervour",
     nameEn: "Vault Fervour",
     nameFr: "Ferveur du Vault",
-    descEn: "+4% power per level, multiplying everything else.",
-    descFr: "+4% de puissance par niveau, multipliant tout le reste.",
-    baseCost: 120,
-    costGrowth: 1.21,
-    perLevel: 0.04,
+    descEn: "×1.08 power per level. Compounds — this is the one that keeps up.",
+    descFr: "×1,08 de puissance par niveau. Se compose — c'est elle qui suit la courbe.",
+    baseCost: 100,
+    costGrowth: 1.33,
+    perLevel: 0.08,
     icon: "core",
+  },
+  {
+    key: "hide",
+    nameEn: "Thick Hide",
+    nameFr: "Cuir Épais",
+    descEn: "×1.06 health per level. What lets the cat outlast a Guardian.",
+    descFr: "×1,06 de vie par niveau. Ce qui fait tenir face à un Gardien.",
+    baseCost: 80,
+    costGrowth: 1.22,
+    perLevel: 0.06,
+    icon: "velvet",
+  },
+  {
+    key: "mending",
+    nameEn: "Slow Mending",
+    nameFr: "Guérison Lente",
+    descEn: "+0.4% of health back per second, per level. Scales with the health you have.",
+    descFr: "+0,4 % de la vie régénérée par seconde et par niveau.",
+    baseCost: 120,
+    costGrowth: 1.16,
+    perLevel: 0.004,
+    maxLevel: 25,
+    icon: "essence",
   },
   {
     key: "instinct",
@@ -173,6 +224,8 @@ export function upgradeCost(def: UpgradeDef, level: number): number {
 
 export interface ItemStats {
   power: number;
+  /** Health the piece adds. Armour is what turns a wall into a purchase. */
+  vitality: number;
   goldBonus: number;
 }
 
@@ -192,6 +245,16 @@ const SLOT_POWER_SHARE: Record<Slot, number> = {
   TRINKET: 0.7,
 };
 
+/** Plate protects more than a bracelet does, and the chest protects most. */
+const SLOT_VITALITY_SHARE: Record<Slot, number> = {
+  HEAD: 1,
+  SHOULDERS: 0.9,
+  CHEST: 1.6,
+  HANDS: 0.6,
+  LEGS: 1.2,
+  TRINKET: 0.5,
+};
+
 const SLOT_GOLD_SHARE: Record<Slot, number> = {
   HEAD: 0,
   SHOULDERS: 0,
@@ -202,10 +265,15 @@ const SLOT_GOLD_SHARE: Record<Slot, number> = {
 };
 
 export function itemStats(slot: Slot, floor: number, rarity: Rarity): ItemStats {
-  const scale = Math.pow(1.34, Math.max(0, floor - 1));
+  // Enemy health multiplies by roughly 2.8 per floor, so equipment that grew at
+  // 1.34 fell behind immediately and every wall became permanent. It grows nearly
+  // as fast as the Vault now: gear alone almost keeps up, and the upgrades are
+  // what close the remaining gap.
+  const scale = Math.pow(1.75, Math.max(0, floor - 1));
   const multiplier = RARITY_MULTIPLIER[rarity];
   return {
     power: Math.max(1, Math.round(6 * SLOT_POWER_SHARE[slot] * scale * multiplier)),
+    vitality: Math.max(1, Math.round(11 * SLOT_VITALITY_SHARE[slot] * scale * multiplier)),
     goldBonus: Math.round(SLOT_GOLD_SHARE[slot] * multiplier * 100) / 100,
   };
 }
@@ -372,3 +440,45 @@ export const OFFLINE_CAP_SECONDS = 12 * 3600;
 
 /** A kill can never resolve faster than this, however strong the cat gets. */
 export const MIN_KILL_SECONDS = 0.2;
+
+// ---------------------------------------------------------------------------
+// Combat
+// ---------------------------------------------------------------------------
+
+/** A bare cat, before anything is worn or bought. */
+export const BASE_MAX_HP = 60;
+
+/**
+ * Healing is a share of total health, not a flat number.
+ *
+ * A flat rate is worthless by floor ten — enemy damage is exponential and a
+ * constant is not — so the cat would heal 1.5 a second against blows of four
+ * thousand. As a share, healing inherits every point of health the player buys or
+ * finds, and stays meaningful at any depth.
+ */
+export const BASE_REGEN_SHARE = 0.02;
+
+/**
+ * And the ceiling on it. Past roughly an eighth of total health per second the
+ * cat outheals anything the Vault can produce, at any depth, forever — which
+ * quietly deletes the losing condition. The cap keeps survival a matter of how
+ * much health was bought, not how much healing was.
+ */
+export const MAX_REGEN_SHARE = 0.12;
+
+/**
+ * How long the cat lies down after losing, before picking itself up at the start
+ * of the floor. Not only flavour: it stops a hopeless fight from re-running
+ * thousands of times inside one tick at almost no cost in time.
+ */
+export const RECOVERY_SECONDS = 4;
+
+/**
+ * Blows land on a beat rather than as a continuous drain.
+ *
+ * The maths stays continuous — a fight is still resolved in closed form — but
+ * both sides *show* discrete hits at these intervals, with the per-blow damage
+ * derived from the same rate. Identical average, legible fight.
+ */
+export const ATTACK_INTERVAL = 0.75;
+export const ENEMY_ATTACK_INTERVAL = 1.05;

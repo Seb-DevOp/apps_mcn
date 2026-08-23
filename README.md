@@ -319,6 +319,61 @@ L'ordre des calques fait tout : corps, puis armure, puis la collerette par-dessu
 le col de l'armure, puis la tête. Une cuirasse glissée sous la crinière a l'air
 portée ; la même peinte au-dessus a l'air d'un autocollant.
 
+### Le chat peut perdre
+
+Sans points de vie il n'y a pas de combat, seulement une minuterie déguisée :
+regarder l'écran suffisait à gagner, et aucun achat ne faisait jamais la
+différence entre passer et ne pas passer.
+
+Le chat a donc une vie, les ennemis frappent, et un chat vaincu est ramené à la
+**première salle de son étage**. L'étage record est conservé — on ne perd pas sa
+progression, on perd le temps qu'il faut pour refaire le chemin.
+
+La résolution reste en forme close, jamais pas à pas. Régénération et dégâts
+forment un seul débit net : positif, le chat ne peut pas perdre ce combat ;
+négatif, `temps avant chute = vie / débit`. Le plus petit des deux délais —
+tuer ou tomber — décide du combat. C'est ce qui permet de résoudre douze heures
+d'absence sans boucle par image.
+
+**Les coups sont discrets à l'écran et continus dans les calculs.** La moyenne est
+identique, mais un nombre qui tombe est un nombre que le joueur peut lire : les
+dégâts montent au-dessus de qui les prend, l'or monte des pieds de l'ennemi, et
+les deux barres se font face.
+
+**L'écran nomme la cause du blocage** plutôt que de dire « trop fort » :
+*Puissance 5/s · Vie 60 · Guérison 1,2/s · Subi 4327,9/s* se lit tout seul, et le
+verdict dit quel achat débloque.
+
+### Les courbes, mesurées et non devinées
+
+`npm run balance` fait tourner le vrai moteur sur des heures simulées avec un
+joueur volontairement bête — « j'achète la chose la moins chère que je peux
+payer » — et imprime où tombent les murs. Trois enseignements y ont été trouvés,
+qu'aucune lecture du code n'aurait donnés :
+
+**Une amélioration additive ne rattrape jamais une exponentielle.** La vie des
+ennemis est en `1,19^niveau` ; une amélioration à +4 % par niveau achetée n fois
+donne un facteur linéaire en n, et n ne croît que comme le logarithme de l'or.
+Résultat mesuré : étage 6 en six heures, 1551 défaites. La Ferveur et le Cuir
+sont donc devenus **multiplicatifs et composés**.
+
+**À croissance exactement équilibrée, la progression est linéaire pour toujours.**
+Le temps par étage reste constant et le chat descend sans fin — mesuré : étage 713
+en six heures. Il faut que la puissance du joueur croisse un peu *moins* vite que
+le Vault, pour que chaque étage coûte plus que le précédent. Le rapport entre le
+coût d'une amélioration et son effet est le seul réglage qui compte :
+`effet ^ (ln croissance_or / ln croissance_coût)` doit rester sous la croissance
+des ennemis.
+
+**Une guérison non plafonnée supprime la défaite.** Achetée sans limite, elle
+finit par dépasser n'importe quel dégât possible à n'importe quelle profondeur :
+le chat devient immortel et la condition de perte disparaît en silence. La
+Guérison Lente est donc la seule amélioration avec un niveau maximum.
+
+Courbe obtenue, joueur naïf : étage 10 à 14 min, étage 20 à 49 min, étage 25 à
+2 h 10, étage 30 à 6 h 30 — 200 défaites réparties sur douze heures, et aucun
+étage qui retienne le chat pour toujours.
+
 ### Les objets sont générés, pas catalogués
 
 Un jeu idle n'a pas de dernier étage, donc un catalogue figé finirait par

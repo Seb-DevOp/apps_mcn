@@ -339,7 +339,6 @@
   "idle.guardian": "The Guardian",
   "idle.enemyHp": "Enemy",
   "idle.guardianHp": "Guardian",
-  "idle.stalled": "Too strong for now. Gold still trickles in — spend it.",
   "idle.gold": "Gold",
   "idle.power": "Power",
   "idle.deepest": "Deepest floor",
@@ -367,5 +366,18 @@
   "idle.resume": "Carry on",
   "idle.durationHm": "{h}h {m}min",
   "idle.durationM": "{m}min",
-  "idle.durationS": "{s}s"
+  "idle.durationS": "{s}s",
+  "idle.catHp": "The cat",
+  "idle.health": "Health",
+  "idle.regen": "Mending",
+  "idle.incoming": "Taking",
+  "idle.fallen": "The cat has fallen",
+  "idle.fallenBack": "Carried back to the first chamber of floor {n}.",
+  "idle.risingIn": "Back on its paws in {s}s",
+  "idle.losing": "This one hits harder than the cat heals. More health, or more power.",
+  "idle.losingBoss": "This Guardian kills the cat before it falls. Buy health, or hit harder.",
+  "idle.slow": "Slow going. Gold still comes in — spend it.",
+  "idle.awayDefeats": "Beaten {n} times while you were away.",
+  "idle.defeatsTotal": "{n} defeats in all",
+  "idle.maxed": "Maxed"
 }
