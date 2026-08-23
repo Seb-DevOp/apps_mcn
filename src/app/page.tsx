@@ -35,7 +35,8 @@ export const metadata: Metadata = {
 
 export default async function EntrancePage() {
   const user = await getSessionUser();
-  if (user) redirect("/vault");
+  // The descent is the game; the Vault hub is now what surrounds it.
+  if (user) redirect("/descent");
 
   return (
     <FarcasterGate locale="en">

@@ -300,3 +300,20 @@ export function McnCrest({ size = 28, className }: IconProps) {
     </svg>
   );
 }
+
+/** The paw: the descent, where the cat actually is. */
+export function PawIcon({ size = 22, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <ellipse cx="7" cy="8.5" rx="2.1" ry="2.8" stroke="currentColor" strokeWidth="1.4" />
+      <ellipse cx="12" cy="6.6" rx="2.1" ry="2.9" stroke="currentColor" strokeWidth="1.4" />
+      <ellipse cx="17" cy="8.5" rx="2.1" ry="2.8" stroke="currentColor" strokeWidth="1.4" />
+      <path
+        d="M12 12.2c3.2 0 5.6 2.2 5.6 4.6 0 2-1.7 3.2-3.6 2.7-1.3-.4-2.7-.4-4 0-1.9.5-3.6-.7-3.6-2.7 0-2.4 2.4-4.6 5.6-4.6Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

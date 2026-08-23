@@ -72,7 +72,7 @@ export function FarcasterGate({
           return;
         }
 
-        router.push("/vault");
+        router.push("/descent");
         router.refresh();
       } catch {
         if (!cancelled) setState("FAILED");

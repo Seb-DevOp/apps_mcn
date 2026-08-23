@@ -1,4 +1,4 @@
-# MCN — THE VAULT · V1 + V2.1 + V2.2 + comptes + Mini App Farcaster
+# MCN — THE VAULT · la Descente (idle) + V1 + V2.1 + V2.2 + comptes + Mini App Farcaster
 
 > Quiet strength never rushes. The Vault is filling.
 
@@ -272,6 +272,78 @@ Variables à définir dans Vercel pour activer le canal :
 
 Tant que `FARCASTER_AUTH_ENABLED` vaut `false`, la route refuse tout en 503 et
 l'application se comporte exactement comme sur le web.
+
+---
+
+## La Descente — le jeu idle
+
+Le cœur du jeu a changé. On ne joue plus une session quotidienne autour d'un
+coffre : on possède un chat qui descend dans le Vault tout seul, et on décide de
+ce qu'il porte et de ce qu'il devient.
+
+**Cinq salles, un Gardien, cinq salles.** `LEVELS_PER_FLOOR = 6` : les positions 1 à 5
+sont des ennemis ordinaires, la 6ᵉ est le Gardien de l'étage — sept fois plus
+résistant, neuf fois plus rémunérateur, et il lâche toujours un équipement.
+
+**Rien ne tourne sur un minuteur.** L'état est une fonction pure de
+`(état, secondes écoulées)`, calculée à la lecture depuis `lastTickAt`. Lire
+`/api/idle` *est* le tick — c'est pourquoi ce GET n'est délibérément pas
+idempotent. Cette seule décision donne trois choses à la fois : la progression
+hors-ligne sans code dédié, une horloge infalsifiable puisque c'est le serveur qui
+la lit, et aucune tâche de fond à maintenir en vie sur un hébergement serverless.
+
+**L'or tombe même quand le chat est bloqué.** Sans cela un mur est une impasse :
+plus de kills, donc plus d'or, donc plus d'amélioration, donc bloqué pour
+toujours. `STALLED_INCOME_SHARE` fait qu'être coincé est une pause, pas un arrêt —
+ce qui est censé être le sens du mot « idle ».
+
+**Ce qui tombe se met tout seul.** Une pièce meilleure que celle portée est
+équipée dans la foulée, y compris pendant une absence. Un jeu idle qui exige de
+trier son sac après chaque absence n'est pas idle. Le reste part au sac, revendable
+d'un bouton.
+
+### Les six emplacements, visibles sur le chat
+
+Tête, épaules, torse, mains, jambes, bijou. Chaque pièce est **dessinée en SVG**,
+pas importée : tous les packs d'assets libres proposant de l'équipement modulaire
+sont du pixel-art humain, et en greffer un sur un Maine Coon peint donnerait
+l'impression de deux jeux collés. Dessiner les pièces les rend cohérentes par
+construction, sans licence, et un nouveau palier devient un `path` plutôt qu'une
+commande à un illustrateur.
+
+Cinq silhouettes par emplacement, choisies selon la profondeur où la pièce est
+trouvée — bandeau, coiffe, heaume, heaume cornu, heaume couronné — teintées par la
+rareté. Le chat **change de forme** en descendant, pas seulement de couleur.
+
+L'ordre des calques fait tout : corps, puis armure, puis la collerette par-dessus
+le col de l'armure, puis la tête. Une cuirasse glissée sous la crinière a l'air
+portée ; la même peinte au-dessus a l'air d'un autocollant.
+
+### Les objets sont générés, pas catalogués
+
+Un jeu idle n'a pas de dernier étage, donc un catalogue figé finirait par
+s'épuiser. `itemStats(slot, floor, rarity)` dérive la pièce de ses trois
+coordonnées : l'étage 400 est aussi meublé que l'étage 4, et aucun butin ne peut
+se retrouver hors de proportion avec ses voisins par accident.
+
+Le français porte le genre et le nombre sur l'adjectif, donc un nom ne peut pas se
+fabriquer par concaténation : « Bandes Usé » est faux là où « Bandes Usées » est
+juste. Chaque nom français voyage avec son accord, et le qualificatif choisit la
+forme correspondante. L'anglais n'a besoin de rien de tout cela et garde une liste
+simple.
+
+### Ce que l'écran prédit, et ce qu'il ne peut pas inventer
+
+Le client simule les secondes entre deux lectures avec exactement les mêmes règles
+que le serveur, pour que la barre de vie bouge à soixante images par seconde
+plutôt que par sauts de dix secondes. Puis il jette sa prédiction dès que la vérité
+arrive. Rien dans le navigateur ne peut accorder une récompense : il peut
+seulement se tromper pendant dix secondes.
+
+**La Descente est l'écran d'arrivée** après connexion, et la première entrée de la
+barre de navigation. Le hub Vault, les missions, l'Armurerie, la Forge et le
+mini-jeu restent en place autour d'elle — le staking est une mécanique, le jeu est
+le produit.
 
 ---
 

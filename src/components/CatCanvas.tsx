@@ -1,0 +1,469 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { RARITY_STYLE } from "@/lib/content/items";
+import type { Slot, Rarity } from "@/lib/content/idle";
+
+/**
+ * The cat, wearing what it found.
+ *
+ * Drawn rather than sourced. Every free asset pack offering modular equipment is
+ * pixel-art humans; bolting one onto a painted Maine Coon would read as two
+ * different games. Drawing the pieces means they are consistent by construction,
+ * carry no licence, and a new tier is a path rather than a commission.
+ *
+ * Layer order is the whole trick: body, then armour, then the mane over the
+ * armour's collar, then the head. Plate that tucks under the ruff looks worn;
+ * plate painted on top looks like a sticker.
+ *
+ * Each slot is a small function taking a shape and a colour — the shape from how
+ * deep the piece was found, the colour from its rarity. A cat therefore changes
+ * silhouette as it descends, not just palette.
+ */
+
+export interface WornPiece {
+  slot: Slot;
+  shape: string;
+  rarity: Rarity;
+}
+
+const FUR = "#8b8072";
+const FUR_DARK = "#655c50";
+const FUR_DEEP = "#4d463c";
+const FUR_LIGHT = "#b3a894";
+const EAR_PINK = "#c2949a";
+
+export function CatCanvas({
+  worn,
+  size = 260,
+  breathing = true,
+}: {
+  worn: WornPiece[];
+  size?: number;
+  breathing?: boolean;
+}) {
+  const bySlot = new Map(worn.map((piece) => [piece.slot, piece]));
+  const colour = (slot: Slot) => {
+    const piece = bySlot.get(slot);
+    return piece ? RARITY_STYLE[piece.rarity].color : null;
+  };
+  const shape = (slot: Slot) => bySlot.get(slot)?.shape ?? null;
+
+  return (
+    <motion.svg
+      viewBox="0 0 200 268"
+      width={size}
+      height={(size * 268) / 200}
+      animate={breathing ? { scale: [1, 1.015, 1] } : undefined}
+      transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+      aria-hidden
+    >
+      <defs>
+        <radialGradient id="cat-ground" cx="50%" cy="50%">
+          <stop offset="0%" stopColor="#4f93ff" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#4f93ff" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="cat-gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f3d68f" />
+          <stop offset="100%" stopColor="#a97f31" />
+        </linearGradient>
+      </defs>
+
+      {/* Light pooling underfoot, so the cat stands on something. */}
+      <ellipse cx="100" cy="252" rx="62" ry="11" fill="url(#cat-ground)" />
+
+      {/* --- Tail, sweeping up behind ------------------------------------ */}
+      <motion.g
+        animate={{ rotate: [0, 4, 0] }}
+        style={{ originX: "72px", originY: "212px" }}
+        transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <path
+          d="M74 214 C36 212 18 176 30 148 C36 134 52 134 54 148"
+          stroke={FUR_DEEP}
+          strokeWidth="19"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M74 214 C40 212 24 178 34 152"
+          stroke={FUR_DARK}
+          strokeWidth="9"
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.7"
+        />
+      </motion.g>
+
+      {/* --- Hind legs ---------------------------------------------------- */}
+      <rect x="71" y="198" width="24" height="46" rx="12" fill={FUR_DARK} />
+      <rect x="105" y="198" width="24" height="46" rx="12" fill={FUR_DARK} />
+      <ellipse cx="83" cy="245" rx="15" ry="7" fill={FUR} />
+      <ellipse cx="117" cy="245" rx="15" ry="7" fill={FUR} />
+      {shape("LEGS") && <Legs shape={shape("LEGS")!} colour={colour("LEGS")!} />}
+
+      {/* --- Barrel of the body ------------------------------------------- */}
+      <path
+        d="M64 140 C59 168 58 196 67 212 C82 224 118 224 133 212 C142 196 141 168 136 140 C122 130 78 130 64 140 Z"
+        fill={FUR}
+      />
+      <path
+        d="M84 146 C80 172 80 194 84 206 C94 212 106 212 116 206 C120 194 120 172 116 146 Z"
+        fill={FUR_LIGHT}
+        opacity="0.42"
+      />
+      {shape("CHEST") && <Chest shape={shape("CHEST")!} colour={colour("CHEST")!} />}
+
+      {/* --- Forelegs ----------------------------------------------------- */}
+      <path d="M62 148 C51 166 48 182 50 196" stroke={FUR_DARK} strokeWidth="18" strokeLinecap="round" fill="none" />
+      <path d="M138 148 C149 166 152 182 150 196" stroke={FUR_DARK} strokeWidth="18" strokeLinecap="round" fill="none" />
+      <ellipse cx="50" cy="201" rx="12" ry="8" fill={FUR} />
+      <ellipse cx="150" cy="201" rx="12" ry="8" fill={FUR} />
+      {shape("HANDS") && <Hands shape={shape("HANDS")!} colour={colour("HANDS")!} />}
+
+      {shape("SHOULDERS") && <Shoulders shape={shape("SHOULDERS")!} colour={colour("SHOULDERS")!} />}
+
+      {/* --- The ruff: what makes a Maine Coon a Maine Coon --------------- */}
+      <path
+        d="M52 112 Q62 140 72 128 Q80 150 92 138 Q100 156 108 138 Q120 150 128 128 Q138 140 148 112 Q100 94 52 112 Z"
+        fill={FUR_LIGHT}
+      />
+      <path
+        d="M62 114 Q70 134 78 126 M122 126 Q130 134 138 114"
+        stroke={FUR}
+        strokeWidth="2"
+        fill="none"
+        opacity="0.6"
+      />
+
+      {shape("TRINKET") && <Trinket shape={shape("TRINKET")!} colour={colour("TRINKET")!} />}
+
+      {/* --- Head ---------------------------------------------------------- */}
+      <g>
+        {/* Ears, with the lynx tips the breed is known for. */}
+        <path d="M66 58 L57 16 L93 42 Z" fill={FUR_DARK} />
+        <path d="M134 58 L143 16 L107 42 Z" fill={FUR_DARK} />
+        <path d="M71 54 L66 30 L85 44 Z" fill={EAR_PINK} opacity="0.75" />
+        <path d="M129 54 L134 30 L115 44 Z" fill={EAR_PINK} opacity="0.75" />
+        <path d="M57 16 L52 4 M143 16 L148 4" stroke={FUR_LIGHT} strokeWidth="2.6" strokeLinecap="round" />
+
+        {/* Cheek tufts, then the skull over them. */}
+        <path d="M64 88 Q46 96 48 112 Q62 108 70 96 Z" fill={FUR_LIGHT} />
+        <path d="M136 88 Q154 96 152 112 Q138 108 130 96 Z" fill={FUR_LIGHT} />
+
+        <ellipse cx="100" cy="78" rx="42" ry="37" fill={FUR} />
+        <ellipse cx="100" cy="94" rx="24" ry="17" fill={FUR_LIGHT} opacity="0.6" />
+
+        {/* Forehead tabby, the breed's own signature. */}
+        <path d="M100 44 v13 M87 46 l4 12 M113 46 l-4 12" stroke={FUR_DEEP} strokeWidth="2.6" strokeLinecap="round" />
+
+        {/* Eyes: the one bright thing on the whole figure. */}
+        <ellipse cx="85" cy="76" rx="8" ry="9.5" fill="#8fd14f" />
+        <ellipse cx="115" cy="76" rx="8" ry="9.5" fill="#8fd14f" />
+        <ellipse cx="85" cy="76" rx="2.8" ry="7.5" fill="#12200f" />
+        <ellipse cx="115" cy="76" rx="2.8" ry="7.5" fill="#12200f" />
+        <circle cx="87.5" cy="72" r="1.8" fill="#ffffff" opacity="0.8" />
+        <circle cx="117.5" cy="72" r="1.8" fill="#ffffff" opacity="0.8" />
+
+        <path d="M95 90 h10 l-5 6 Z" fill={EAR_PINK} />
+        <path d="M100 96 v4 M100 100 q-7 5 -13 2 M100 100 q7 5 13 2" stroke={FUR_DEEP} strokeWidth="2" fill="none" strokeLinecap="round" />
+        <path d="M78 94 l-22 -6 M78 100 l-22 3 M122 94 l22 -6 M122 100 l22 3" stroke={FUR_LIGHT} strokeWidth="1.5" strokeLinecap="round" opacity="0.85" />
+      </g>
+
+      {shape("HEAD") && <Head shape={shape("HEAD")!} colour={colour("HEAD")!} />}
+    </motion.svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Equipment layers
+// ---------------------------------------------------------------------------
+
+function Head({ shape, colour }: { shape: string; colour: string }) {
+  if (shape === "band") {
+    return (
+      <g>
+        <path d="M62 60 Q100 46 138 60 L138 71 Q100 57 62 71 Z" fill={colour} />
+        <circle cx="100" cy="59" r="4" fill="url(#cat-gold)" />
+      </g>
+    );
+  }
+  if (shape === "cap") {
+    return (
+      <g>
+        <path d="M60 66 Q100 34 140 66 L140 75 Q100 60 60 75 Z" fill={colour} />
+        <path d="M60 68 Q100 54 140 68" stroke="url(#cat-gold)" strokeWidth="3" fill="none" />
+      </g>
+    );
+  }
+  if (shape === "helm") {
+    return (
+      <g>
+        <path d="M58 68 Q100 26 142 68 L142 78 Q100 62 58 78 Z" fill={colour} />
+        <path d="M100 32 V66" stroke="url(#cat-gold)" strokeWidth="4" />
+        <path d="M58 70 Q100 56 142 70" stroke="url(#cat-gold)" strokeWidth="3.4" fill="none" />
+      </g>
+    );
+  }
+  if (shape === "horned") {
+    return (
+      <g>
+        <path d="M58 68 Q100 26 142 68 L142 78 Q100 62 58 78 Z" fill={colour} />
+        {/* Sweeping outward, not upward: horns that parallel the ears read as a
+            second pair of ears. */}
+        <path d="M62 58 C44 60 28 56 18 44 C34 44 50 46 68 52 Z" fill="url(#cat-gold)" />
+        <path d="M138 58 C156 60 172 56 182 44 C166 44 150 46 132 52 Z" fill="url(#cat-gold)" />
+        <path d="M100 32 V66" stroke="url(#cat-gold)" strokeWidth="4" />
+      </g>
+    );
+  }
+  return (
+    <g>
+      <path d="M58 68 Q100 24 142 68 L142 78 Q100 62 58 78 Z" fill={colour} />
+      <path d="M66 40 L60 10 L82 26 L100 2 L118 26 L140 10 L134 40 Z" fill="url(#cat-gold)" />
+      <circle cx="100" cy="18" r="5" fill={colour} stroke="url(#cat-gold)" strokeWidth="2" />
+      <path d="M58 70 Q100 56 142 70" stroke="url(#cat-gold)" strokeWidth="3.4" fill="none" />
+    </g>
+  );
+}
+
+function Shoulders({ shape, colour }: { shape: string; colour: string }) {
+  const pad = (x: number, mirror: boolean) => {
+    const s = mirror ? -1 : 1;
+    if (shape === "pads") {
+      return (
+        <path d={`M${x - 20} 152 Q${x} 132 ${x + 20} 152 Q${x} 162 ${x - 20} 152 Z`} fill={colour} />
+      );
+    }
+    if (shape === "plates") {
+      return (
+        <g>
+          <path d={`M${x - 22} 153 Q${x} 130 ${x + 22} 153 Q${x} 164 ${x - 22} 153 Z`} fill={colour} />
+          <path d={`M${x - 18} 149 Q${x} 137 ${x + 18} 149`} stroke="url(#cat-gold)" strokeWidth="2.4" fill="none" />
+        </g>
+      );
+    }
+    if (shape === "spiked") {
+      return (
+        <g>
+          <path d={`M${x - 23} 154 Q${x} 128 ${x + 23} 154 Q${x} 165 ${x - 23} 154 Z`} fill={colour} />
+          <path d={`M${x + s * 9} 136 l${s * 13} -17 l${s * -3} 19 Z`} fill="url(#cat-gold)" />
+          <path d={`M${x - s * 7} 134 l${s * -9} -14 l${s * -1} 16 Z`} fill="url(#cat-gold)" />
+        </g>
+      );
+    }
+    if (shape === "winged") {
+      return (
+        <g>
+          <path d={`M${x - 23} 154 Q${x} 126 ${x + 23} 154 Q${x} 165 ${x - 23} 154 Z`} fill={colour} />
+          <path
+            d={`M${x + s * 13} 143 C${x + s * 30} 138 ${x + s * 38} 126 ${x + s * 40} 112 C${x + s * 30} 122 ${x + s * 20} 132 ${x + s * 11} 151 Z`}
+            fill="url(#cat-gold)"
+            opacity="0.9"
+          />
+        </g>
+      );
+    }
+    return (
+      <g>
+        <path d={`M${x - 25} 155 Q${x} 122 ${x + 25} 155 Q${x} 167 ${x - 25} 155 Z`} fill={colour} />
+        <path d={`M${x - 20} 148 Q${x} 132 ${x + 20} 148`} stroke="url(#cat-gold)" strokeWidth="3" fill="none" />
+        <circle cx={x} cy="142" r="4.5" fill="url(#cat-gold)" />
+      </g>
+    );
+  };
+
+  return (
+    <g>
+      {pad(58, true)}
+      {pad(142, false)}
+    </g>
+  );
+}
+
+function Chest({ shape, colour }: { shape: string; colour: string }) {
+  const body =
+    "M68 138 C63 166 63 194 71 208 C84 218 116 218 129 208 C137 194 137 166 132 138 C118 130 82 130 68 138 Z";
+
+  if (shape === "tunic") {
+    return <path d={body} fill={colour} opacity="0.88" />;
+  }
+  if (shape === "mail") {
+    return (
+      <g>
+        <path d={body} fill={colour} />
+        <path d="M70 156 h60 M69 172 h62 M71 188 h58" stroke={FUR_DEEP} strokeWidth="1.6" opacity="0.45" />
+      </g>
+    );
+  }
+  if (shape === "plate") {
+    return (
+      <g>
+        <path d={body} fill={colour} />
+        <path d="M100 132 V214" stroke="url(#cat-gold)" strokeWidth="3" />
+        <path d="M68 158 Q100 148 132 158" stroke="url(#cat-gold)" strokeWidth="2.6" fill="none" />
+      </g>
+    );
+  }
+  if (shape === "runed") {
+    return (
+      <g>
+        <path d={body} fill={colour} />
+        <path d="M100 132 V214" stroke="url(#cat-gold)" strokeWidth="3" />
+        <circle cx="100" cy="172" r="14" fill="none" stroke="url(#cat-gold)" strokeWidth="2.4" />
+        <path d="M100 159 v26 M87 172 h26" stroke="url(#cat-gold)" strokeWidth="1.8" />
+      </g>
+    );
+  }
+  return (
+    <g>
+      <path d={body} fill={colour} />
+      <path d="M100 130 V214" stroke="url(#cat-gold)" strokeWidth="3.4" />
+      <path d="M68 156 Q100 144 132 156" stroke="url(#cat-gold)" strokeWidth="3" fill="none" />
+      <path d="M100 158 l15 22 l-15 22 l-15 -22 Z" fill="url(#cat-gold)" />
+      <circle cx="100" cy="180" r="6" fill={colour} />
+    </g>
+  );
+}
+
+function Hands({ shape, colour }: { shape: string; colour: string }) {
+  const glove = (x: number, mirror: boolean) => {
+    const s = mirror ? -1 : 1;
+    if (shape === "wraps") {
+      return <rect x={x - 11} y="186" width="22" height="18" rx="8" fill={colour} />;
+    }
+    if (shape === "bracers") {
+      return (
+        <g>
+          <rect x={x - 12} y="180" width="24" height="26" rx="9" fill={colour} />
+          <path d={`M${x - 12} 190 h24`} stroke="url(#cat-gold)" strokeWidth="2.2" />
+        </g>
+      );
+    }
+    if (shape === "gauntlets") {
+      return (
+        <g>
+          <rect x={x - 13} y="176" width="26" height="32" rx="9" fill={colour} />
+          <path d={`M${x - 13} 186 h26 M${x - 13} 196 h26`} stroke="url(#cat-gold)" strokeWidth="2" />
+        </g>
+      );
+    }
+    if (shape === "clawed") {
+      return (
+        <g>
+          <rect x={x - 13} y="174" width="26" height="34" rx="9" fill={colour} />
+          <path
+            d={`M${x - 8} 208 l-2 9 M${x} 209 l0 10 M${x + 8} 208 l2 9`}
+            stroke="url(#cat-gold)"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+          />
+        </g>
+      );
+    }
+    return (
+      <g>
+        <rect x={x - 14} y="172" width="28" height="36" rx="10" fill={colour} />
+        <circle cx={x} cy="188" r="5" fill="url(#cat-gold)" />
+        <path d={`M${x + s * 14} 182 q${s * 10} 6 ${s * 2} 15`} stroke="url(#cat-gold)" strokeWidth="2.2" fill="none" />
+      </g>
+    );
+  };
+
+  return (
+    <g>
+      {glove(50, true)}
+      {glove(150, false)}
+    </g>
+  );
+}
+
+function Legs({ shape, colour }: { shape: string; colour: string }) {
+  const leg = (x: number) => {
+    if (shape === "cloth") {
+      return <rect x={x - 13} y="200" width="26" height="26" rx="10" fill={colour} opacity="0.9" />;
+    }
+    if (shape === "greaves") {
+      return (
+        <g>
+          <rect x={x - 14} y="198" width="28" height="34" rx="10" fill={colour} />
+          <path d={`M${x - 14} 210 h28`} stroke="url(#cat-gold)" strokeWidth="2.2" />
+        </g>
+      );
+    }
+    if (shape === "plated") {
+      return (
+        <g>
+          <rect x={x - 15} y="196" width="30" height="40" rx="10" fill={colour} />
+          <path d={`M${x - 15} 206 h30 M${x - 15} 218 h30`} stroke="url(#cat-gold)" strokeWidth="2" />
+        </g>
+      );
+    }
+    if (shape === "runed") {
+      return (
+        <g>
+          <rect x={x - 15} y="195" width="30" height="42" rx="10" fill={colour} />
+          <circle cx={x} cy="213" r="7" fill="none" stroke="url(#cat-gold)" strokeWidth="2" />
+        </g>
+      );
+    }
+    return (
+      <g>
+        <rect x={x - 16} y="194" width="32" height="44" rx="11" fill={colour} />
+        <path d={`M${x} 199 l9 14 l-9 14 l-9 -14 Z`} fill="url(#cat-gold)" />
+      </g>
+    );
+  };
+
+  return (
+    <g>
+      {leg(83)}
+      {leg(117)}
+    </g>
+  );
+}
+
+function Trinket({ shape, colour }: { shape: string; colour: string }) {
+  if (shape === "cord") {
+    return <path d="M74 114 Q100 132 126 114" stroke={colour} strokeWidth="4.5" fill="none" strokeLinecap="round" />;
+  }
+  if (shape === "pendant") {
+    return (
+      <g>
+        <path d="M74 114 Q100 132 126 114" stroke="url(#cat-gold)" strokeWidth="3.2" fill="none" />
+        <circle cx="100" cy="140" r="7.5" fill={colour} stroke="url(#cat-gold)" strokeWidth="2" />
+      </g>
+    );
+  }
+  if (shape === "gem") {
+    return (
+      <g>
+        <path d="M72 113 Q100 133 128 113" stroke="url(#cat-gold)" strokeWidth="3.2" fill="none" />
+        <path d="M100 131 l10 11 l-10 13 l-10 -13 Z" fill={colour} stroke="url(#cat-gold)" strokeWidth="2" />
+      </g>
+    );
+  }
+  if (shape === "sigil") {
+    // A shield rather than another ringed rune: the runed breastplate already
+    // owns that motif, and two of them on one chest read as a mistake.
+    return (
+      <g>
+        <path d="M70 112 Q100 134 130 112" stroke="url(#cat-gold)" strokeWidth="3.6" fill="none" />
+        <path
+          d="M100 131 l12 5 v10 q0 10 -12 15 q-12 -5 -12 -15 v-10 Z"
+          fill={colour}
+          stroke="url(#cat-gold)"
+          strokeWidth="2.2"
+        />
+        <path d="M100 138 v13 M94 144 h12" stroke="url(#cat-gold)" strokeWidth="1.8" />
+      </g>
+    );
+  }
+  return (
+    <g>
+      <path d="M68 111 Q100 136 132 111" stroke="url(#cat-gold)" strokeWidth="4" fill="none" />
+      <path d="M87 136 l-3 -13 l10 7 l6 -12 l6 12 l10 -7 l-3 13 Z" fill="url(#cat-gold)" />
+      <circle cx="100" cy="146" r="6.5" fill={colour} stroke="url(#cat-gold)" strokeWidth="2" />
+    </g>
+  );
+}

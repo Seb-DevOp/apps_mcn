@@ -35,7 +35,7 @@ export function SignIn({ locale, onBack }: { locale: Locale; onBack: () => void 
   }, []);
 
   function done() {
-    router.push("/vault");
+    router.push("/descent");
     router.refresh();
   }
 

@@ -65,6 +65,8 @@ model User {
   boosts        UserBoost[]
   grants        RewardGrant[]
   equipment     UserEquipment[]
+  idle          IdleProfile?
+  idleItems     IdleItem[]
   credentials   Credential[]
   recoveryCodes RecoveryCode[]
   emailTokens   EmailToken[]
@@ -82,6 +84,66 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// IDLE PROGRESSION
+// ---------------------------------------------------------------------------
+
+/// One row per player. Nothing ticks on a timer: progress is computed from
+/// lastTickAt whenever the state is read, which is what makes offline progress
+/// fall out for free and keeps the clock on the server.
+model IdleProfile {
+  userId String @id
+
+  /// Global level, never reset. Floor and boss position are derived from it.
+  level        Int   @default(1)
+  highestLevel Int   @default(1)
+  /// Health left on the enemy currently being fought.
+  enemyHp      Float @default(0)
+
+  /// Doubles rather than integers: idle currencies outgrow a 32-bit column
+  /// within hours, and 15 significant digits is far more than this needs.
+  gold      Float @default(0)
+  totalGold Float @default(0)
+
+  kills     Int @default(0)
+  bossKills Int @default(0)
+
+  /// { claws: 3, fervour: 1, ... } — keys come from UPGRADES in content/idle.
+  upgradesJson String @default("{}")
+
+  lastTickAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// A looted piece. Generated from (slot, floor, rarity) rather than a catalogue,
+/// because an idle game has no last floor for a catalogue to cover.
+model IdleItem {
+  id     String @id @default(cuid())
+  userId String
+
+  slot   String
+  floor  Int
+  rarity String
+  shape  String
+
+  power     Float
+  goldBonus Float @default(0)
+
+  /// Null when owned but not worn. Postgres treats NULLs as distinct, so the
+  /// unique index below allows any number of spares and exactly one worn piece
+  /// per slot — the constraint lives in the database, not in a code path.
+  equippedSlot String?
+
+  foundAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, equippedSlot])
+  @@index([userId, slot])
 }
 
 // ---------------------------------------------------------------------------
