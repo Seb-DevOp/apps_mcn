@@ -17,7 +17,11 @@ import {
   MIN_KILL_SECONDS,
   BASE_MAX_HP,
   BASE_REGEN_SHARE,
-  MAX_REGEN_SHARE,
+  BASE_ATTACK_DAMAGE,
+  BASE_ATTACK_SPEED,
+  BASE_CRIT_CHANCE,
+  BASE_CRIT_MULTIPLIER,
+  BASE_DOUBLE_CHANCE,
   RECOVERY_SECONDS,
   type Slot,
   type Rarity,
@@ -46,9 +50,6 @@ const MAX_STEPS_PER_TICK = 25_000;
 /** And keeps at most this many drops, so one long absence cannot flood the table. */
 const MAX_DROPS_PER_TICK = 25;
 
-/** Base power of a cat wearing nothing at all — enough to clear the first floor. */
-const BASE_POWER = 5;
-
 /**
  * Gold still accrues while the cat is stuck on an enemy it cannot kill.
  *
@@ -59,15 +60,22 @@ const BASE_POWER = 5;
 const STALLED_INCOME_SHARE = 0.08;
 
 export interface Upgrades {
-  claws: number;
-  fervour: number;
-  instinct: number;
-  fortune: number;
-  hide: number;
-  mending: number;
+  attack: number;
+  health: number;
+  speed: number;
+  crit: number;
+  critDamage: number;
+  double: number;
 }
 
 export interface DerivedStats {
+  /** Damage of one ordinary blow. */
+  hitDamage: number;
+  attacksPerSecond: number;
+  critChance: number;
+  critMultiplier: number;
+  doubleChance: number;
+  /** The product of all four — what the fight is actually resolved with. */
   power: number;
   maxHp: number;
   /** Health returned per second. Also the reason weak enemies stop mattering. */
@@ -87,12 +95,12 @@ interface ItemRow {
 
 export function parseUpgrades(json: string): Upgrades {
   const base: Upgrades = {
-    claws: 0,
-    fervour: 0,
-    instinct: 0,
-    fortune: 0,
-    hide: 0,
-    mending: 0,
+    attack: 0,
+    health: 0,
+    speed: 0,
+    crit: 0,
+    critDamage: 0,
+    double: 0,
   };
   try {
     const parsed = JSON.parse(json) as Partial<Upgrades>;
@@ -115,43 +123,53 @@ export function parseUpgrades(json: string): Upgrades {
  */
 export function derive(items: ItemRow[], upgrades: Upgrades, highestLevel: number): DerivedStats {
   const worn = items.filter((item) => item.equippedSlot);
+  const level = (key: keyof Upgrades) => upgrades[key];
+  const per = (key: keyof Upgrades) => UPGRADE_BY_KEY[key].perLevel;
 
-  const flatPower = worn.reduce((sum, item) => sum + item.power, 0);
+  // Equipment adds flat damage; Attack multiplies whatever that came to. A stat
+  // that only added would be worthless by floor ten, and one that only multiplied
+  // would make found gear pointless — both together is what keeps looting and
+  // spending worth doing at the same time.
+  const hitDamage =
+    (BASE_ATTACK_DAMAGE + worn.reduce((sum, item) => sum + item.power, 0)) *
+    Math.pow(1 + per("attack"), level("attack"));
 
-  // Fervour compounds rather than adding percentages. It has to: enemy health is
-  // exponential in the level, and an upgrade whose total effect is linear in the
-  // number bought can never catch an exponential, however much gold is poured
-  // into it. Compounding is what makes the wall a purchase instead of a ceiling.
+  const attacksPerSecond = BASE_ATTACK_SPEED + level("speed") * per("speed");
+  const critChance = Math.min(0.95, BASE_CRIT_CHANCE + level("crit") * per("crit"));
+  const critMultiplier =
+    BASE_CRIT_MULTIPLIER * Math.pow(1 + per("critDamage"), level("critDamage"));
+  const doubleChance = Math.min(1, BASE_DOUBLE_CHANCE + level("double") * per("double"));
+
+  // The four offence stats meet here, and only here. Expected damage per second
+  // is their product, which is why each of them is worth buying and why none of
+  // them replaces another.
   const power =
-    (BASE_POWER + flatPower + upgrades.claws * UPGRADE_BY_KEY.claws.perLevel) *
-    Math.pow(1 + UPGRADE_BY_KEY.fervour.perLevel, upgrades.fervour);
+    hitDamage *
+    attacksPerSecond *
+    (1 + critChance * (critMultiplier - 1)) *
+    (1 + doubleChance);
 
-  const goldMultiplier =
-    (1 + upgrades.instinct * UPGRADE_BY_KEY.instinct.perLevel) *
-    (1 + worn.reduce((sum, item) => sum + item.goldBonus, 0));
-
-  const dropChance = Math.min(
-    0.75,
-    BASE_DROP_CHANCE + upgrades.fortune * UPGRADE_BY_KEY.fortune.perLevel,
-  );
-
-  // Same reasoning as Fervour, on the other axis: incoming damage is exponential,
-  // so survival has to be too.
   const maxHp =
     (BASE_MAX_HP + worn.reduce((sum, item) => sum + item.vitality, 0)) *
-    Math.pow(1 + UPGRADE_BY_KEY.hide.perLevel, upgrades.hide);
+    Math.pow(1 + per("health"), level("health"));
 
-  const regen =
-    maxHp *
-    Math.min(
-      MAX_REGEN_SHARE,
-      BASE_REGEN_SHARE + upgrades.mending * UPGRADE_BY_KEY.mending.perLevel,
-    );
+  // Healing is deliberately not purchasable. Bought without limit it eventually
+  // exceeds any damage at any depth, and an immortal cat has no losing condition
+  // left to play against.
+  const regen = maxHp * BASE_REGEN_SHARE;
+
+  const goldMultiplier = 1 + worn.reduce((sum, item) => sum + item.goldBonus, 0);
+  const dropChance = BASE_DROP_CHANCE;
 
   const passiveGoldPerSecond =
     levelInfo(highestLevel).goldReward * STALLED_INCOME_SHARE * goldMultiplier;
 
   return {
+    hitDamage,
+    attacksPerSecond,
+    critChance,
+    critMultiplier,
+    doubleChance,
     power: Math.max(1, power),
     maxHp: Math.max(1, maxHp),
     regen,
@@ -591,6 +609,63 @@ export async function sellItem(userId: string, itemId: string) {
       data: { gold: { increment: value } },
     });
     return { ok: true as const, gold: value };
+  });
+}
+
+/**
+ * Wears the best piece the bag holds, slot by slot.
+ *
+ * "Best" is power, and that is enough: within one slot, power and vitality are
+ * generated from the same floor and rarity, so they never disagree about which
+ * piece is the better one.
+ */
+export async function equipBest(userId: string) {
+  return prisma.$transaction(async (tx) => {
+    const items = await tx.idleItem.findMany({ where: { userId } });
+    let changed = 0;
+
+    for (const slot of SLOTS) {
+      const forSlot = items.filter((item) => item.slot === slot);
+      if (forSlot.length === 0) continue;
+
+      const best = forSlot.reduce((a, b) => (b.power > a.power ? b : a));
+      if (best.equippedSlot) continue;
+
+      // The slot has to be emptied first: the unique index allows exactly one
+      // worn piece per slot, and it is the database that enforces it.
+      await tx.idleItem.updateMany({
+        where: { userId, equippedSlot: slot },
+        data: { equippedSlot: null },
+      });
+      await tx.idleItem.update({ where: { id: best.id }, data: { equippedSlot: slot } });
+      changed += 1;
+    }
+
+    return { ok: true as const, changed };
+  });
+}
+
+/**
+ * Sells every spare below a rarity. The bag fills with commons far faster than
+ * with anything worth reading, and clearing them one by one is not a game.
+ */
+export async function sellBelow(userId: string, rarity: string) {
+  const threshold = RARITIES.indexOf(rarity as Rarity);
+  if (threshold < 0) return { ok: false as const, error: "NOT_FOUND" as const };
+
+  const below = RARITIES.slice(0, threshold);
+  if (below.length === 0) return { ok: true as const, gold: 0, sold: 0 };
+
+  return prisma.$transaction(async (tx) => {
+    const spares = await tx.idleItem.findMany({
+      where: { userId, equippedSlot: null, rarity: { in: below } },
+    });
+    if (spares.length === 0) return { ok: true as const, gold: 0, sold: 0 };
+
+    const value = spares.reduce((sum, item) => sum + Math.max(1, Math.round(item.power * 4)), 0);
+    await tx.idleItem.deleteMany({ where: { id: { in: spares.map((item) => item.id) } } });
+    await tx.idleProfile.update({ where: { userId }, data: { gold: { increment: value } } });
+    return { ok: true as const, gold: value, sold: spares.length };
   });
 }
 

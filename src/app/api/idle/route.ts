@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { ok, fail, withUser, rateLimit } from "@/lib/api";
-import { getIdleState, buyUpgrade, equipItem, sellItem, sellAllSpares } from "@/lib/engine/idle";
+import {
+  getIdleState,
+  buyUpgrade,
+  equipItem,
+  equipBest,
+  sellItem,
+  sellBelow,
+  sellAllSpares,
+} from "@/lib/engine/idle";
 
 /**
  * The whole game in one endpoint.
@@ -19,7 +27,9 @@ export async function GET() {
 const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("upgrade"), key: z.string().min(1).max(32) }),
   z.object({ action: z.literal("equip"), itemId: z.string().min(1).max(64) }),
+  z.object({ action: z.literal("equipBest") }),
   z.object({ action: z.literal("sell"), itemId: z.string().min(1).max(64) }),
+  z.object({ action: z.literal("sellBelow"), rarity: z.string().min(1).max(20) }),
   z.object({ action: z.literal("sellAll") }),
 ]);
 
@@ -31,16 +41,26 @@ export async function POST(request: Request) {
     if (!body.success) return fail("INVALID_BODY", 400);
 
     const input = body.data;
-    const result =
-      input.action === "upgrade"
-        ? await buyUpgrade(user.id, input.key)
-        : input.action === "equip"
-          ? await equipItem(user.id, input.itemId)
-          : input.action === "sell"
-            ? await sellItem(user.id, input.itemId)
-            : await sellAllSpares(user.id);
+    const result = await run(user.id, input);
 
     if (!result.ok) return fail(result.error, 409);
     return ok({ state: await getIdleState(user.id) });
   });
+}
+
+function run(userId: string, input: z.infer<typeof Schema>) {
+  switch (input.action) {
+    case "upgrade":
+      return buyUpgrade(userId, input.key);
+    case "equip":
+      return equipItem(userId, input.itemId);
+    case "equipBest":
+      return equipBest(userId);
+    case "sell":
+      return sellItem(userId, input.itemId);
+    case "sellBelow":
+      return sellBelow(userId, input.rarity);
+    case "sellAll":
+      return sellAllSpares(userId);
+  }
 }

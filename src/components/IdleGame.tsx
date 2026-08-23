@@ -3,51 +3,53 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ATTACK_INTERVAL,
   ENEMY_ATTACK_INTERVAL,
   LEVELS_PER_FLOOR,
   RECOVERY_SECONDS,
-  SLOTS,
   floorStart,
-  itemName,
   levelInfo,
-  type Rarity,
-  type Slot,
 } from "@/lib/content/idle";
-import { RARITY_STYLE } from "@/lib/content/items";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
+import { IdleBag } from "./IdleBag";
 import { useI18n } from "./I18nProvider";
+import { formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
 
 /**
  * THE DESCENT
  *
  * Five chambers, a Guardian, five more. The cat fights on its own; the player
- * decides what it wears and what it becomes — and whether it survives, because
- * enemies hit back and a beaten cat is carried to the start of its floor.
+ * decides what it wears, what it becomes, and whether it survives.
  *
  * The server owns the clock: reading `/api/idle` *is* the tick. This screen
- * replays the seconds between two reads under exactly the same rules, so blows
- * land in front of the player instead of arriving as a ten-second jump, then
- * throws its replay away whenever the truth turns up. Nothing here can grant a
- * reward; it can only be wrong for ten seconds.
+ * replays the seconds between two reads under the same rules, so blows land in
+ * front of the player instead of arriving as a ten-second jump, then throws its
+ * replay away whenever the truth turns up. Nothing here can grant a reward; it
+ * can only be wrong for ten seconds.
  *
- * Blows are discrete on screen and continuous in the maths. Average damage is
- * identical either way, and a number that lands is a number a player can read.
+ * The replay rolls its own criticals and double strikes. It has to: the server
+ * resolves fights with the *expected* damage per second, which is the right
+ * number to compute twelve hours with and the wrong one to watch. Rolling each
+ * blow gives the same average and a fight worth looking at.
  */
 
 /** How often the replay is replaced by the server's answer. */
 const SYNC_INTERVAL_MS = 10_000;
 /** The replay runs on a timer rather than a frame loop: bars step, they do not slide. */
 const STEP_MS = 60;
+/** However fast the cat gets, blows never land closer together than this. */
+const MIN_SWING_SECONDS = 0.15;
 
 interface Hit {
   id: number;
-  /** Who took it — the enemy, the cat, or the purse. */
   target: "ENEMY" | "CAT" | "GOLD";
   value: number;
+  crit: boolean;
+  /** Horizontal offset, so blows that land together stay separately readable. */
   drift: number;
+  /** And a vertical one, for the same reason. */
+  lift: number;
 }
 
 /** The predicted world. Kept in a ref: it changes far faster than it renders. */
@@ -62,16 +64,15 @@ interface World {
 }
 
 export function IdleGame({ initial }: { initial: IdleState }) {
-  const { t, L, locale } = useI18n();
+  const { t, L } = useI18n();
 
   const [state, setState] = useState(initial);
+  const [tab, setTab] = useState<"FIGHT" | "BAG">("FIGHT");
   const [busy, setBusy] = useState<string | null>(null);
-  const [drawer, setDrawer] = useState(false);
   const [welcome, setWelcome] = useState(
     initial.report.seconds > 60 && initial.report.goldEarned > 0,
   );
 
-  // What the screen shows, mirrored from the world at every step.
   const [shown, setShown] = useState({
     level: initial.level.level,
     enemyHp: initial.enemyHp,
@@ -100,27 +101,33 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   });
 
   const nextHitId = useRef(0);
-  const addHit = useCallback((target: Hit["target"], value: number) => {
-    const id = nextHitId.current++;
-    setHits((current) => [
-      ...current.slice(-11),
-      { id, target, value, drift: Math.random() * 26 - 13 },
-    ]);
-    window.setTimeout(() => {
-      setHits((current) => current.filter((hit) => hit.id !== id));
-    }, 900);
-  }, []);
+  const addHit = useCallback(
+    (target: Hit["target"], value: number, crit = false, side = 0) => {
+      const id = nextHitId.current++;
+      // A double strike puts its two numbers on opposite sides on purpose; every
+      // other blow is scattered. Landing them all on one line made four hits look
+      // like one unreadable smear.
+      const drift = side === 0 ? Math.random() * 56 - 28 : side * (16 + Math.random() * 16);
+      setHits((current) => [
+        ...current.slice(-13),
+        { id, target, value, crit, drift, lift: Math.random() * 16 - 8 },
+      ]);
+      window.setTimeout(() => {
+        setHits((current) => current.filter((hit) => hit.id !== id));
+      }, 900);
+    },
+    [],
+  );
 
   const adopt = useCallback((next: IdleState) => {
     setState(next);
     world.current = {
+      ...world.current,
       level: next.level.level,
       enemyHp: next.enemyHp,
       hp: next.hp,
       recovering: next.recoverFor,
       gold: next.gold,
-      catTimer: world.current.catTimer,
-      enemyTimer: world.current.enemyTimer,
     };
   }, []);
 
@@ -134,22 +141,25 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     }
   }, [adopt]);
 
-  async function act(body: Record<string, unknown>, key: string) {
-    setBusy(key);
-    try {
-      const response = await fetch("/api/idle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await response.json();
-      if (data.ok) adopt(data.state as IdleState);
-    } catch {
-      // Silent: the next sync repairs the display either way.
-    } finally {
-      setBusy(null);
-    }
-  }
+  const act = useCallback(
+    async (body: Record<string, unknown>, key: string) => {
+      setBusy(key);
+      try {
+        const response = await fetch("/api/idle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json();
+        if (data.ok) adopt(data.state as IdleState);
+      } catch {
+        // Silent: the next sync repairs the display either way.
+      } finally {
+        setBusy(null);
+      }
+    },
+    [adopt],
+  );
 
   useEffect(() => {
     const timer = window.setInterval(sync, SYNC_INTERVAL_MS);
@@ -179,13 +189,20 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         if (w.enemyHp <= 0) w.enemyHp = info.enemyHp;
 
         let killed = false;
+        const swing = Math.max(MIN_SWING_SECONDS, 1 / Math.max(0.1, stats.attacksPerSecond));
 
         w.catTimer += dt;
-        if (w.catTimer >= ATTACK_INTERVAL) {
-          w.catTimer -= ATTACK_INTERVAL;
-          const blow = stats.power * ATTACK_INTERVAL;
-          w.enemyHp -= blow;
-          addHit("ENEMY", blow);
+        if (w.catTimer >= swing) {
+          w.catTimer -= swing;
+
+          const crit = Math.random() < stats.critChance;
+          const blows = Math.random() < stats.doubleChance ? 2 : 1;
+          const damage = stats.hitDamage * (crit ? stats.critMultiplier : 1);
+
+          for (let blow = 0; blow < blows; blow++) {
+            w.enemyHp -= damage;
+            addHit("ENEMY", damage, crit, blows === 2 ? (blow === 0 ? -1 : 1) : 0);
+          }
           setCatSwings((n) => n + 1);
 
           if (w.enemyHp <= 0) {
@@ -249,14 +266,8 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity })),
     [state.items],
   );
-  const wornBySlot = useMemo(
-    () => new Map(state.items.filter((i) => i.equipped).map((i) => [i.slot, i])),
-    [state.items],
-  );
-  const spares = useMemo(
-    () => state.items.filter((item) => !item.equipped).sort((a, b) => b.power - a.power),
-    [state.items],
-  );
+
+  const spareCount = state.items.filter((item) => !item.equipped).length;
 
   return (
     <div className="pb-4">
@@ -266,255 +277,171 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           {here.isBoss ? t("idle.guardian") : t("idle.chamber", { n: here.position })}
         </h1>
         <FloorPips position={here.position} />
+        <p className="gold-text tabular mt-3 text-lg">{formatNumber(shown.gold)}</p>
+        <p className="dim text-[0.6rem] uppercase tracking-widest">{t("idle.gold")}</p>
       </header>
 
-      {/* --- The arena ---------------------------------------------------- */}
-      <motion.section
-        className="panel panel-sapphire relative mt-4 overflow-hidden px-3 pb-3 pt-4"
-        // The whole arena flinches when the cat is hit. Cheap, and it tells the
-        // player where the damage went without reading a single number.
-        animate={{ x: catWounds % 2 === 0 ? 0 : -3 }}
-        transition={{ type: "spring", stiffness: 900, damping: 14 }}
-      >
-        <div className="relative flex items-end justify-between gap-1">
-          {/* --- The cat --- */}
-          <div className="relative">
-            <motion.div
-              animate={{ x: fallen ? 0 : catSwings % 2 === 0 ? 0 : 12 }}
-              transition={{ type: "spring", stiffness: 520, damping: 16 }}
-              style={{
-                filter: fallen ? "grayscale(0.85) brightness(0.6)" : undefined,
-                transformOrigin: "bottom center",
-              }}
-            >
-              <motion.div
-                animate={fallen ? { rotate: -12, y: 10 } : { rotate: 0, y: 0 }}
-                transition={{ type: "spring", stiffness: 200, damping: 18 }}
-              >
-                <CatCanvas worn={worn} size={150} breathing={!fallen} />
-              </motion.div>
-            </motion.div>
-            <HitStream hits={hits} target="CAT" tone="#ff6b6b" />
-          </div>
-
-          {/* --- What it is fighting --- */}
-          <div className="relative flex-1 pb-4">
-            <AnimatePresence mode="popLayout">
-              <motion.div
-                key={enemyDeaths}
-                initial={{ opacity: 0, x: 34, scale: 0.85 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.4, rotate: 18, y: 20 }}
-                transition={{ duration: 0.28 }}
-              >
-                <Enemy isBoss={here.isBoss} recoil={catSwings} />
-              </motion.div>
-            </AnimatePresence>
-            <HitStream hits={hits} target="ENEMY" tone="#f0d089" />
-            <HitStream hits={hits} target="GOLD" tone="#8fd14f" from="feet" prefix="+" />
-          </div>
-        </div>
-
-        {/* --- Two bars facing each other --------------------------------- */}
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          <Bar
-            label={t("idle.catHp")}
-            value={shown.hp}
-            max={stats.maxHp}
-            fill="linear-gradient(90deg,#3f8f5a,#7ed08f)"
-            low="linear-gradient(90deg,#8f2f2f,#e0603f)"
-          />
-          <Bar
-            label={here.isBoss ? t("idle.guardianHp") : t("idle.enemyHp")}
-            value={shown.enemyHp}
-            max={here.enemyHp}
-            fill={
-              here.isBoss
-                ? "linear-gradient(90deg,#8f2f2f,#e0603f)"
-                : "linear-gradient(90deg,#4b3f7a,#8a72d0)"
-            }
-            align="right"
-          />
-        </div>
-
-        {/* --- Defeat ------------------------------------------------------- */}
-        <AnimatePresence>
-          {fallen && (
-            <motion.div
-              className="absolute inset-0 flex flex-col items-center justify-center bg-[#05080f]/72 backdrop-blur-[1px]"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <p className="display text-lg text-[#ff8e8e]">{t("idle.fallen")}</p>
-              <p className="dim mt-1 max-w-[16rem] text-center text-[0.72rem]">
-                {t("idle.fallenBack", { n: levelInfo(shown.level).floor })}
-              </p>
-              <p className="tabular gold-text mt-2 text-sm">
-                {t("idle.risingIn", { s: Math.ceil(shown.recovering) })}
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.section>
-
-      {/* --- The verdict on this fight ------------------------------------ */}
-      <Verdict outcome={state.outcome} isBoss={here.isBoss} />
-
-      {/* --- The numbers -------------------------------------------------- */}
-      <section className="mt-3 grid grid-cols-3 gap-2">
-        <Stat label={t("idle.gold")} value={formatNumber(shown.gold)} tone="gold" />
-        <Stat label={t("idle.power")} value={`${formatNumber(stats.power)}/s`} />
-        <Stat label={t("idle.health")} value={formatNumber(stats.maxHp)} />
-        <Stat label={t("idle.regen")} value={`${stats.regen.toFixed(1)}/s`} />
-        <Stat label={t("idle.incoming")} value={`${here.enemyDamage.toFixed(1)}/s`} tone="danger" />
-        <Stat label={t("idle.deepest")} value={String(levelInfo(state.highestLevel).floor)} />
-      </section>
-
-      {/* --- Upgrades ----------------------------------------------------- */}
-      <h2 className="eyebrow mt-6">{t("idle.upgrades")}</h2>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {state.upgrades.map((upgrade) => {
-          const affordable = shown.gold >= upgrade.cost && !upgrade.maxed;
-          return (
-            <button
-              key={upgrade.key}
-              type="button"
-              disabled={!affordable || busy !== null}
-              onClick={() => act({ action: "upgrade", key: upgrade.key }, upgrade.key)}
-              className="panel p-3 text-left transition disabled:opacity-45"
-              style={affordable ? { borderColor: "rgba(201,162,77,0.45)" } : undefined}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-[var(--gold)]">
-                  <ItemIcon icon={upgrade.icon} size={18} />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[0.78rem] text-[var(--parchment)]">
-                  {L(upgrade.nameEn, upgrade.nameFr)}
-                </span>
-                <span className="tabular dim text-[0.7rem]">{upgrade.level}</span>
-              </div>
-              <p className="dim mt-1 text-[0.65rem] leading-snug">
-                {L(upgrade.descEn, upgrade.descFr)}
-              </p>
-              <p className="gold-text tabular mt-2 text-[0.72rem]">
-                {upgrade.maxed ? t("idle.maxed") : formatNumber(upgrade.cost)}
-              </p>
-            </button>
-          );
-        })}
+      {/* --- Two tabs, one running game --------------------------------- */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <TabButton active={tab === "FIGHT"} onClick={() => setTab("FIGHT")}>
+          {t("idle.tabFight")}
+        </TabButton>
+        <TabButton active={tab === "BAG"} onClick={() => setTab("BAG")} badge={spareCount}>
+          {t("idle.tabBag")}
+        </TabButton>
       </div>
 
-      {/* --- What it is wearing ------------------------------------------- */}
-      <h2 className="eyebrow mt-6">{t("idle.equipped")}</h2>
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        {SLOTS.map((slot) => {
-          const item = wornBySlot.get(slot);
-          const style = item ? RARITY_STYLE[item.rarity] : null;
-          return (
-            <div
-              key={slot}
-              className="panel p-2 text-center"
-              style={style ? { borderColor: `${style.color}55` } : { opacity: 0.5 }}
-            >
-              <p className="dim text-[0.6rem] uppercase tracking-widest">
-                {t(`idle.slot.${slot}`)}
-              </p>
-              {item ? (
-                <>
-                  <p
-                    className="mt-1 line-clamp-2 text-[0.66rem] leading-tight"
-                    style={{ color: style!.color }}
-                  >
-                    {itemName(item.slot, item.floor, item.rarity, locale)}
-                  </p>
-                  <p className="tabular mt-1 text-[0.62rem] text-[var(--parchment)]">
-                    {formatNumber(item.power)}
-                    <span className="dim"> · </span>
-                    <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
-                  </p>
-                </>
-              ) : (
-                <p className="dim mt-1 text-[0.68rem]">{t("idle.empty")}</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* --- The bag ------------------------------------------------------ */}
-      <div className="mt-6 flex items-center justify-between">
-        <h2 className="eyebrow">{t("idle.spares", { n: spares.length })}</h2>
-        {spares.length > 0 && (
-          <button
-            type="button"
-            className="btn btn-ghost px-3 py-1 text-[0.7rem]"
-            disabled={busy !== null}
-            onClick={() => act({ action: "sellAll" }, "sellAll")}
-          >
-            {t("idle.sellAll")}
-          </button>
-        )}
-      </div>
-
-      {spares.length === 0 ? (
-        <p className="dim mt-2 text-center text-[0.72rem] italic">{t("idle.bagEmpty")}</p>
+      {tab === "BAG" ? (
+        <IdleBag state={state} busy={busy} act={act} />
       ) : (
-        <div className="mt-2 space-y-2">
-          {(drawer ? spares : spares.slice(0, 5)).map((item) => {
-            const style = RARITY_STYLE[item.rarity];
-            const current = wornBySlot.get(item.slot);
-            const better = !current || item.power > current.power;
-            return (
-              <div
-                key={item.id}
-                className="panel flex items-center gap-2 p-2"
-                style={{ borderColor: `${style.color}44` }}
-              >
-                <span style={{ color: style.color }}>
-                  <ItemIcon icon="badge" size={18} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[0.72rem]" style={{ color: style.color }}>
-                    {itemName(item.slot, item.floor, item.rarity, locale)}
-                  </p>
-                  <p className="dim tabular text-[0.65rem]">
-                    {formatNumber(item.power)} · {formatNumber(item.vitality)}
-                    {better ? ` · ${t("idle.better")}` : ""}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-royal px-2 py-1 text-[0.68rem]"
-                  disabled={busy !== null}
-                  onClick={() => act({ action: "equip", itemId: item.id }, item.id)}
+        <>
+          {/* --- The arena -------------------------------------------- */}
+          <motion.section
+            className="panel panel-sapphire relative mt-4 overflow-hidden px-3 pb-3 pt-4"
+            // The whole arena flinches when the cat is hit. Cheap, and it says
+            // where the damage went without reading a single number.
+            animate={{ x: catWounds % 2 === 0 ? 0 : -3 }}
+            transition={{ type: "spring", stiffness: 900, damping: 14 }}
+          >
+            <div className="relative flex items-end justify-between gap-1">
+              <div className="relative">
+                <motion.div
+                  animate={{ x: fallen ? 0 : catSwings % 2 === 0 ? 0 : 12 }}
+                  transition={{ type: "spring", stiffness: 520, damping: 16 }}
+                  style={{
+                    filter: fallen ? "grayscale(0.85) brightness(0.6)" : undefined,
+                    transformOrigin: "bottom center",
+                  }}
                 >
-                  {t("idle.equip")}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost px-2 py-1 text-[0.68rem]"
-                  disabled={busy !== null}
-                  onClick={() => act({ action: "sell", itemId: item.id }, item.id)}
-                >
-                  {t("idle.sell")}
-                </button>
+                  <motion.div
+                    animate={fallen ? { rotate: -12, y: 10 } : { rotate: 0, y: 0 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 18 }}
+                  >
+                    <CatCanvas worn={worn} size={150} breathing={!fallen} />
+                  </motion.div>
+                </motion.div>
+                <HitStream hits={hits} target="CAT" tone="#ff6b6b" />
               </div>
-            );
-          })}
-          {spares.length > 5 && (
-            <button
-              type="button"
-              className="btn btn-ghost w-full py-1.5 text-[0.7rem]"
-              onClick={() => setDrawer((open) => !open)}
-            >
-              {drawer ? t("idle.showLess") : t("idle.showAll", { n: spares.length })}
-            </button>
+
+              <div className="relative flex-1 pb-4">
+                <AnimatePresence mode="popLayout">
+                  <motion.div
+                    key={enemyDeaths}
+                    initial={{ opacity: 0, x: 34, scale: 0.85 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.4, rotate: 18, y: 20 }}
+                    transition={{ duration: 0.28 }}
+                  >
+                    <Enemy isBoss={here.isBoss} recoil={catSwings} />
+                  </motion.div>
+                </AnimatePresence>
+                <HitStream hits={hits} target="ENEMY" tone="#f0d089" />
+                <HitStream hits={hits} target="GOLD" tone="#8fd14f" from="feet" prefix="+" />
+              </div>
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <Bar
+                label={t("idle.catHp")}
+                value={shown.hp}
+                max={stats.maxHp}
+                fill="linear-gradient(90deg,#3f8f5a,#7ed08f)"
+                low="linear-gradient(90deg,#8f2f2f,#e0603f)"
+              />
+              <Bar
+                label={here.isBoss ? t("idle.guardianHp") : t("idle.enemyHp")}
+                value={shown.enemyHp}
+                max={here.enemyHp}
+                fill={
+                  here.isBoss
+                    ? "linear-gradient(90deg,#8f2f2f,#e0603f)"
+                    : "linear-gradient(90deg,#4b3f7a,#8a72d0)"
+                }
+                align="right"
+              />
+            </div>
+
+            <AnimatePresence>
+              {fallen && (
+                <motion.div
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-[#05080f]/72 backdrop-blur-[1px]"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <p className="display text-lg text-[#ff8e8e]">{t("idle.fallen")}</p>
+                  <p className="dim mt-1 max-w-[16rem] text-center text-[0.72rem]">
+                    {t("idle.fallenBack", { n: levelInfo(shown.level).floor })}
+                  </p>
+                  <p className="tabular gold-text mt-2 text-sm">
+                    {t("idle.risingIn", { s: Math.ceil(shown.recovering) })}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.section>
+
+          <Verdict outcome={state.outcome} isBoss={here.isBoss} />
+
+          {/* --- The six statistics ----------------------------------- */}
+          <section className="mt-3 grid grid-cols-3 gap-2">
+            <Stat label={t("idle.dps")} value={`${formatNumber(stats.power)}/s`} tone="gold" />
+            <Stat label={t("idle.health")} value={formatNumber(stats.maxHp)} tone="life" />
+            <Stat label={t("idle.speed")} value={`${stats.attacksPerSecond.toFixed(1)}/s`} />
+            <Stat label={t("idle.crit")} value={`${Math.round(stats.critChance * 100)}%`} />
+            <Stat label={t("idle.critDamage")} value={`×${formatNumber(stats.critMultiplier)}`} />
+            <Stat label={t("idle.double")} value={`${Math.round(stats.doubleChance * 100)}%`} />
+          </section>
+
+          <p className="dim mt-2 text-center text-[0.64rem]">
+            {t("idle.incomingHere", { n: formatNumber(here.enemyDamage) })}
+            {" · "}
+            {t("idle.deepestShort", { n: levelInfo(state.highestLevel).floor })}
+          </p>
+
+          {/* --- Upgrades --------------------------------------------- */}
+          <h2 className="eyebrow mt-6">{t("idle.upgrades")}</h2>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {state.upgrades.map((upgrade) => {
+              const affordable = shown.gold >= upgrade.cost && !upgrade.maxed;
+              return (
+                <button
+                  key={upgrade.key}
+                  type="button"
+                  disabled={!affordable || busy !== null}
+                  onClick={() => act({ action: "upgrade", key: upgrade.key }, upgrade.key)}
+                  className="panel p-3 text-left transition disabled:opacity-45"
+                  style={affordable ? { borderColor: "rgba(201,162,77,0.45)" } : undefined}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-[var(--gold)]">
+                      <ItemIcon icon={upgrade.icon} size={18} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[0.78rem] text-[var(--parchment)]">
+                      {L(upgrade.nameEn, upgrade.nameFr)}
+                    </span>
+                    <span className="tabular dim text-[0.7rem]">{upgrade.level}</span>
+                  </div>
+                  <p className="dim mt-1 text-[0.65rem] leading-snug">
+                    {L(upgrade.descEn, upgrade.descFr)}
+                  </p>
+                  <p className="gold-text tabular mt-2 text-[0.72rem]">
+                    {upgrade.maxed ? t("idle.maxed") : formatNumber(upgrade.cost)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {defeats + state.defeats > 0 && (
+            <p className="dim mt-5 text-center text-[0.66rem]">
+              {t("idle.defeatsTotal", { n: state.defeats + defeats })}
+            </p>
           )}
-        </div>
+        </>
       )}
 
-      {/* --- What happened while away ------------------------------------- */}
+      {/* --- What happened while away ---------------------------------- */}
       <AnimatePresence>
         {welcome && (
           <motion.div
@@ -563,17 +490,41 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {defeats > 0 && (
-        <p className="dim mt-4 text-center text-[0.66rem]">
-          {t("idle.defeatsTotal", { n: state.defeats + defeats })}
-        </p>
-      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
+
+function TabButton({
+  active,
+  badge,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  badge?: number;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="panel relative py-2 text-[0.78rem] uppercase tracking-widest transition"
+      style={{
+        borderColor: active ? "rgba(201,162,77,0.6)" : undefined,
+        color: active ? "var(--gold-bright)" : "var(--text-dim)",
+        background: active ? "rgba(201,162,77,0.08)" : undefined,
+      }}
+    >
+      {children}
+      {badge !== undefined && badge > 0 && (
+        <span className="tabular ml-1.5 text-[0.68rem] opacity-70">({badge})</span>
+      )}
+    </button>
+  );
+}
 
 /**
  * Damage that floats off whoever took it, then gets out of the way.
@@ -608,11 +559,23 @@ function HitStream({
           .map((hit) => (
             <motion.span
               key={hit.id}
-              className="tabular absolute whitespace-nowrap text-[0.85rem] font-bold"
-              style={{ color: tone, textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}
-              initial={{ opacity: 0, y: feet ? 6 : 12, x: hit.drift, scale: 0.6 }}
-              animate={{ opacity: 1, y: feet ? -22 : -28, scale: 1 }}
-              exit={{ opacity: 0, y: feet ? -40 : -48 }}
+              className="tabular absolute whitespace-nowrap font-bold"
+              style={{
+                // A critical is worth reading differently, not just worth more.
+                color: hit.crit ? "#ff9d3d" : tone,
+                fontSize: hit.crit ? "1.15rem" : "0.85rem",
+                textShadow: hit.crit
+                  ? "0 0 10px rgba(255,157,61,0.7), 0 1px 4px rgba(0,0,0,0.9)"
+                  : "0 1px 4px rgba(0,0,0,0.9)",
+              }}
+              initial={{
+                opacity: 0,
+                y: (feet ? 6 : 12) + hit.lift,
+                x: hit.drift,
+                scale: hit.crit ? 1.5 : 0.6,
+              }}
+              animate={{ opacity: 1, y: (feet ? -22 : -30) + hit.lift, scale: 1 }}
+              exit={{ opacity: 0, y: (feet ? -40 : -50) + hit.lift }}
               transition={{ duration: 0.78, ease: "easeOut" }}
             >
               {prefix}
@@ -675,9 +638,7 @@ function Verdict({ outcome, isBoss }: { outcome: IdleState["outcome"]; isBoss: b
         color: losing ? "#ffb0a0" : "var(--candle)",
       }}
     >
-      {losing
-        ? t(isBoss ? "idle.losingBoss" : "idle.losing")
-        : t("idle.slow")}
+      {losing ? t(isBoss ? "idle.losingBoss" : "idle.losing") : t("idle.slow")}
     </motion.p>
   );
 }
@@ -779,19 +740,19 @@ function Stat({
 }: {
   label: string;
   value: string;
-  tone?: "gold" | "danger";
+  tone?: "gold" | "life";
 }) {
   return (
     <div className="panel px-2 py-2 text-center">
-      <p className="dim text-[0.58rem] uppercase tracking-widest">{label}</p>
+      <p className="dim text-[0.56rem] uppercase tracking-widest">{label}</p>
       <p
-        className="tabular mt-1 text-[0.9rem]"
+        className="tabular mt-1 text-[0.88rem]"
         style={{
           color:
             tone === "gold"
               ? "var(--gold-bright)"
-              : tone === "danger"
-                ? "#ff8e8e"
+              : tone === "life"
+                ? "#7ed08f"
                 : "var(--parchment)",
         }}
       >
@@ -799,26 +760,6 @@ function Stat({
       </p>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-
-/**
- * Idle numbers outgrow every reader long before they outgrow the game, so past a
- * few thousand only the leading digits carry meaning.
- */
-const SUFFIXES = ["", "k", "M", "B", "T", "Qa", "Qi"];
-
-export function formatNumber(value: number): string {
-  const n = Math.floor(value);
-  if (n < 1000) return String(n);
-  let tier = 0;
-  let scaled = n;
-  while (scaled >= 1000 && tier < SUFFIXES.length - 1) {
-    scaled /= 1000;
-    tier += 1;
-  }
-  return `${scaled.toFixed(scaled < 10 ? 2 : scaled < 100 ? 1 : 0)}${SUFFIXES[tier]}`;
 }
 
 function formatDuration(

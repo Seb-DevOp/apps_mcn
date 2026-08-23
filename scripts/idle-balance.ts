@@ -1,27 +1,30 @@
 /**
  * Balance probe for the Descent.
  *
- * Runs the real engine over simulated hours under a deliberately dumb player —
- * "buy the cheapest thing I can afford, every minute" — and prints where the
- * walls land. The point is not to find the optimal curve but to prove there is no
- * dead end: a floor the cat can never leave, however long it is left alone, is a
- * broken idle game rather than a hard one.
+ * Runs the real engine over simulated hours and answers two questions that no
+ * amount of reading the numbers can:
  *
- *   npm run balance
+ *   1. Does the game dead-end? A floor the cat can never leave, however long it
+ *      is left alone, is a broken idle game rather than a hard one.
+ *   2. Is any of the six upgrades a trap? "None stronger than another" only means
+ *      something if every one of them is the best purchase at some point. An
+ *      upgrade the player should never buy is a lie on the screen.
+ *
+ * The player it simulates is deliberate but not clever: it buys whichever upgrade
+ * gives the most improvement per gold right now, switching to survival whenever
+ * the cat is losing its current fight. Real players do better; if the game works
+ * for this one, it works.
+ *
+ *   npm run balance [hours]
  */
 import {
   UPGRADES,
   upgradeCost,
-  itemStats,
   levelInfo,
-  shapeFor,
   BASE_MAX_HP,
-  type Rarity,
-  type Slot,
+  type UpgradeKey,
 } from "../src/lib/content/idle";
 import { derive, simulate, type Upgrades } from "../src/lib/engine/idle";
-
-const SLOTS: Slot[] = ["HEAD", "SHOULDERS", "CHEST", "HANDS", "LEGS", "TRINKET"];
 
 interface Worn {
   slot: string;
@@ -32,12 +35,12 @@ interface Worn {
 }
 
 const upgrades: Upgrades = {
-  claws: 0,
-  fervour: 0,
-  instinct: 0,
-  fortune: 0,
-  hide: 0,
-  mending: 0,
+  attack: 0,
+  health: 0,
+  speed: 0,
+  crit: 0,
+  critDamage: 0,
+  double: 0,
 };
 
 let items: Worn[] = [];
@@ -49,9 +52,27 @@ let hp = BASE_MAX_HP;
 let recoverFor = 0;
 let defeats = 0;
 
+const spent: Record<string, number> = {};
+const chosen: Record<string, number> = {};
+const firstBought: Record<string, number> = {};
+const lastBought: Record<string, number> = {};
+for (const def of UPGRADES) {
+  spent[def.key] = 0;
+  chosen[def.key] = 0;
+}
+
 const MINUTE = 60;
-const HOURS = Number(process.argv[2] ?? 6);
-const marks = new Map<number, number>(); // floor -> minute first reached
+const HOURS = Number(process.argv[2] ?? 12);
+const marks = new Map<number, number>();
+
+/** What one more level of this upgrade would multiply its own axis by. */
+function marginalGain(key: UpgradeKey): number {
+  const trial: Upgrades = { ...upgrades, [key]: upgrades[key] + 1 };
+  const before = derive(items, upgrades, highestLevel);
+  const after = derive(items, trial, highestLevel);
+  const def = UPGRADES.find((entry) => entry.key === key)!;
+  return def.axis === "SURVIVAL" ? after.maxHp / before.maxHp : after.power / before.power;
+}
 
 for (let minute = 1; minute <= HOURS * 60; minute++) {
   const stats = derive(items, upgrades, highestLevel);
@@ -79,22 +100,37 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
     }
   }
 
-  // The dumb player: cheapest affordable upgrade, as often as possible.
-  for (let spree = 0; spree < 40; spree++) {
-    const options = UPGRADES.map((def) => ({
-      def,
-      cost: upgradeCost(def, upgrades[def.key as keyof Upgrades]),
-    }))
-      .filter((option) => option.cost <= gold)
-      .filter(
-        (option) =>
-          option.def.maxLevel === undefined ||
-          upgrades[option.def.key as keyof Upgrades] < option.def.maxLevel,
-      )
-      .sort((a, b) => a.cost - b.cost);
+  for (let spree = 0; spree < 60; spree++) {
+    const now = derive(items, upgrades, highestLevel);
+    const info = levelInfo(level);
+    const net = now.regen - info.enemyDamage;
+    const timeToFall = net < 0 ? now.maxHp / -net : Number.POSITIVE_INFINITY;
+    const timeToKill = info.enemyHp / now.power;
+    // A player who reads the screen buys health *before* the cat starts dying, not
+    // after. Keeping a margin of two is what an attentive one actually does, and
+    // it is the difference between a game with defeats in it and a game of them.
+    const exposed = timeToFall < timeToKill * 2;
+
+    const options = UPGRADES.filter((def) => {
+      if (def.maxLevel !== undefined && upgrades[def.key] >= def.maxLevel) return false;
+      if (upgradeCost(def, upgrades[def.key]) > gold) return false;
+      return exposed ? def.axis === "SURVIVAL" : true;
+    }).map((def) => {
+      const cost = upgradeCost(def, upgrades[def.key]);
+      // Improvement per gold, on a log scale so multipliers compare honestly.
+      return { def, cost, value: Math.log(marginalGain(def.key)) / cost };
+    });
+
     if (options.length === 0) break;
-    gold -= options[0].cost;
-    upgrades[options[0].def.key as keyof Upgrades] += 1;
+    options.sort((a, b) => b.value - a.value);
+    const best = options[0];
+
+    gold -= best.cost;
+    spent[best.def.key] += best.cost;
+    chosen[best.def.key] += 1;
+    upgrades[best.def.key] += 1;
+    if (firstBought[best.def.key] === undefined) firstBought[best.def.key] = minute;
+    lastBought[best.def.key] = minute;
   }
 
   const floor = levelInfo(highestLevel).floor;
@@ -103,54 +139,60 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
 
 const stats = derive(items, upgrades, highestLevel);
 const here = levelInfo(level);
+const totalSpent = Object.values(spent).reduce((sum, value) => sum + value, 0);
 
-console.log(`après ${HOURS} h de jeu passif, joueur naïf`);
+console.log(`après ${HOURS} h de jeu passif`);
 console.log(`  étage atteint      ${levelInfo(highestLevel).floor}`);
 console.log(`  défaites           ${defeats}`);
-console.log(`  puissance          ${stats.power.toFixed(0)}/s`);
-console.log(`  vie                ${stats.maxHp.toFixed(0)} (+${stats.regen.toFixed(1)}/s)`);
-console.log(`  dégâts subis ici   ${here.enemyDamage.toFixed(1)}/s`);
-console.log(`  or en poche        ${Math.round(gold)}`);
+console.log(`  dégâts par coup    ${stats.hitDamage.toExponential(2)}`);
+console.log(`  attaques / s       ${stats.attacksPerSecond.toFixed(2)}`);
 console.log(
-  `  améliorations      ${Object.entries(upgrades)
-    .map(([key, value]) => `${key} ${value}`)
-    .join(" · ")}`,
+  `  critique           ${(stats.critChance * 100).toFixed(0)} % · ×${stats.critMultiplier.toFixed(1)}`,
 );
-console.log(`  équipé             ${items.length}/6 emplacements`);
+console.log(`  double coup        ${(stats.doubleChance * 100).toFixed(0)} %`);
+console.log(`  dps effectif       ${stats.power.toExponential(2)}`);
+console.log(`  vie                ${stats.maxHp.toExponential(2)} (+${stats.regen.toExponential(2)}/s)`);
+console.log(`  dégâts subis ici   ${here.enemyDamage.toExponential(2)}/s`);
+
+console.log("\nrépartition de l'or, et rôle de chaque statistique :");
+for (const def of UPGRADES) {
+  const share = totalSpent > 0 ? (spent[def.key] / totalSpent) * 100 : 0;
+  const capped = def.maxLevel !== undefined && upgrades[def.key] >= def.maxLevel;
+  const exponent = Math.log(1 + def.perLevel) / Math.log(def.costGrowth);
+  const window =
+    firstBought[def.key] === undefined
+      ? "jamais acheté"
+      : `${firstBought[def.key]}→${lastBought[def.key]} min`;
+  console.log(
+    `  ${def.nameFr.padEnd(18)} niv ${String(upgrades[def.key]).padStart(4)}` +
+      `${capped ? " (max)" : "     "} · ${share.toFixed(1).padStart(5)} % de l'or` +
+      ` · ${window.padEnd(16)}` +
+      (def.maxLevel === undefined ? ` · exposant ${exponent.toFixed(3)}` : ""),
+  );
+}
+
+const traps = UPGRADES.filter((def) => chosen[def.key] === 0);
+console.log(
+  traps.length
+    ? `\nPIÈGES : ${traps.map((def) => def.nameFr).join(", ")} — jamais le meilleur achat`
+    : "\naucun piège : les six ont été le meilleur achat à un moment",
+);
 
 console.log("\npremière arrivée par étage (minute) :");
 const rows = [...marks.entries()].sort((a, b) => a[0] - b[0]);
-for (const [floor, minute] of rows) {
-  const previous = rows[rows.indexOf([floor, minute] as never) - 1];
-  void previous;
+const step = Math.max(1, Math.ceil(rows.length / 20));
+for (const [floor, minute] of rows.filter((_, index) => index % step === 0)) {
   console.log(`  étage ${String(floor).padStart(3)} → ${minute} min`);
 }
+if (rows.length > 0) {
+  const [floor, minute] = rows[rows.length - 1];
+  console.log(`  étage ${String(floor).padStart(3)} → ${minute} min  (dernier)`);
+}
 
-// A floor that took more than a quarter of the whole run to leave is a wall
-// worth naming out loud.
-const walls = rows
-  .map(([floor, minute], index) => ({
-    floor,
-    spent: (rows[index + 1]?.[1] ?? HOURS * 60) - minute,
-  }))
-  .filter((entry) => entry.spent > (HOURS * 60) / 4);
-
-console.log(
-  walls.length
-    ? `\nmurs : ${walls.map((w) => `étage ${w.floor} (${w.spent} min)`).join(", ")}`
-    : "\nmurs : aucun étage n'a retenu le chat plus d'un quart de la partie",
-);
-
-// Sample the future: can the current build still be blocked forever?
-const stuck = (() => {
-  const info = levelInfo(highestLevel);
-  const net = stats.regen - info.enemyDamage;
-  const toKill = info.enemyHp / stats.power;
-  const toFall = net < 0 ? stats.maxHp / -net : Infinity;
-  return toFall < toKill;
-})();
+const net = stats.regen - here.enemyDamage;
+const stuck = net < 0 && stats.maxHp / -net < here.enemyHp / stats.power;
 console.log(
   stuck
-    ? "état final : le chat perd son combat actuel — l'or passif doit le débloquer"
-    : "état final : le chat gagne son combat actuel",
+    ? "\nétat final : le chat perd son combat actuel — l'or passif doit le débloquer"
+    : "\nétat final : le chat gagne son combat actuel",
 );

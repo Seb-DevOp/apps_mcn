@@ -341,7 +341,8 @@ dégâts montent au-dessus de qui les prend, l'or monte des pieds de l'ennemi, e
 les deux barres se font face.
 
 **L'écran nomme la cause du blocage** plutôt que de dire « trop fort » :
-*Puissance 5/s · Vie 60 · Guérison 1,2/s · Subi 4327,9/s* se lit tout seul, et le
+*Dégâts 81,3k/s · Vie 81,0k · Vitesse 2,4/s · Critique 32 % · Dég. crit ×3 · Double
+22 %* se lit tout seul, et le
 verdict dit quel achat débloque.
 
 ### Les courbes, mesurées et non devinées
@@ -365,14 +366,78 @@ coût d'une amélioration et son effet est le seul réglage qui compte :
 `effet ^ (ln croissance_or / ln croissance_coût)` doit rester sous la croissance
 des ennemis.
 
-**Une guérison non plafonnée supprime la défaite.** Achetée sans limite, elle
-finit par dépasser n'importe quel dégât possible à n'importe quelle profondeur :
-le chat devient immortel et la condition de perte disparaît en silence. La
-Guérison Lente est donc la seule amélioration avec un niveau maximum.
+**Une guérison achetable supprime la défaite.** Achetée sans limite elle finit
+par dépasser n'importe quel dégât possible à n'importe quelle profondeur : le chat
+devient immortel et la condition de perte disparaît en silence. La régénération est
+donc fixée à 2 % de la vie totale et ne figure pas dans la boutique — elle suit ce
+que le joueur a acheté en vie, sans jamais pouvoir le dépasser.
 
 Courbe obtenue, joueur naïf : étage 10 à 14 min, étage 20 à 49 min, étage 25 à
 2 h 10, étage 30 à 6 h 30 — 200 défaites réparties sur douze heures, et aucun
 étage qui retienne le chat pour toujours.
+
+### Six statistiques, et une définition de « aussi forte »
+
+Attaque, Points de Vie, Vitesse, Chance Critique, Dégâts Critiques, Double Coup.
+Les dégâts par seconde sont un **produit**, pas une somme :
+
+`dps = dégâts × vitesse × (1 + crit × (dégâts_crit − 1)) × (1 + double)`
+
+ce qui donne un sens exact à « aucune plus forte qu'une autre ». Pour une
+amélioration dont le niveau n multiplie son facteur par m et coûte `base·c^n`, le
+multiplicateur qu'un budget G achète vaut `(G/base)^(ln m / ln c)`. **Cet exposant,
+et rien d'autre**, décide de la force d'une amélioration sur le long terme : deux
+améliorations sans plafond sont équivalentes exactement quand leurs `ln m / ln c`
+coïncident.
+
+| Statistique | Effet par niveau | Coût | Plafond | Exposant |
+| --- | --- | --- | --- | --- |
+| Attaque | ×1,10 dégâts | ×2,00 | — | 0,138 |
+| Dégâts Critiques | ×1,08 sur un crit | ×1,78 | — | 0,133 |
+| Points de Vie | ×1,12 vie | ×1,46 | — | 0,299 |
+| Vitesse | +0,1 attaque/s | ×1,36 | 5,0/s | borné |
+| Chance Critique | +1,5 % | ×1,27 | 72,5 % | borné |
+| Double Coup | +2 % | ×1,33 | 90 % | borné |
+
+Attaque et Dégâts Critiques sont les deux offensives sans plafond et partagent le
+même exposant. **Points de Vie répond à une autre courbe** — les dégâts ennemis
+croissent en 1,152 par niveau, leur vie en 1,19 — et est calée sur celle-là : lui
+donner l'exposant de l'Attaque laisserait le chat incapable de survivre à ce qu'il
+sait déjà tuer.
+
+Les trois bornées achètent un multiplicateur total fini : elles ne peuvent pas
+changer la courbe de fond, et sont tarifées pour que l'échelle entière coûte à peu
+près ce que le même multiplicateur coûte en Attaque. C'est une **forme**, pas un
+avantage : elles sont le meilleur achat au début et terminées ensuite.
+
+`npm run balance` le vérifie plutôt que de l'affirmer. La sonde simule un joueur
+qui achète à chaque instant ce qui rend le plus par pièce d'or, et rapporte la part
+d'or allée à chacune. Verdict mesuré sur douze heures : **aucun piège — les six ont
+été le meilleur achat à un moment**, l'or se répartit 24 / 39 / 36 % entre les trois
+sans plafond, et les trois bornées sont saturées avant la vingtième minute.
+
+Une mesure a changé la conception elle-même : avec des dégâts ennemis croissant en
+1,17, **le mur de progression et le mur de mort étaient le même mur** — 1400
+défaites en douze heures, une toutes les 25 secondes. Ramener la croissance des
+dégâts à 1,152 sépare les deux : le chat ralentit avant de mourir, et les 130
+défaites restantes tombent là où elles doivent, sur les Gardiens.
+
+### Le sac
+
+Un onglet à part, parce que trier n'est pas se battre — et le combat continue côté
+serveur pendant qu'on trie, donc revenir à l'arène doit être instantané plutôt
+qu'une navigation.
+
+On y voit le chat en grand avec ce qu'il porte, un point vert sur chaque
+emplacement où le sac contient mieux, et deux boutons qui remplacent cent tapotements :
+
+- **Équiper le recommandé** — met le meilleur de chaque emplacement d'un coup. La
+  comparaison se fait sur la puissance seule, et c'est suffisant : dans un même
+  emplacement, puissance et vitalité sont générées depuis le même étage et la même
+  rareté, elles ne peuvent donc pas désigner des gagnants différents.
+- **Vendre sous [rareté]** — une vente groupée par seuil, avec le nombre d'objets
+  et l'or exact avant de cliquer. Les seuils s'arrêtent à Épique : « vendre sous
+  Mythique » n'est que « tout vendre » déguisé, et ce bouton existe déjà.
 
 ### Les objets sont générés, pas catalogués
 

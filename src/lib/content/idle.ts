@@ -80,8 +80,8 @@ const BOSS_GOLD_MULTIPLIER = 9;
  * asking for two different purchases.
  */
 const DMG_BASE = 0.9;
-const DMG_GROWTH = 1.17;
-const BOSS_DMG_MULTIPLIER = 2.6;
+const DMG_GROWTH = 1.152;
+const BOSS_DMG_MULTIPLIER = 1.7;
 
 export function levelInfo(level: number): LevelInfo {
   const n = Math.max(1, Math.floor(level));
@@ -118,7 +118,13 @@ export function floorStart(level: number): number {
 // Upgrades: the gold sink
 // ---------------------------------------------------------------------------
 
-export type UpgradeKey = "claws" | "instinct" | "fervour" | "fortune" | "hide" | "mending";
+export type UpgradeKey =
+  | "attack"
+  | "health"
+  | "speed"
+  | "crit"
+  | "critDamage"
+  | "double";
 
 export interface UpgradeDef {
   key: UpgradeKey;
@@ -128,84 +134,116 @@ export interface UpgradeDef {
   descFr: string;
   baseCost: number;
   costGrowth: number;
-  /** What one level adds. Interpreted by `derivedStats`. */
+  /** What one level adds. Interpreted by `derive`. */
   perLevel: number;
-  /**
-   * Where the upgrade stops, when leaving it uncapped would end the game.
-   * Healing is the case: bought without limit it eventually exceeds any possible
-   * incoming damage, and an immortal cat has no failure state left to play against.
-   */
+  /** Where the upgrade stops, for the ones that would break the game uncapped. */
   maxLevel?: number;
+  /** Which side of the fight it changes — used to compare like with like. */
+  axis: "OFFENCE" | "SURVIVAL";
   icon: string;
 }
 
+/**
+ * Six statistics, and one rule about them.
+ *
+ * Damage per second is a product, not a sum:
+ *
+ *   dps = damage × speed × (1 + crit × (critDamage − 1)) × (1 + double)
+ *
+ * which means "as strong as each other" has an exact meaning. For an upgrade
+ * whose level n multiplies its factor by m and whose level n costs base·c^n, the
+ * multiplier bought with a budget G is (G/base)^(ln m / ln c). That exponent —
+ * and nothing else — decides how strong an upgrade is in the long run, so two
+ * uncapped upgrades are equal exactly when their ln m / ln c match.
+ *
+ * Attack and Critical Damage are the two uncapped offence stats and share an
+ * exponent of ~0.14. Health answers a different curve (incoming damage grows at
+ * 1.17 per level, enemy health at 1.19) so it is matched against that instead —
+ * being "equal" to Attack would leave the cat unable to survive what it can
+ * already kill.
+ *
+ * Speed, Critical Chance and Double Strike are capped: each buys a bounded total
+ * multiplier, so they cannot change the long-run curve at all. They are priced so
+ * that the whole ladder costs about what the same multiplier costs on Attack —
+ * which makes them the better purchase early, and finished later. That is a shape,
+ * not an advantage, and `npm run balance` checks that every one of the six is the
+ * best buy at some point rather than a trap nobody should ever take.
+ */
 export const UPGRADES: UpgradeDef[] = [
   {
-    key: "claws",
-    nameEn: "Sharpened Claws",
-    nameFr: "Griffes Aiguisées",
-    descEn: "+2 power per level. The plain, dependable one.",
-    descFr: "+2 de puissance par niveau. Le simple et fiable.",
-    baseCost: 15,
-    costGrowth: 1.15,
-    perLevel: 2,
+    key: "attack",
+    nameEn: "Attack",
+    nameFr: "Attaque",
+    descEn: "×1.10 damage per hit, per level. Never stops being worth it.",
+    descFr: "×1,10 de dégâts par coup et par niveau. Ne cesse jamais de payer.",
+    baseCost: 30,
+    costGrowth: 2,
+    perLevel: 0.1,
+    axis: "OFFENCE",
     icon: "sword",
   },
   {
-    key: "fervour",
-    nameEn: "Vault Fervour",
-    nameFr: "Ferveur du Vault",
-    descEn: "×1.08 power per level. Compounds — this is the one that keeps up.",
-    descFr: "×1,08 de puissance par niveau. Se compose — c'est elle qui suit la courbe.",
-    baseCost: 100,
-    costGrowth: 1.33,
-    perLevel: 0.08,
-    icon: "core",
-  },
-  {
-    key: "hide",
-    nameEn: "Thick Hide",
-    nameFr: "Cuir Épais",
-    descEn: "×1.06 health per level. What lets the cat outlast a Guardian.",
-    descFr: "×1,06 de vie par niveau. Ce qui fait tenir face à un Gardien.",
-    baseCost: 80,
-    costGrowth: 1.22,
-    perLevel: 0.06,
+    key: "health",
+    nameEn: "Health",
+    nameFr: "Points de Vie",
+    descEn: "×1.12 health per level. The only answer to a Guardian that hits hard.",
+    descFr: "×1,12 de vie par niveau. La seule réponse à un Gardien qui frappe fort.",
+    baseCost: 40,
+    costGrowth: 1.46,
+    perLevel: 0.12,
+    axis: "SURVIVAL",
     icon: "velvet",
   },
   {
-    key: "mending",
-    nameEn: "Slow Mending",
-    nameFr: "Guérison Lente",
-    descEn: "+0.4% of health back per second, per level. Scales with the health you have.",
-    descFr: "+0,4 % de la vie régénérée par seconde et par niveau.",
-    baseCost: 120,
-    costGrowth: 1.16,
-    perLevel: 0.004,
-    maxLevel: 25,
-    icon: "essence",
+    key: "speed",
+    nameEn: "Attack Speed",
+    nameFr: "Vitesse",
+    descEn: "+0.1 attacks per second. From one blow a second up to five.",
+    descFr: "+0,1 attaque par seconde. D'un coup par seconde jusqu'à cinq.",
+    baseCost: 45,
+    costGrowth: 1.36,
+    perLevel: 0.1,
+    maxLevel: 40,
+    axis: "OFFENCE",
+    icon: "boost-xp",
   },
   {
-    key: "instinct",
-    nameEn: "Hunter's Instinct",
-    nameFr: "Instinct du Chasseur",
-    descEn: "+6% gold per level.",
-    descFr: "+6% d'or par niveau.",
+    key: "crit",
+    nameEn: "Critical Chance",
+    nameFr: "Chance Critique",
+    descEn: "+1.5% chance to strike critically. Worthless without critical damage.",
+    descFr: "+1,5 % de chance de coup critique. Sans intérêt sans dégâts critiques.",
+    baseCost: 25,
+    costGrowth: 1.27,
+    perLevel: 0.015,
+    maxLevel: 45,
+    axis: "OFFENCE",
+    icon: "aura",
+  },
+  {
+    key: "critDamage",
+    nameEn: "Critical Damage",
+    nameFr: "Dégâts Critiques",
+    descEn: "×1.08 on a critical hit, per level. Grows with how often you crit.",
+    descFr: "×1,08 sur un coup critique, par niveau. Vaut ce que vaut ta chance critique.",
+    baseCost: 150,
+    costGrowth: 1.78,
+    perLevel: 0.08,
+    axis: "OFFENCE",
+    icon: "legend",
+  },
+  {
+    key: "double",
+    nameEn: "Double Strike",
+    nameFr: "Double Coup",
+    descEn: "+2% chance the blow lands twice. Doubles the critical with it.",
+    descFr: "+2 % de chance que le coup parte deux fois. Double aussi le critique.",
     baseCost: 60,
-    costGrowth: 1.18,
-    perLevel: 0.06,
-    icon: "gold",
-  },
-  {
-    key: "fortune",
-    nameEn: "Keen Eye",
-    nameFr: "Œil Aiguisé",
-    descEn: "+3% chance that a fallen enemy leaves something behind.",
-    descFr: "+3% de chance qu'un ennemi vaincu laisse quelque chose.",
-    baseCost: 250,
-    costGrowth: 1.26,
-    perLevel: 0.03,
-    icon: "key",
+    costGrowth: 1.33,
+    perLevel: 0.02,
+    maxLevel: 45,
+    axis: "OFFENCE",
+    icon: "magic-sword",
   },
 ];
 
@@ -447,6 +485,11 @@ export const MIN_KILL_SECONDS = 0.2;
 
 /** A bare cat, before anything is worn or bought. */
 export const BASE_MAX_HP = 60;
+export const BASE_ATTACK_DAMAGE = 5;
+export const BASE_ATTACK_SPEED = 1;
+export const BASE_CRIT_CHANCE = 0.05;
+export const BASE_CRIT_MULTIPLIER = 2;
+export const BASE_DOUBLE_CHANCE = 0;
 
 /**
  * Healing is a share of total health, not a flat number.
@@ -458,13 +501,6 @@ export const BASE_MAX_HP = 60;
  */
 export const BASE_REGEN_SHARE = 0.02;
 
-/**
- * And the ceiling on it. Past roughly an eighth of total health per second the
- * cat outheals anything the Vault can produce, at any depth, forever — which
- * quietly deletes the losing condition. The cap keeps survival a matter of how
- * much health was bought, not how much healing was.
- */
-export const MAX_REGEN_SHARE = 0.12;
 
 /**
  * How long the cat lies down after losing, before picking itself up at the start
