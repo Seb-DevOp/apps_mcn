@@ -15,8 +15,6 @@ import { CatCanvas, type WornPiece } from "./CatCanvas";
 import { FloorBackdrop, themeFor } from "./FloorBackdrop";
 import { IdleBag } from "./IdleBag";
 import { LootPrompt, type LootEntry } from "./LootPrompt";
-import { IdleRebirth } from "./IdleRebirth";
-import { IdleShop } from "./IdleShop";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
@@ -78,7 +76,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   const { t, L } = useI18n();
 
   const [state, setState] = useState(initial);
-  const [tab, setTab] = useState<"FIGHT" | "BAG" | "REBIRTH" | "SHOP">("FIGHT");
+  const [tab, setTab] = useState<"FIGHT" | "BAG">("FIGHT");
   const [busy, setBusy] = useState<string | null>(null);
   const [welcome, setWelcome] = useState(
     initial.report.seconds > 60 && initial.report.goldEarned > 0,
@@ -388,8 +386,6 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
   const spareCount = state.items.filter((item) => !item.equipped && !item.onPack).length;
   const breathOpen = state.unlocks.some((entry) => entry.key === "breath" && entry.open);
-  const showRebirth =
-    state.rebirth.ready || state.rebirth.relics > 0 || state.rebirth.rebirths > 0;
 
   return (
     <div className="pb-4">
@@ -405,36 +401,17 @@ export function IdleGame({ initial }: { initial: IdleState }) {
       </header>
 
       {/* --- Two tabs, one running game --------------------------------- */}
-      <div
-        className="mt-4 grid gap-2"
-        style={{ gridTemplateColumns: `repeat(${showRebirth ? 4 : 3}, minmax(0, 1fr))` }}
-      >
+      <div className="mt-4 grid grid-cols-2 gap-2">
         <TabButton active={tab === "FIGHT"} onClick={() => setTab("FIGHT")}>
           {t("idle.tabFight")}
         </TabButton>
         <TabButton active={tab === "BAG"} onClick={() => setTab("BAG")} badge={spareCount}>
           {t("idle.tabBag")}
         </TabButton>
-        {/* Hidden until it can do something: a tab that only ever says "not yet"
-            is a worse first impression than no tab. And no count on it — three
-            tabs plus a five-figure relic total overflows the row, and the panel
-            behind it shows the number in large type anyway. */}
-        <TabButton active={tab === "SHOP"} onClick={() => setTab("SHOP")}>
-          {t("idle.tabShop")}
-        </TabButton>
-        {showRebirth && (
-          <TabButton active={tab === "REBIRTH"} onClick={() => setTab("REBIRTH")}>
-            {t("idle.tabRebirth")}
-          </TabButton>
-        )}
       </div>
 
       {tab === "BAG" ? (
         <IdleBag state={state} busy={busy} act={act} />
-      ) : tab === "REBIRTH" ? (
-        <IdleRebirth state={state} busy={busy} act={act} />
-      ) : tab === "SHOP" ? (
-        <IdleShop state={state} busy={busy} act={act} />
       ) : (
         <>
           {/* --- The arena -------------------------------------------- */}

@@ -317,3 +317,34 @@ export function PawIcon({ size = 22, className }: IconProps) {
     </svg>
   );
 }
+
+/** A purse: what gold is for, rather than what it is. */
+export function ShopIcon({ size = 22, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M5 9h14l1.2 10.5a1.5 1.5 0 0 1-1.5 1.5H5.3a1.5 1.5 0 0 1-1.5-1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M8.5 11V7a3.5 3.5 0 0 1 7 0v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A life turning over: the same road walked again, further in. */
+export function RebirthIcon({ size = 22, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M12 4.5a7.5 7.5 0 1 1-6.6 3.9"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path d="M4.4 4.2 5.4 8.4l4.2-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}

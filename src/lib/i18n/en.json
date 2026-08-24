@@ -246,5 +246,7 @@
   "leaderboard.context": "floor {floor} · {lives} lives",
   "leaderboard.distanceValue": "{n} floors",
   "leaderboard.lifeValue": "1 life",
-  "leaderboard.contextOne": "floor {floor} · 1 life"
+  "leaderboard.contextOne": "floor {floor} · 1 life",
+  "nav.shop": "Shop",
+  "nav.rebirth": "Lives"
 }

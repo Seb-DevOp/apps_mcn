@@ -404,12 +404,14 @@ La Descente est le jeu. Tout ce qui l'entourait appartenait à un autre jeu et a
 missions, l'Armurerie, la Forge, l'exploration, la galerie des rangs — routes,
 API, moteurs, contenu et composants.
 
-Il reste **trois écrans** :
+Il reste **cinq écrans** :
 
 | Écran | Ce qu'il fait |
 | --- | --- |
 | **Descente** | le combat et le sac, deux onglets d'un même jeu qui tourne |
-| **Classement** | profondeur, Gardiens, fortune — trois tables lues sur `IdleProfile` |
+| **Boutique** | le coffre et les pelages |
+| **Vies** | la Renaissance, l'échelle des cinq marches et les reliques |
+| **Classement** | cinq tables lues sur `IdleProfile` |
 | **Profil** | le chat, ses chiffres, le compte et ses moyens de connexion |
 
 Le dictionnaire est passé de 404 à 189 clés, élagué par un script qui garde les
@@ -775,6 +777,42 @@ Le cumul vit dans `totalLevels`, incrémenté à chaque salle franchie et **jama
 remis à zéro par une renaissance**. C'est le seul nombre qui dise combien de Vault
 un chat a réellement parcouru, là où le record ne dit que jusqu'où il est descendu
 une fois.
+
+### Deux systèmes qui étaient enterrés
+
+La Boutique et la Renaissance étaient des onglets *à l'intérieur* du combat, ce qui
+plaçait deux systèmes entiers un tap plus loin que le sac. Ce sont des écrans à part
+entière maintenant, et l'arène ne garde que les deux onglets qui sont réellement la
+même activité : se battre, et décider de ce que le chat porte pendant qu'il se bat.
+
+Les deux partagent une coquille qui tient l'état, l'action et une horloge — mais
+pas la boucle de rejouabilité ni les cartes de butin. Celles-là appartiennent à
+l'arène, et les faire tourner derrière une boutique dépenserait un budget d'images
+sur un combat que personne ne regarde. La synchronisation y est plus lente pour la
+même raison : rien n'y bouge entre deux réponses sauf l'or, et un or qui a quelques
+secondes de retard ne coûte rien.
+
+« Renaissance » fait onze caractères dans une case de quatre-vingts pixels : la barre
+dit **Vies**, l'écran qu'elle ouvre s'appelle toujours Renaissance.
+
+### Le bouton qui ne fermait rien
+
+Presser « Porter » sur une carte de butin la laissait ouverte, tous ses boutons
+morts, jusqu'à ce que ses treize secondes s'écoulent.
+
+La carte se retirait quand l'objet **disparaissait** — ce que vendre fait, et
+qu'équiper ne fait pas : la pièce est toujours là, seulement portée. Elle se retire
+maintenant dès que la question qu'elle posait a reçu une réponse.
+
+Une pièce partie directement sur un emplacement vide reste l'exception : elle
+arrive déjà portée et n'est là que pour être lue, pas pour être répondue, donc elle
+garde tout son temps à l'écran.
+
+Le premier test de la correction a menti dans les deux sens : il comptait les cartes
+à l'écran plutôt que la carte cliquée, et trois peuvent être empilées — en fermer
+une en laisse deux, et de nouveaux butins arrivent entre le clic et la vérification.
+Instrumenter la réponse de l'API a montré `equipped=true` et la disparition de la
+bonne carte.
 
 ### Le sac
 

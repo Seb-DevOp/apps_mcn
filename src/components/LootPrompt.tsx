@@ -89,10 +89,21 @@ function Card({
     return () => window.clearTimeout(timer);
   }, [entry.id, onDismiss]);
 
-  // The item leaves the list the moment it is sold, so the card follows it out.
+  /**
+   * The card goes when the question it asked has been answered.
+   *
+   * Selling removes the item, so its absence was already handled. Wearing does
+   * not — the piece is still there, only worn — so the card sat open after
+   * "Wear" with every button dead, waiting out its thirteen seconds.
+   *
+   * A piece that went straight on because the slot was bare is the exception: it
+   * arrives already worn and is there to be read, not answered, so it keeps its
+   * full time on screen.
+   */
   useEffect(() => {
     if (!item) onDismiss(entry.id);
-  }, [item, entry.id, onDismiss]);
+    else if (!entry.equipped && item.equipped) onDismiss(entry.id);
+  }, [item, entry.id, entry.equipped, onDismiss]);
 
   if (!item) return null;
 
@@ -108,6 +119,7 @@ function Card({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 12, scale: 0.96 }}
       transition={{ type: "spring", stiffness: 380, damping: 30 }}
+      data-loot-card=""
       className="panel pointer-events-auto p-3"
       style={{
         borderColor: `${style.color}88`,

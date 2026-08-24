@@ -1071,6 +1071,11 @@ export interface SkinDef {
  * Each is roughly ten times the last, and gold grows by a thousand every eight
  * floors — so a coat unlocks by descending rather than by saving, and the shop
  * always has exactly one thing that is nearly affordable.
+ *
+ * The whole ladder was raised a thousandfold after play showed the top of it
+ * being bought in an afternoon. Where the ladder starts is the only thing that
+ * decides which floor each coat belongs to; the spacing between rungs is what
+ * makes it a ladder at all, so that stayed.
  */
 export const SKINS: SkinDef[] = [
   {
@@ -1089,7 +1094,7 @@ export const SKINS: SkinDef[] = [
     key: "ember",
     nameEn: "Ember",
     nameFr: "Braise",
-    price: 5_000,
+    price: 5_000_000,
     fur: "#c2703a",
     furDark: "#94502a",
     furDeep: "#6b3a1e",
@@ -1101,7 +1106,7 @@ export const SKINS: SkinDef[] = [
     key: "shadow",
     nameEn: "Shadow",
     nameFr: "Ombre",
-    price: 60_000,
+    price: 60_000_000,
     fur: "#3a3a42",
     furDark: "#26262c",
     furDeep: "#17171b",
@@ -1113,7 +1118,7 @@ export const SKINS: SkinDef[] = [
     key: "snow",
     nameEn: "Snow",
     nameFr: "Neige",
-    price: 700_000,
+    price: 700_000_000,
     fur: "#e2e0da",
     furDark: "#c2bfb6",
     furDeep: "#9d9a91",
@@ -1125,7 +1130,7 @@ export const SKINS: SkinDef[] = [
     key: "siamese",
     nameEn: "Siamese",
     nameFr: "Siamois",
-    price: 8_000_000,
+    price: 8_000_000_000,
     fur: "#ddd0b8",
     furDark: "#6b5a4a",
     furDeep: "#453a30",
@@ -1137,7 +1142,7 @@ export const SKINS: SkinDef[] = [
     key: "spectre",
     nameEn: "Spectre",
     nameFr: "Fantôme",
-    price: 90_000_000,
+    price: 90_000_000_000,
     fur: "#6f86a8",
     furDark: "#4a5c78",
     furDeep: "#2f3c52",
@@ -1149,7 +1154,7 @@ export const SKINS: SkinDef[] = [
     key: "gilded",
     nameEn: "Gilded",
     nameFr: "Doré",
-    price: 1_000_000_000,
+    price: 1_000_000_000_000,
     fur: "#d4a94e",
     furDark: "#a67f30",
     furDeep: "#75581e",
@@ -1161,7 +1166,7 @@ export const SKINS: SkinDef[] = [
     key: "vault",
     nameEn: "Vault Heart",
     nameFr: "Cœur du Vault",
-    price: 12_000_000_000,
+    price: 12_000_000_000_000,
     fur: "#5a4b9c",
     furDark: "#3d3270",
     furDeep: "#26204a",

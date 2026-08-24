@@ -3,16 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./I18nProvider";
-import { PawIcon, TrophyIcon, ProfileIcon } from "./ui/Icons";
+import { PawIcon, ShopIcon, RebirthIcon, TrophyIcon, ProfileIcon } from "./ui/Icons";
 
 /**
- * Three destinations, thumb-height, always reachable.
- * Everything else the app used to offer belonged to a different game; what is
- * left is the descent, who else is descending, and your own account.
+ * Five destinations, thumb-height, always reachable.
+ *
+ * The Shop and Rebirth were tabs inside the fight, which buried two whole
+ * systems one tap deeper than the bag. They are screens now; the arena keeps
+ * only the two tabs that are genuinely the same activity — fighting and
+ * deciding what the cat wears while it fights.
  */
 const ITEMS = [
   // The descent leads: it is the game, and the one screen a player returns to.
   { href: "/descent", labelKey: "nav.descent", Icon: PawIcon },
+  { href: "/shop", labelKey: "nav.shop", Icon: ShopIcon },
+  // "Renaissance" is eleven characters in a slot eighty pixels wide. The screen
+  // it opens still calls itself that; only the bar shortens.
+  { href: "/rebirth", labelKey: "nav.rebirth", Icon: RebirthIcon },
   { href: "/leaderboard", labelKey: "nav.leaderboard", Icon: TrophyIcon },
   { href: "/profile", labelKey: "nav.profile", Icon: ProfileIcon },
 ];
