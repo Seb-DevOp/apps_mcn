@@ -858,7 +858,8 @@ function Bar({
 }
 
 /**
- * One minute of the cat's own damage, every three. A share of current output
+ * Twenty-five seconds of the cat's own damage, every three minutes. A share of
+ * current output
  * rather than a fixed number, so it stays worth pressing at any depth without
  * ever being the thing that clears a floor by itself.
  */

@@ -818,13 +818,19 @@ export const STRIKE_DAMAGE_MULTIPLIER = 2;
 export const MAX_STRIKES_PER_SECOND = 8;
 
 /**
- * The Roar: one minute of the cat's own damage, delivered at once.
+ * The Roar: twenty-five seconds of the cat's own damage, delivered at once.
  *
  * A share of current output rather than a fixed number, so it stays meaningful at
  * every depth without ever being the thing that clears a floor on its own.
+ *
+ * What matters is the ratio of these two numbers, not either alone: pressed on
+ * every cooldown, the Roar adds `damage / cooldown` to sustained output. At sixty
+ * seconds over a hundred and eighty it was adding a third of the cat's entire
+ * damage for one tap every three minutes, which made an idle game reward sitting
+ * on the screen. Fourteen per cent rewards attention without punishing absence.
  */
 export const ROAR_COOLDOWN_SECONDS = 180;
-export const ROAR_DAMAGE_SECONDS = 60;
+export const ROAR_DAMAGE_SECONDS = 25;
 
 // ---------------------------------------------------------------------------
 // The ladder: what each life brings back

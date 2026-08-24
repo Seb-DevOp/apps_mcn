@@ -633,10 +633,17 @@ pour une fraction du trafic. Le compte envoyé est une *prétention*, pas un fai
 le serveur le rogne au temps écoulé depuis la dernière tape, donc un script ne
 gagne rien qu'un pouce rapide n'obtiendrait.
 
-**Le Rugissement.** Une minute des dégâts du chat, d'un coup, toutes les trois
-minutes. Une part de la production courante plutôt qu'un nombre fixe, pour qu'il
-reste digne d'être pressé à n'importe quelle profondeur sans jamais être ce qui
-libère un étage à lui seul.
+**Le Rugissement.** Vingt-cinq secondes des dégâts du chat, d'un coup, toutes les
+trois minutes. Une part de la production courante plutôt qu'un nombre fixe, pour
+qu'il reste digne d'être pressé à n'importe quelle profondeur sans jamais être ce
+qui libère un étage à lui seul.
+
+Ce qui compte est le **rapport** entre les deux nombres, pas l'un des deux : pressé
+à chaque recharge, le Rugissement ajoute `dégâts / recharge` à la production
+soutenue. À soixante secondes sur cent quatre-vingts, il ajoutait un tiers de tous
+les dégâts du chat pour une tape toutes les trois minutes — un idle qui récompense
+le fait de rester devant l'écran. À quatorze pour cent, il récompense l'attention
+sans punir l'absence.
 
 Ni l'un ni l'autre ne tue quoi que ce soit directement : ils **blessent** l'ennemi
 et laissent le tick suivant l'achever. Faire mourir l'ennemi ici demanderait une
