@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   RARITIES,
@@ -39,21 +39,28 @@ export function IdleBag({
 }) {
   const { t, locale } = useI18n();
 
+  // Which cat is being dressed. Only ever offered once the Pack exists — a
+  // toggle with one option is a toggle that lies about having a choice.
+  const packOpen = state.unlocks.some((entry) => entry.key === "pack" && entry.open);
+  const [dressing, setDressing] = useState<"CAT" | "PACK">("CAT");
+  const onPack = packOpen && dressing === "PACK";
+
   const worn = useMemo<WornPiece[]>(
     () =>
       state.items
-        .filter((item) => item.equipped)
+        .filter((item) => item.equipped && item.onPack === onPack)
         .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity })),
-    [state.items],
+    [state.items, onPack],
   );
 
   const wornBySlot = useMemo(
-    () => new Map(state.items.filter((i) => i.equipped).map((i) => [i.slot, i])),
-    [state.items],
+    () => new Map(state.items.filter((i) => i.equipped && i.onPack === onPack).map((i) => [i.slot, i])),
+    [state.items, onPack],
   );
 
+  // Anything on the other cat is not a spare — it is busy.
   const spares = useMemo(
-    () => state.items.filter((item) => !item.equipped),
+    () => state.items.filter((item) => !item.equipped && !item.onPack),
     [state.items],
   );
 
@@ -96,6 +103,25 @@ export function IdleBag({
 
   return (
     <div className="pb-4">
+      {packOpen && (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {(["CAT", "PACK"] as const).map((who) => (
+            <button
+              key={who}
+              type="button"
+              onClick={() => setDressing(who)}
+              className="panel py-2 text-[0.74rem] uppercase tracking-widest transition"
+              style={{
+                borderColor: dressing === who ? "rgba(201,162,77,0.6)" : undefined,
+                color: dressing === who ? "var(--gold-bright)" : "var(--text-dim)",
+              }}
+            >
+              {t(who === "CAT" ? "pack.first" : "pack.second")}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* --- The cat, as it currently stands --------------------------- */}
       <div className="panel panel-sapphire mt-4 flex justify-center py-3">
         <CatCanvas worn={worn} size={190} />
@@ -154,7 +180,7 @@ export function IdleBag({
         <button
           type="button"
           className="btn btn-gold w-full py-2 text-[0.8rem] disabled:opacity-40"
-          disabled={upgradesWaiting === 0 || busy !== null}
+          disabled={upgradesWaiting === 0 || busy !== null || onPack}
           onClick={() => act({ action: "equipBest" }, "equipBest")}
         >
           {upgradesWaiting > 0
@@ -255,7 +281,7 @@ export function IdleBag({
                       index={index}
                       better={item.gain > 1.0001}
                       busy={busy !== null}
-                      onEquip={() => act({ action: "equip", itemId: item.id }, item.id)}
+                      onEquip={() => act({ action: "equip", itemId: item.id, onPack }, item.id)}
                       onSell={() => act({ action: "sell", itemId: item.id }, item.id)}
                     />
                   ))}

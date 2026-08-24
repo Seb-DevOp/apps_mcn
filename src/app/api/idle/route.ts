@@ -4,6 +4,7 @@ import {
   getIdleState,
   buyUpgrade,
   equipItem,
+  unequipItem,
   equipBest,
   sellItem,
   sellBelow,
@@ -32,7 +33,12 @@ export async function GET() {
 
 const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("upgrade"), key: z.string().min(1).max(32) }),
-  z.object({ action: z.literal("equip"), itemId: z.string().min(1).max(64) }),
+  z.object({
+    action: z.literal("equip"),
+    itemId: z.string().min(1).max(64),
+    onPack: z.boolean().optional(),
+  }),
+  z.object({ action: z.literal("unequip"), itemId: z.string().min(1).max(64) }),
   z.object({ action: z.literal("equipBest") }),
   z.object({ action: z.literal("sell"), itemId: z.string().min(1).max(64) }),
   z.object({ action: z.literal("sellBelow"), rarity: z.string().min(1).max(20) }),
@@ -66,7 +72,9 @@ function run(userId: string, input: z.infer<typeof Schema>) {
     case "upgrade":
       return buyUpgrade(userId, input.key);
     case "equip":
-      return equipItem(userId, input.itemId);
+      return equipItem(userId, input.itemId, input.onPack ?? false);
+    case "unequip":
+      return unequipItem(userId, input.itemId);
     case "equipBest":
       return equipBest(userId);
     case "sell":

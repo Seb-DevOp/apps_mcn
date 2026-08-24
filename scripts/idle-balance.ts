@@ -26,6 +26,7 @@ import {
   levelInfo,
   BASE_MAX_HP,
   rebirthFloorFor,
+  unlocked,
   type UpgradeKey,
 } from "../src/lib/content/idle";
 import {
@@ -63,6 +64,7 @@ let enemyHp = levelInfo(1).enemyHp;
 let hp = BASE_MAX_HP;
 let recoverFor = 0;
 let shieldFor = 0;
+let elite = false;
 let defeats = 0;
 
 // --- Rebirth ---------------------------------------------------------------
@@ -100,13 +102,19 @@ function marginalGain(key: UpgradeKey): number {
 
 for (let minute = 1; minute <= HOURS * 60; minute++) {
   const stats = derive(items, upgrades, relics, rebirths);
-  const result = simulate(MINUTE, { level, enemyHp, hp, recoverFor, shieldFor, highestLevel }, stats);
+  const result = simulate(
+    MINUTE,
+    { level, enemyHp, elite, hp, recoverFor, shieldFor, highestLevel },
+    stats,
+    unlocked("elites", rebirths),
+  );
 
   level = result.level;
   enemyHp = result.enemyHp;
   hp = result.hp;
   recoverFor = result.recoverFor;
   shieldFor = result.shieldFor;
+  elite = result.elite;
   highestLevel = result.highestLevel;
   gold += result.goldEarned;
   defeats += result.defeats;

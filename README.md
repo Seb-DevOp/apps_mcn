@@ -643,6 +643,52 @@ et laissent le tick suivant l'achever. Faire mourir l'ennemi ici demanderait une
 seconde copie de la logique de récompense — or, deux copies d'un chemin de
 récompense, c'est ainsi qu'un jeu finit par payer deux fois.
 
+### Cinq marches, une par vie
+
+Viser cinq renaissances impose que chacune rapporte un **système** plutôt qu'un
+plus gros chiffre : une renaissance qui ne fait que multiplier est une corvée avec
+une cérémonie autour.
+
+L'exigence monte de douze étages par vie — 15, 27, 39, 51, 63. Sans ça le record
+avance un peu, une vie est dépensée, et toute l'échelle est grimpée en deux jours,
+soit l'inverse de l'étaler. Mesuré, la cinquième marche demande environ neuf jours
+d'idle ininterrompu, et bien plus pour qui dort. L'exigence continue de monter
+ensuite, donc les vies tardives restent rares — et elles continuent de payer des
+reliques pour toujours : s'arrêter à cinq laisserait un seul arc qui décélère,
+c'est-à-dire le problème que le second arc existe pour résoudre.
+
+| Vie | Marche | Ce que ça change |
+| --- | --- | --- |
+| 1 | **Le Flair** | tout ce qui tombe sous une rareté choisie devient de l'or sur place |
+| 2 | **Les Sceaux** | trois pièces portées de même rareté se renforcent, davantage si elles sont rares |
+| 3 | **Le Souffle** | soin complet, et plus rien n'atteint le chat pendant quinze secondes |
+| 4 | **Les Élites** | un ennemi sur onze revient difforme : six fois la vie, un butin d'une rareté supérieure |
+| 5 | **La Meute** | un second chat, habillé du fond du sac, qui ajoute un tiers de ce qu'il vaut |
+
+Quelques décisions qui ne se voient que quand elles manquent.
+
+**Trois pièces, pas deux, pour un Sceau.** Deux raretés qui coïncident arrivent par
+accident, et un bonus obtenu par accident n'apprend rien. À partir de trois, c'est
+la première fois que le sac contredit le bouton « Équiper le recommandé » : garder
+une pièce légèrement plus faible peut devenir juste.
+
+**Le Souffle stocke des secondes dues, pas une date d'expiration.** Le résolveur de
+tick travaille en durées écoulées et non en heure murale — comme tout le reste ici.
+Sa fin est un événement au même titre qu'une mort : l'étape s'y arrête au lieu de
+moyenner à travers un changement de taux, donc un bouclier qui expire au milieu
+d'un combat est exact et non approché.
+
+**Une Élite est tirée quand l'ennemi entre**, pas quand l'état est lu — sinon
+rafraîchir la page serait un nouveau tirage. Et elle porte une couronne d'éclats :
+six fois la vie qui arrive sans prévenir se lit comme un bug.
+
+**La Meute vit dans la même table**, marquée par un préfixe sur l'emplacement porté
+(`PACK:HEAD`). La garantie « une pièce par emplacement » du schéma couvre alors les
+deux chats avec un seul index, sans seconde contrainte à tenir en phase. Elle se
+bat avec les mêmes améliorations et les mêmes reliques — c'est le même joueur —
+mais seul un tiers de ce que ça donne atteint le combat : un second chat entier
+doublerait chaque nombre à l'écran et diviserait par deux le sens du premier.
+
 ### Le sac
 
 Un onglet à part, parce que trier n'est pas se battre — et le combat continue côté

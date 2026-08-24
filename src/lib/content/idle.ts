@@ -911,3 +911,54 @@ export function sealBonus(worn: Rarity[]): SealBonus {
 
 export const BREATH_COOLDOWN_SECONDS = 120;
 export const BREATH_SHIELD_SECONDS = 15;
+
+// ---------------------------------------------------------------------------
+// The Elites, and the Pack
+// ---------------------------------------------------------------------------
+
+/**
+ * Some enemies come back wrong.
+ *
+ * Multipliers rather than a separate table: an Elite is the chamber it stands in,
+ * made harder, so it stays in proportion at every depth without a second curve to
+ * keep in step with the first. It always leaves something, and something better
+ * than the floor would normally give.
+ */
+export const ELITE_CHANCE = 0.09;
+export const ELITE_HP_MULTIPLIER = 6;
+export const ELITE_DAMAGE_MULTIPLIER = 1.35;
+export const ELITE_GOLD_MULTIPLIER = 5;
+
+/** What an Elite does to the chamber it occupies. */
+export function eliteLevel(info: LevelInfo): LevelInfo {
+  return {
+    ...info,
+    enemyHp: Math.round(info.enemyHp * ELITE_HP_MULTIPLIER),
+    enemyDamage: Math.round(info.enemyDamage * ELITE_DAMAGE_MULTIPLIER * 10) / 10,
+    goldReward: Math.round(info.goldReward * ELITE_GOLD_MULTIPLIER),
+  };
+}
+
+/**
+ * The second cat.
+ *
+ * It fights with the same upgrades and relics as the first — it is the same
+ * player, after all — but only a share of what that comes to reaches the fight.
+ * A full second cat would double every number on the screen and halve the meaning
+ * of the first one; a third of one turns the bottom of the bag into something
+ * worth dressing.
+ *
+ * Its pieces live in the same table, marked by a prefix on the worn slot. That
+ * keeps the database's own one-piece-per-slot guarantee doing the work for both
+ * cats, with no second constraint to keep in step.
+ */
+export const PACK_SHARE = 0.35;
+export const PACK_PREFIX = "PACK:";
+
+export function packSlot(slot: Slot): string {
+  return `${PACK_PREFIX}${slot}`;
+}
+
+export function isPackSlot(worn: string | null): boolean {
+  return typeof worn === "string" && worn.startsWith(PACK_PREFIX);
+}

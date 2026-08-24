@@ -220,5 +220,9 @@
   "rebirth.ladder": "What each life brings back",
   "rebirth.ladderHint": "Five rungs, each a system rather than a bigger number. After the fifth, lives keep paying relics.",
   "rebirth.open": "open",
-  "rebirth.atLife": "life {n}"
+  "rebirth.atLife": "life {n}",
+  "idle.eliteHp": "Elite",
+  "idle.packShare": "The Pack adds {n}/s · {pct}% of the damage",
+  "pack.first": "The cat",
+  "pack.second": "The Pack"
 }

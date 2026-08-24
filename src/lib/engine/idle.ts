@@ -44,6 +44,11 @@ import {
   unlocked,
   sealBonus,
   rebirthFloorFor,
+  eliteLevel,
+  ELITE_CHANCE,
+  PACK_SHARE,
+  isPackSlot,
+  packSlot,
   type Affix,
   type RelicKey,
   type Slot,
@@ -112,6 +117,8 @@ export interface DerivedStats {
   extraStrikes: number;
   /** The matching set currently worn, if any — shown, not just applied. */
   seal: SealBonus;
+  /** What the second cat contributes, already folded into `power`. */
+  packPower: number;
   /** The product of all four — what the fight is actually resolved with. */
   power: number;
   maxHp: number;
@@ -165,8 +172,10 @@ export function derive(
   relics: Relics = NO_RELICS,
   /** Lives spent, because some of what the cat can do was brought back by them. */
   rebirths = 0,
+  /** False while deriving the second cat, so it cannot recurse into a third. */
+  withPack = true,
 ): DerivedStats {
-  const worn = items.filter((item) => item.equippedSlot);
+  const worn = items.filter((item) => item.equippedSlot && !isPackSlot(item.equippedSlot));
   const level = (key: keyof Upgrades) => upgrades[key];
   const per = (key: keyof Upgrades) => UPGRADE_BY_KEY[key].perLevel;
 
@@ -255,6 +264,25 @@ export function derive(
   // left to play against.
   const regen = maxHp * BASE_REGEN_SHARE;
 
+  /**
+   * The second cat fights with the same upgrades and relics — it is the same
+   * player — but only a share of what that comes to reaches the fight. A full
+   * second cat would double every number on screen and halve the meaning of the
+   * first; a third of one turns the bottom of the bag into something worth
+   * dressing.
+   */
+  const packItems = withPack ? items.filter((item) => isPackSlot(item.equippedSlot)) : [];
+  const packPower =
+    packItems.length > 0 && unlocked("pack", rebirths)
+      ? derive(
+          packItems.map((item) => ({ ...item, equippedSlot: item.slot })),
+          upgrades,
+          relics,
+          rebirths,
+          false,
+        ).power * PACK_SHARE
+      : 0;
+
   const goldMultiplier =
     (1 + worn.reduce((sum, item) => sum + item.goldBonus, 0)) * relic("greed");
 
@@ -270,7 +298,8 @@ export function derive(
     critMultiplier,
     extraStrikes,
     seal,
-    power: Math.max(1, power),
+    packPower,
+    power: Math.max(1, power + packPower),
     maxHp: Math.max(1, maxHp),
     regen,
     goldMultiplier,
@@ -385,21 +414,25 @@ export function simulate(
   state: {
     level: number;
     enemyHp: number;
+    elite: boolean;
     hp: number;
     recoverFor: number;
     shieldFor: number;
     highestLevel: number;
   },
   stats: DerivedStats,
+  /** Elites only exist once a fourth life has brought them back. */
+  elitesOpen = false,
 ): TickReport & {
   level: number;
   enemyHp: number;
+  elite: boolean;
   hp: number;
   recoverFor: number;
   shieldFor: number;
   highestLevel: number;
 } {
-  let { level, enemyHp, hp, recoverFor, shieldFor, highestLevel } = state;
+  let { level, enemyHp, elite, hp, recoverFor, shieldFor, highestLevel } = state;
   let remaining = seconds;
   // Gold comes from kills and from nothing else. Waiting is not an income.
   let goldEarned = 0;
@@ -427,7 +460,12 @@ export function simulate(
       continue;
     }
 
-    const info = levelInfo(level);
+    // An Elite is rolled when the enemy walks in, not when the state is read —
+    // otherwise refreshing the page would be a reroll.
+    if (enemyHp <= 0) {
+      elite = elitesOpen && Math.random() < ELITE_CHANCE;
+    }
+    const info = elite ? eliteLevel(levelInfo(level)) : levelInfo(level);
     if (enemyHp <= 0) enemyHp = info.enemyHp;
 
     // Both sides grow exponentially, so at absurd depth both overflow to
@@ -489,6 +527,7 @@ export function simulate(
       killsSinceDefeat = 0;
 
       enemyHp = 0;
+      elite = false;
       hp = stats.maxHp;
       recoverFor = RECOVERY_SECONDS;
       shieldFor = 0;
@@ -510,20 +549,26 @@ export function simulate(
       heals += 1;
     }
 
-    const guaranteed = info.isBoss;
+    const guaranteed = info.isBoss || elite;
     if (drops.length < MAX_DROPS_PER_TICK && (guaranteed || Math.random() < stats.dropChance)) {
       const slot = SLOTS[randomInt(0, SLOTS.length - 1)];
-      const rarity = rollRarity(info.floor);
-      const rolled = itemStats(slot, info.floor, rarity);
+      // An Elite always leaves something, and something better than the floor
+      // would otherwise give — one tier up, which is the whole reward for the
+      // six times the health.
+      const rolled = rollRarity(info.floor);
+      const rarity = elite
+        ? RARITIES[Math.min(RARITIES.length - 1, RARITIES.indexOf(rolled) + 1)]
+        : rolled;
+      const stats2 = itemStats(slot, info.floor, rarity);
       drops.push({
         slot,
         floor: info.floor,
         rarity,
         id: "",
         shape: shapeFor(slot, info.floor),
-        power: rolled.power,
-        vitality: rolled.vitality,
-        goldBonus: rolled.goldBonus,
+        power: stats2.power,
+        vitality: stats2.vitality,
+        goldBonus: stats2.goldBonus,
         affixes: rollAffixes(rarity),
         equipped: false,
         sold: false,
@@ -534,6 +579,7 @@ export function simulate(
     levelsCleared += 1;
     highestLevel = Math.max(highestLevel, level);
     enemyHp = 0;
+    elite = false;
   }
 
   return {
@@ -550,6 +596,7 @@ export function simulate(
     drops,
     level,
     enemyHp,
+    elite,
     hp,
     recoverFor,
     shieldFor,
@@ -613,12 +660,14 @@ export async function getIdleState(userId: string) {
       {
         level: profile.level,
         enemyHp: profile.enemyHp,
+        elite: profile.enemyElite,
         hp: profile.hp,
         recoverFor: profile.recoverFor,
         shieldFor: profile.shieldFor,
         highestLevel: profile.highestLevel,
       },
       stats,
+      unlocked("elites", profile.rebirths),
     );
 
     // Store the drops. Only an *empty* slot fills itself.
@@ -678,6 +727,7 @@ export async function getIdleState(userId: string) {
         level: result.level,
         highestLevel: result.highestLevel,
         enemyHp: result.enemyHp,
+        enemyElite: result.elite,
         hp: result.hp,
         recoverFor: result.recoverFor,
         shieldFor: result.shieldFor,
@@ -706,6 +756,7 @@ function view(
     level: number;
     highestLevel: number;
     enemyHp: number;
+    enemyElite: boolean;
     hp: number;
     recoverFor: number;
     defeats: number;
@@ -729,7 +780,8 @@ function view(
   const upgrades = parseUpgrades(profile.upgradesJson);
   const relics = parseRelics(profile.relicsJson);
   const stats = derive(items, upgrades, relics, profile.rebirths);
-  const info = levelInfo(profile.level);
+  const base = levelInfo(profile.level);
+  const info = profile.enemyElite ? eliteLevel(base) : base;
   const enemyHp = profile.enemyHp > 0 ? profile.enemyHp : info.enemyHp;
   const hp = Math.min(stats.maxHp, profile.hp > 0 ? profile.hp : stats.maxHp);
 
@@ -741,6 +793,7 @@ function view(
 
   return {
     level: info,
+    elite: profile.enemyElite,
     enemyHp,
     enemyHpMax: info.enemyHp,
     hp,
@@ -844,6 +897,8 @@ function view(
       vitality: item.vitality,
       goldBonus: item.goldBonus,
       affixes: parseAffixes(item.affixesJson),
+      /** Which cat wears it, when one does. */
+      onPack: isPackSlot(item.equippedSlot),
       // What wearing it would multiply the cat by. Above one is an upgrade, and
       // the screen can say so without the player doing the arithmetic.
       gain: item.equippedSlot ? 1 : scoreWith(items, upgrades, item, relics, profile.rebirths) / baseline,
@@ -897,18 +952,38 @@ export async function buyUpgrade(userId: string, key: string) {
   return result;
 }
 
-export async function equipItem(userId: string, itemId: string) {
+export async function equipItem(userId: string, itemId: string, onPack = false) {
   return prisma.$transaction(async (tx) => {
     const item = await tx.idleItem.findFirst({ where: { id: itemId, userId } });
     if (!item) return { ok: false as const, error: "NOT_FOUND" as const };
     if (item.equippedSlot) return { ok: false as const, error: "ALREADY_EQUIPPED" as const };
 
-    // Free the slot first — the unique index allows only one worn piece per slot.
+    if (onPack) {
+      const profile = await tx.idleProfile.findUnique({ where: { userId } });
+      if (!unlocked("pack", profile?.rebirths ?? 0)) {
+        return { ok: false as const, error: "LOCKED" as const };
+      }
+    }
+
+    const target = onPack ? packSlot(item.slot as Slot) : item.slot;
+
+    // Free the slot first — the unique index allows only one worn piece per slot,
+    // and the prefix makes that one index cover both cats.
     await tx.idleItem.updateMany({
-      where: { userId, equippedSlot: item.slot },
+      where: { userId, equippedSlot: target },
       data: { equippedSlot: null },
     });
-    await tx.idleItem.update({ where: { id: item.id }, data: { equippedSlot: item.slot } });
+    await tx.idleItem.update({ where: { id: item.id }, data: { equippedSlot: target } });
+    return { ok: true as const };
+  });
+}
+
+/** Takes a piece off whichever cat is wearing it, back into the bag. */
+export async function unequipItem(userId: string, itemId: string) {
+  return prisma.$transaction(async (tx) => {
+    const item = await tx.idleItem.findFirst({ where: { id: itemId, userId } });
+    if (!item) return { ok: false as const, error: "NOT_FOUND" as const };
+    await tx.idleItem.update({ where: { id: item.id }, data: { equippedSlot: null } });
     return { ok: true as const };
   });
 }
@@ -954,7 +1029,7 @@ export async function equipBest(userId: string) {
     const worn = [...items];
 
     for (const slot of SLOTS) {
-      const forSlot = items.filter((item) => item.slot === slot);
+      const forSlot = items.filter((item) => item.slot === slot && !isPackSlot(item.equippedSlot));
       if (forSlot.length === 0) continue;
 
       const best = forSlot.reduce((a, b) =>

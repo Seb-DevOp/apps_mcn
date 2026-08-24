@@ -372,12 +372,20 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   const worn = useMemo<WornPiece[]>(
     () =>
       state.items
-        .filter((item) => item.equipped)
+        .filter((item) => item.equipped && !item.onPack)
         .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity })),
     [state.items],
   );
 
-  const spareCount = state.items.filter((item) => !item.equipped).length;
+  const packWorn = useMemo<WornPiece[]>(
+    () =>
+      state.items
+        .filter((item) => item.onPack)
+        .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity })),
+    [state.items],
+  );
+
+  const spareCount = state.items.filter((item) => !item.equipped && !item.onPack).length;
   const breathOpen = state.unlocks.some((entry) => entry.key === "breath" && entry.open);
   const showRebirth =
     state.rebirth.ready || state.rebirth.relics > 0 || state.rebirth.rebirths > 0;
@@ -462,6 +470,11 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                   style={{ background: "radial-gradient(circle, #7ed08f 0%, transparent 65%)" }}
                 />
                 <HitStream hits={hits} target="CAT" tone="#ff6b6b" />
+                {packWorn.length > 0 && (
+                  <div className="pointer-events-none absolute -left-1 bottom-0 opacity-80">
+                    <CatCanvas worn={packWorn} size={92} breathing={!fallen} />
+                  </div>
+                )}
                 <HitStream hits={hits} target="HEAL" tone="#7ed08f" from="feet" prefix="+" />
               </div>
 
@@ -487,7 +500,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                     exit={{ opacity: 0, scale: 0.4, rotate: 18, y: 20 }}
                     transition={{ duration: 0.28 }}
                   >
-                    <Enemy isBoss={here.isBoss} recoil={catSwings} />
+                    <Enemy isBoss={here.isBoss} elite={state.elite} recoil={catSwings} />
                   </motion.div>
                 </AnimatePresence>
                 <HitStream hits={hits} target="ENEMY" tone="#f0d089" />
@@ -504,13 +517,21 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                 low="linear-gradient(90deg,#8f2f2f,#e0603f)"
               />
               <Bar
-                label={here.isBoss ? t("idle.guardianHp") : t("idle.enemyHp")}
+                label={
+                  state.elite
+                    ? t("idle.eliteHp")
+                    : here.isBoss
+                      ? t("idle.guardianHp")
+                      : t("idle.enemyHp")
+                }
                 value={shown.enemyHp}
                 max={here.enemyHp}
                 fill={
-                  here.isBoss
-                    ? "linear-gradient(90deg,#8f2f2f,#e0603f)"
-                    : "linear-gradient(90deg,#4b3f7a,#8a72d0)"
+                  state.elite
+                    ? "linear-gradient(90deg,#1d6d8a,#37d5ff)"
+                    : here.isBoss
+                      ? "linear-gradient(90deg,#8f2f2f,#e0603f)"
+                      : "linear-gradient(90deg,#4b3f7a,#8a72d0)"
                 }
                 align="right"
               />
@@ -569,6 +590,15 @@ export function IdleGame({ initial }: { initial: IdleState }) {
             <Stat label={t("idle.critDamage")} value={`×${formatNumber(stats.critMultiplier)}`} />
             <Stat label={t("idle.double")} value={`×${(1 + stats.extraStrikes).toFixed(2)}`} />
           </section>
+
+          {stats.packPower > 0 && (
+            <p className="mt-2 text-center text-[0.68rem]" style={{ color: "#9ad0ff" }}>
+              {t("idle.packShare", {
+                n: formatNumber(stats.packPower),
+                pct: Math.round((stats.packPower / stats.power) * 100),
+              })}
+            </p>
+          )}
 
           {stats.seal.rarity && (
             <p className="mt-2 text-center text-[0.68rem]" style={{ color: "var(--sapphire-pale)" }}>
@@ -937,8 +967,16 @@ function FloorPips({ position }: { position: number }) {
  * eye stays where the progress is — but it lunges, because a static enemy is what
  * made this screen read as a progress bar with a picture next to it.
  */
-function Enemy({ isBoss, recoil }: { isBoss: boolean; recoil: number }) {
-  const tint = isBoss ? "#e0603f" : "#5a4f7a";
+function Enemy({
+  isBoss,
+  elite,
+  recoil,
+}: {
+  isBoss: boolean;
+  elite: boolean;
+  recoil: number;
+}) {
+  const tint = elite ? "#37d5ff" : isBoss ? "#e0603f" : "#5a4f7a";
   return (
     <motion.svg
       viewBox="0 0 120 150"
@@ -951,8 +989,21 @@ function Enemy({ isBoss, recoil }: { isBoss: boolean; recoil: number }) {
       <motion.g
         animate={{ x: recoil % 2 === 0 ? 0 : 9, scale: recoil % 2 === 0 ? 1 : 0.97 }}
         transition={{ type: "spring", stiffness: 700, damping: 15 }}
-        style={{ originX: "60px", originY: "90px" }}
+        style={{
+          originX: "60px",
+          originY: "90px",
+          filter: elite ? "drop-shadow(0 0 10px rgba(55,213,255,0.8))" : undefined,
+        }}
       >
+        {/* A crown of shards, so an Elite is recognised before its health bar is
+            read. Six times the health arriving unannounced reads as a bug. */}
+        {elite && (
+          <path
+            d="M30 26 L24 2 L44 16 L60 -4 L76 16 L96 2 L90 26 Z"
+            fill={tint}
+            opacity="0.9"
+          />
+        )}
         <ellipse cx="60" cy="142" rx="34" ry="7" fill="#000" opacity="0.42" />
         <path
           d="M60 30 C88 30 100 56 96 88 C93 116 78 132 60 132 C42 132 27 116 24 88 C20 56 32 30 60 30 Z"

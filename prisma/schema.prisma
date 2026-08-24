@@ -101,6 +101,8 @@ model IdleProfile {
   highestLevel Int   @default(1)
   /// Health left on the enemy currently being fought.
   enemyHp      Float @default(0)
+  /// Whether that enemy came back wrong. Rolled when it spawns, not when it is read.
+  enemyElite   Boolean @default(false)
   /// Health left on the cat. Zero means "never fought yet" and is read as full,
   /// which is also how rows written before combat existed are carried over.
   hp           Float @default(0)
@@ -170,9 +172,10 @@ model IdleItem {
   /// portable to any Prisma provider, which was the point of avoiding them.
   affixesJson String @default("[]")
 
-  /// Null when owned but not worn. Postgres treats NULLs as distinct, so the
-  /// unique index below allows any number of spares and exactly one worn piece
-  /// per slot — the constraint lives in the database, not in a code path.
+  /// Null when owned but not worn; "HEAD" for the cat, "PACK:HEAD" for the
+  /// second one. Postgres treats NULLs as distinct, so the unique index below
+  /// allows any number of spares and exactly one worn piece per slot per cat —
+  /// the prefix means one constraint covers both, with nothing to keep in step.
   equippedSlot String?
 
   foundAt DateTime @default(now())
