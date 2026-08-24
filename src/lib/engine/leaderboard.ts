@@ -1,158 +1,132 @@
 import { prisma } from "@/lib/db";
-import { weekKey } from "@/lib/time";
-import { rankForXp } from "@/lib/content/ranks";
+import { levelInfo } from "@/lib/content/idle";
 
 /**
- * Several boards, on purpose.
+ * Three boards, on purpose.
  *
- * No single ranking should decide who matters. A precise player tops the score
- * board, a loyal player tops the streak board, a steady player tops XP. Everyone
- * has a table they can be good at.
+ * No single ranking should decide who matters. The deepest board belongs to
+ * whoever pushed furthest, the Guardians board to whoever kept beating the thing
+ * at the end of each floor, and the fortune board to whoever kept going longest.
+ * Everyone has a table they can be good at.
+ *
+ * All three read the idle profile and nothing else: the old ladders ranked XP and
+ * streaks, which no longer exist to be ranked.
  */
 
-export type BoardKey = "xp" | "score" | "weekly" | "streak";
+export type BoardKey = "depth" | "guardians" | "fortune";
+
+export const BOARDS: BoardKey[] = ["depth", "guardians", "fortune"];
 
 export interface BoardRow {
   position: number;
   userId: string;
   handle: string;
-  rankKey: string;
-  rankEmoji: string;
+  /** The headline number for this board. */
   value: number;
+  /** Deepest floor, shown on every board as the common yardstick. */
+  floor: number;
   isViewer: boolean;
 }
 
 export interface BoardResult {
   board: BoardKey;
   rows: BoardRow[];
+  /** The viewer's own row, when they are ranked but not in the visible top. */
   viewer: BoardRow | null;
-  /** Total players ranked on this board. */
   total: number;
 }
 
 const LIMIT = 25;
 
+const ORDER: Record<BoardKey, "highestLevel" | "bossKills" | "totalGold"> = {
+  depth: "highestLevel",
+  guardians: "bossKills",
+  fortune: "totalGold",
+};
+
+function toRow(
+  profile: {
+    userId: string;
+    highestLevel: number;
+    bossKills: number;
+    totalGold: number;
+    user: { handle: string };
+  },
+  board: BoardKey,
+  position: number,
+  viewerId: string | null,
+): BoardRow {
+  return {
+    position,
+    userId: profile.userId,
+    handle: profile.user.handle,
+    value:
+      board === "depth"
+        ? levelInfo(profile.highestLevel).floor
+        : board === "guardians"
+          ? profile.bossKills
+          : Math.floor(profile.totalGold),
+    floor: levelInfo(profile.highestLevel).floor,
+    isViewer: profile.userId === viewerId,
+  };
+}
+
 export async function getBoard(board: BoardKey, viewerId: string | null): Promise<BoardResult> {
-  if (board === "xp" || board === "streak") {
-    const orderBy = board === "xp" ? { xp: "desc" as const } : { bestStreak: "desc" as const };
-    const users = await prisma.user.findMany({
-      where: board === "xp" ? { xp: { gt: 0 } } : { bestStreak: { gt: 0 } },
-      orderBy: [orderBy, { createdAt: "asc" }],
+  const field = ORDER[board];
+  const where = { [field]: { gt: board === "depth" ? 1 : 0 } };
+
+  const [profiles, total] = await Promise.all([
+    prisma.idleProfile.findMany({
+      where,
+      // createdAt breaks ties: whoever got there first keeps the higher place.
+      orderBy: [{ [field]: "desc" }, { createdAt: "asc" }],
       take: LIMIT,
-      select: { id: true, handle: true, xp: true, bestStreak: true, rankKey: true },
-    });
+      select: {
+        userId: true,
+        highestLevel: true,
+        bossKills: true,
+        totalGold: true,
+        user: { select: { handle: true } },
+      },
+    }),
+    prisma.idleProfile.count({ where }),
+  ]);
 
-    const rows: BoardRow[] = users.map((u, index) => ({
-      position: index + 1,
-      userId: u.id,
-      handle: u.handle,
-      rankKey: u.rankKey,
-      rankEmoji: rankForXp(u.xp).emoji,
-      value: board === "xp" ? u.xp : u.bestStreak,
-      isViewer: u.id === viewerId,
-    }));
+  const rows = profiles.map((profile, index) => toRow(profile, board, index + 1, viewerId));
 
-    const total = await prisma.user.count({
-      where: board === "xp" ? { xp: { gt: 0 } } : { bestStreak: { gt: 0 } },
-    });
-    const viewer = await viewerRow(board, viewerId, rows);
-    return { board, rows, viewer, total };
-  }
-
-  // Score boards: a player's single best run, all time or this week.
-  const where =
-    board === "weekly"
-      ? { gameKey: "crystal-resonance", weekKey: weekKey() }
-      : { gameKey: "crystal-resonance" };
-
-  const grouped = await prisma.scoreEntry.groupBy({
-    by: ["userId"],
-    where,
-    _max: { score: true },
-    orderBy: { _max: { score: "desc" } },
-    take: LIMIT,
-  });
-
-  const users = await prisma.user.findMany({
-    where: { id: { in: grouped.map((g) => g.userId) } },
-    select: { id: true, handle: true, xp: true, rankKey: true },
-  });
-  const byId = new Map(users.map((u) => [u.id, u]));
-
-  const rows: BoardRow[] = grouped.map((g, index) => {
-    const user = byId.get(g.userId);
-    return {
-      position: index + 1,
-      userId: g.userId,
-      handle: user?.handle ?? "—",
-      rankKey: user?.rankKey ?? "wanderer",
-      rankEmoji: rankForXp(user?.xp ?? 0).emoji,
-      value: g._max.score ?? 0,
-      isViewer: g.userId === viewerId,
-    };
-  });
-
-  const distinct = await prisma.scoreEntry.groupBy({ by: ["userId"], where });
-  const viewer = await viewerRow(board, viewerId, rows);
-  return { board, rows, viewer, total: distinct.length };
+  return { board, rows, viewer: await viewerRow(board, viewerId, rows), total };
 }
 
 /**
- * The viewer's own line, always shown even when they are far below the top —
- * seeing your real position is more motivating than not appearing at all.
+ * The viewer's own line, when they did not make the visible top.
+ *
+ * Counting how many profiles beat them is one query and is exact, which matters:
+ * a leaderboard that tells a player the wrong position about themselves is worse
+ * than one that does not show them at all.
  */
 async function viewerRow(
   board: BoardKey,
   viewerId: string | null,
   rows: BoardRow[],
 ): Promise<BoardRow | null> {
-  if (!viewerId) return null;
-  const inTop = rows.find((r) => r.userId === viewerId);
-  if (inTop) return inTop;
+  if (!viewerId || rows.some((row) => row.isViewer)) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: viewerId },
-    select: { id: true, handle: true, xp: true, bestStreak: true, rankKey: true },
+  const profile = await prisma.idleProfile.findUnique({
+    where: { userId: viewerId },
+    select: {
+      userId: true,
+      highestLevel: true,
+      bossKills: true,
+      totalGold: true,
+      user: { select: { handle: true } },
+    },
   });
-  if (!user) return null;
+  if (!profile) return null;
 
-  let value = 0;
-  let position = 0;
+  const field = ORDER[board];
+  const own = profile[field];
+  if (own <= (board === "depth" ? 1 : 0)) return null;
 
-  if (board === "xp") {
-    value = user.xp;
-    position = (await prisma.user.count({ where: { xp: { gt: user.xp } } })) + 1;
-  } else if (board === "streak") {
-    value = user.bestStreak;
-    position = (await prisma.user.count({ where: { bestStreak: { gt: user.bestStreak } } })) + 1;
-  } else {
-    const where =
-      board === "weekly"
-        ? { userId: viewerId, gameKey: "crystal-resonance", weekKey: weekKey() }
-        : { userId: viewerId, gameKey: "crystal-resonance" };
-    const best = await prisma.scoreEntry.aggregate({ where, _max: { score: true } });
-    value = best._max.score ?? 0;
-    if (value === 0) return null;
-
-    const better = await prisma.scoreEntry.groupBy({
-      by: ["userId"],
-      where:
-        board === "weekly"
-          ? { gameKey: "crystal-resonance", weekKey: weekKey(), score: { gt: value } }
-          : { gameKey: "crystal-resonance", score: { gt: value } },
-    });
-    position = better.length + 1;
-  }
-
-  if (value === 0) return null;
-
-  return {
-    position,
-    userId: user.id,
-    handle: user.handle,
-    rankKey: user.rankKey,
-    rankEmoji: rankForXp(user.xp).emoji,
-    value,
-    isViewer: true,
-  };
+  const ahead = await prisma.idleProfile.count({ where: { [field]: { gt: own } } });
+  return toRow(profile, board, ahead + 1, viewerId);
 }

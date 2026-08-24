@@ -3,20 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./I18nProvider";
-import { VaultIcon, PawIcon, MissionsIcon, ArmoryIcon, ProfileIcon } from "./ui/Icons";
+import { PawIcon, TrophyIcon, ProfileIcon } from "./ui/Icons";
 
 /**
- * Five destinations, thumb-height, always reachable.
- * The daily session should never need more than one hand.
+ * Three destinations, thumb-height, always reachable.
+ * Everything else the app used to offer belonged to a different game; what is
+ * left is the descent, who else is descending, and your own account.
  */
 const ITEMS = [
   // The descent leads: it is the game, and the one screen a player returns to.
   { href: "/descent", labelKey: "nav.descent", Icon: PawIcon },
-  { href: "/vault", labelKey: "nav.vault", Icon: VaultIcon },
-  { href: "/missions", labelKey: "nav.missions", Icon: MissionsIcon },
-  // The mini-game keeps its place on the Vault hub rather than a permanent slot —
-  // the daily loop now sits around the descent, not beside it.
-  { href: "/armory", labelKey: "nav.armory", Icon: ArmoryIcon },
+  { href: "/leaderboard", labelKey: "nav.leaderboard", Icon: TrophyIcon },
   { href: "/profile", labelKey: "nav.profile", Icon: ProfileIcon },
 ];
 

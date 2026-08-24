@@ -8,10 +8,14 @@ import { prisma } from "@/lib/db";
  * Left alone they are what fills a database, not the players themselves.
  *
  * The rule that governs everything here: **purging must never change a number a
- * player can see.** So the things a player's screens read from are kept —
- * ChestOpening (chests opened), DailyActivity (active days and retention), User
- * (xp, shards, streaks), InventoryItem, UserEquipment — and each player's
- * all-time best run survives regardless of age.
+ * player can see.** IdleProfile and IdleItem — floor, gold, kills, everything the
+ * Descent shows — are never touched, and each player's all-time best run survives
+ * regardless of age.
+ *
+ * Several tables below belong to the pre-Descent game and no longer receive
+ * writes. They are still purged rather than dropped: an empty DELETE costs
+ * nothing, and dropping the tables is a destructive migration that should be a
+ * deliberate decision rather than a side effect of a gameplay change.
  */
 
 /** Raw events. Retention curves are read from DailyActivity, which is kept. */

@@ -12,6 +12,8 @@ import {
   shapeFor,
   rarityWeights,
   floorStart,
+  floorOf,
+  LEVELS_PER_FLOOR,
   BASE_DROP_CHANCE,
   OFFLINE_CAP_SECONDS,
   MIN_KILL_SECONDS,
@@ -50,15 +52,6 @@ const MAX_STEPS_PER_TICK = 25_000;
 /** And keeps at most this many drops, so one long absence cannot flood the table. */
 const MAX_DROPS_PER_TICK = 25;
 
-/**
- * Gold still accrues while the cat is stuck on an enemy it cannot kill.
- *
- * Without this a wall is a dead end: no kills, no gold, no way to buy the upgrade
- * that would break the wall. With it, being stuck is a pause rather than a stop —
- * which is what "idle" is supposed to mean.
- */
-const STALLED_INCOME_SHARE = 0.08;
-
 export interface Upgrades {
   attack: number;
   health: number;
@@ -82,7 +75,6 @@ export interface DerivedStats {
   regen: number;
   goldMultiplier: number;
   dropChance: number;
-  passiveGoldPerSecond: number;
 }
 
 interface ItemRow {
@@ -121,7 +113,7 @@ export function parseUpgrades(json: string): Upgrades {
  * looked small early keeps mattering later, which is what keeps a long game from
  * flattening out.
  */
-export function derive(items: ItemRow[], upgrades: Upgrades, highestLevel: number): DerivedStats {
+export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
   const worn = items.filter((item) => item.equippedSlot);
   const level = (key: keyof Upgrades) => upgrades[key];
   const per = (key: keyof Upgrades) => UPGRADE_BY_KEY[key].perLevel;
@@ -161,9 +153,6 @@ export function derive(items: ItemRow[], upgrades: Upgrades, highestLevel: numbe
   const goldMultiplier = 1 + worn.reduce((sum, item) => sum + item.goldBonus, 0);
   const dropChance = BASE_DROP_CHANCE;
 
-  const passiveGoldPerSecond =
-    levelInfo(highestLevel).goldReward * STALLED_INCOME_SHARE * goldMultiplier;
-
   return {
     hitDamage,
     attacksPerSecond,
@@ -175,7 +164,6 @@ export function derive(items: ItemRow[], upgrades: Upgrades, highestLevel: numbe
     regen,
     goldMultiplier,
     dropChance,
-    passiveGoldPerSecond,
   };
 }
 
@@ -201,6 +189,8 @@ export interface TickReport {
   levelsCleared: number;
   /** How many times the cat was carried back to the start of its floor. */
   defeats: number;
+  /** Guardians felled, each one healing the cat outright. */
+  heals: number;
   drops: Drop[];
 }
 
@@ -238,11 +228,17 @@ export function simulate(
 } {
   let { level, enemyHp, hp, recoverFor, highestLevel } = state;
   let remaining = seconds;
-  let goldEarned = stats.passiveGoldPerSecond * seconds;
+  // Gold comes from kills and from nothing else. Waiting is not an income.
+  let goldEarned = 0;
   let kills = 0;
   let bossKills = 0;
   let levelsCleared = 0;
   let defeats = 0;
+  let heals = 0;
+  // Starts at one, not zero: a tick that opens on a defeat should not be read as
+  // a fruitless loop, or a player checking in on a hard Guardian would be dropped
+  // a floor for looking.
+  let killsSinceDefeat = 1;
   const drops: Drop[] = [];
 
   const clampHp = (value: number) => Math.min(stats.maxHp, Math.max(0.0001, value));
@@ -283,7 +279,15 @@ export function simulate(
       // clock has been spent and the floor has to be walked again.
       remaining -= timeToFall;
       defeats += 1;
-      level = floorStart(level);
+
+      // Falling twice without a single kill in between means the floor's own
+      // first chamber is out of reach, and since gold only comes from kills the
+      // cat would loop there for ever with no way to buy its way out. Dropping a
+      // floor puts it back among enemies it can actually beat.
+      const retreatTo = killsSinceDefeat === 0 ? Math.max(1, floorOf(level) - 1) : floorOf(level);
+      level = (retreatTo - 1) * LEVELS_PER_FLOOR + 1;
+      killsSinceDefeat = 0;
+
       enemyHp = 0;
       hp = stats.maxHp;
       recoverFor = RECOVERY_SECONDS;
@@ -294,7 +298,16 @@ export function simulate(
     hp = clampHp(hp + netHealth * timeToKill);
     goldEarned += info.goldReward * stats.goldMultiplier;
     kills += 1;
-    if (info.isBoss) bossKills += 1;
+    killsSinceDefeat += 1;
+
+    // A Guardian's fall is the floor's reward: the cat walks on at full health.
+    // Without it the next floor opens on a cat that is already half dead, which
+    // turns every boss into a wall on the chamber after it rather than on itself.
+    if (info.isBoss) {
+      bossKills += 1;
+      hp = stats.maxHp;
+      heals += 1;
+    }
 
     const guaranteed = info.isBoss;
     if (drops.length < MAX_DROPS_PER_TICK && (guaranteed || Math.random() < stats.dropChance)) {
@@ -327,6 +340,7 @@ export function simulate(
     bossKills,
     levelsCleared,
     defeats,
+    heals,
     drops,
     level,
     enemyHp,
@@ -377,12 +391,13 @@ export async function getIdleState(userId: string) {
           bossKills: 0,
           levelsCleared: 0,
           defeats: 0,
+          heals: 0,
           drops: [],
         } as TickReport,
       };
     }
 
-    const stats = derive(items, upgrades, profile.highestLevel);
+    const stats = derive(items, upgrades);
     const result = simulate(
       seconds,
       {
@@ -472,7 +487,7 @@ function view(
   report: TickReport,
 ) {
   const upgrades = parseUpgrades(profile.upgradesJson);
-  const stats = derive(items, upgrades, profile.highestLevel);
+  const stats = derive(items, upgrades);
   const info = levelInfo(profile.level);
   const enemyHp = profile.enemyHp > 0 ? profile.enemyHp : info.enemyHp;
   const hp = Math.min(stats.maxHp, profile.hp > 0 ? profile.hp : stats.maxHp);

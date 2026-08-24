@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { getCollection } from "@/lib/engine/state";
-import { walletCapabilities } from "@/lib/web3/wallet";
 import { getAccountStatus } from "@/lib/auth/account";
+import { getIdleState } from "@/lib/engine/idle";
+import { levelInfo } from "@/lib/content/idle";
 import { ProfileView } from "@/components/ProfileView";
 
 export const dynamic = "force-dynamic";
@@ -12,42 +11,24 @@ export default async function ProfilePage() {
   const user = await getSessionUser();
   if (!user) redirect("/");
 
-  const [collection, best, chestsOpened, account] = await Promise.all([
-    getCollection(user.id),
-    prisma.scoreEntry.aggregate({
-      where: { userId: user.id, gameKey: "crystal-resonance" },
-      _max: { score: true },
-    }),
-    prisma.chestOpening.count({ where: { userId: user.id } }),
-    getAccountStatus(user.id),
-  ]);
-
-  const inventory = [
-    ...collection.badges,
-    ...collection.cosmetics,
-    ...collection.boosts,
-    ...collection.materials,
-  ].map((entry) => ({ itemKey: entry.row.itemKey, quantity: entry.row.quantity }));
+  // Reading the idle state advances it, which is exactly right: time spent on the
+  // profile page is time the cat spent descending.
+  const [state, account] = await Promise.all([getIdleState(user.id), getAccountStatus(user.id)]);
 
   return (
     <ProfileView
-      player={{
-        handle: user.handle,
-        locale: user.locale,
-        xp: user.xp,
-        shards: user.shards,
-        rankKey: user.rankKey,
-        currentStreak: user.currentStreak,
-        bestStreak: user.bestStreak,
-        totalActiveDays: user.totalActiveDays,
+      player={{ handle: user.handle, locale: user.locale }}
+      stats={{
+        floor: levelInfo(state.highestLevel).floor,
+        kills: state.kills,
+        bossKills: state.bossKills,
+        defeats: state.defeats,
+        totalGold: state.totalGold,
+        items: state.items.length,
       }}
-      stats={{ bestScore: best._max.score ?? 0, chestsOpened }}
-      inventory={inventory}
-      activeBoosts={collection.activeBoosts.map((boost) => ({
-        boostKey: boost.boostKey,
-        expiresAt: boost.expiresAt.toISOString(),
-      }))}
-      wallet={{ capabilities: walletCapabilities(), address: user.walletAddress }}
+      worn={state.items
+        .filter((item) => item.equipped)
+        .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity }))}
       account={account}
     />
   );

@@ -2,8 +2,14 @@
 
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { RARITIES, SLOTS, itemName, type Rarity, type Slot } from "@/lib/content/idle";
-import { RARITY_STYLE } from "@/lib/content/items";
+import {
+  RARITIES,
+  RARITY_STYLE,
+  SLOTS,
+  itemName,
+  type Rarity,
+  type Slot,
+} from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
 import { useI18n } from "./I18nProvider";

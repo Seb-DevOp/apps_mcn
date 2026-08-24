@@ -43,7 +43,7 @@ const MIN_SWING_SECONDS = 0.15;
 
 interface Hit {
   id: number;
-  target: "ENEMY" | "CAT" | "GOLD";
+  target: "ENEMY" | "CAT" | "GOLD" | "HEAL";
   value: number;
   crit: boolean;
   /** Horizontal offset, so blows that land together stay separately readable. */
@@ -61,6 +61,8 @@ interface World {
   gold: number;
   catTimer: number;
   enemyTimer: number;
+  /** Reset on every defeat, so a fruitless death loop can be detected. */
+  killsSinceDefeat: number;
 }
 
 export function IdleGame({ initial }: { initial: IdleState }) {
@@ -86,6 +88,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   const [catWounds, setCatWounds] = useState(0);
   const [enemyDeaths, setEnemyDeaths] = useState(0);
   const [defeats, setDefeats] = useState(0);
+  const [heals, setHeals] = useState(0);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -98,6 +101,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     gold: initial.gold,
     catTimer: 0,
     enemyTimer: 0,
+    killsSinceDefeat: 1,
   });
 
   const nextHitId = useRef(0);
@@ -179,7 +183,6 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
       const w = world.current;
       const stats = stateRef.current.stats;
-      w.gold += stats.passiveGoldPerSecond * dt;
 
       if (w.recovering > 0) {
         w.recovering = Math.max(0, w.recovering - dt);
@@ -210,6 +213,16 @@ export function IdleGame({ initial }: { initial: IdleState }) {
             const reward = info.goldReward * stats.goldMultiplier;
             w.gold += reward;
             addHit("GOLD", reward);
+            w.killsSinceDefeat += 1;
+
+            // A Guardian's fall heals the cat outright — the floor's reward.
+            if (info.isBoss) {
+              const healed = stats.maxHp - w.hp;
+              w.hp = stats.maxHp;
+              if (healed > 0) addHit("HEAL", healed);
+              setHeals((n) => n + 1);
+            }
+
             w.level += 1;
             w.enemyHp = levelInfo(w.level).enemyHp;
             w.enemyTimer = 0;
@@ -229,7 +242,15 @@ export function IdleGame({ initial }: { initial: IdleState }) {
             setCatWounds((n) => n + 1);
 
             if (w.hp <= 0) {
-              w.level = floorStart(w.level);
+              // Falling twice with nothing killed in between means this floor's
+              // own first chamber is out of reach; since gold comes only from
+              // kills, dropping a floor is the only way back to an income.
+              const floor = levelInfo(w.level).floor;
+              w.level =
+                w.killsSinceDefeat === 0
+                  ? floorStart(Math.max(1, (floor - 2) * LEVELS_PER_FLOOR + 1))
+                  : floorStart(w.level);
+              w.killsSinceDefeat = 0;
               w.hp = stats.maxHp;
               w.enemyHp = levelInfo(w.level).enemyHp;
               w.recovering = RECOVERY_SECONDS;
@@ -320,7 +341,18 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                     <CatCanvas worn={worn} size={150} breathing={!fallen} />
                   </motion.div>
                 </motion.div>
+                {/* A Guardian's fall lights the cat up for a moment. The number
+                    says how much; the glow says it happened. */}
+                <motion.div
+                  key={heals}
+                  className="pointer-events-none absolute inset-0 rounded-full"
+                  initial={{ opacity: heals === 0 ? 0 : 0.55, scale: 0.8 }}
+                  animate={{ opacity: 0, scale: 1.15 }}
+                  transition={{ duration: 0.9, ease: "easeOut" }}
+                  style={{ background: "radial-gradient(circle, #7ed08f 0%, transparent 65%)" }}
+                />
                 <HitStream hits={hits} target="CAT" tone="#ff6b6b" />
+                <HitStream hits={hits} target="HEAL" tone="#7ed08f" from="feet" prefix="+" />
               </div>
 
               <div className="relative flex-1 pb-4">

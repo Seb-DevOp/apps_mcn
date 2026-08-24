@@ -1,8 +1,6 @@
 import { createClient, Errors } from "@farcaster/quick-auth";
 import { prisma } from "../db";
 import { normalizeHandle, startSessionFor } from "./session";
-import { ensureMissions } from "../engine/missions";
-import { grantStarterEquipment } from "../engine/loadout";
 import { track } from "../engine/analytics";
 
 /**
@@ -104,8 +102,8 @@ export async function signInWithFarcaster(
     },
   });
 
-  await ensureMissions(user.id, user.rankKey);
-  await grantStarterEquipment(user.id);
+  // A new cat starts bare, at the first chamber. The Descent creates its own
+  // profile on the first read, so registration has nothing left to hand out.
   await startSessionFor(user.id);
   await track("account.registered", user.id, { method: "FARCASTER" });
 

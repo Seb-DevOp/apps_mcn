@@ -1,8 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { RARITY_STYLE } from "@/lib/content/items";
-import type { Slot, Rarity } from "@/lib/content/idle";
+import { RARITY_STYLE, type Slot, type Rarity } from "@/lib/content/idle";
 
 /**
  * The cat, wearing what it found.

@@ -292,10 +292,9 @@ idempotent. Cette seule décision donne trois choses à la fois : la progression
 hors-ligne sans code dédié, une horloge infalsifiable puisque c'est le serveur qui
 la lit, et aucune tâche de fond à maintenir en vie sur un hébergement serverless.
 
-**L'or tombe même quand le chat est bloqué.** Sans cela un mur est une impasse :
-plus de kills, donc plus d'or, donc plus d'amélioration, donc bloqué pour
-toujours. `STALLED_INCOME_SHARE` fait qu'être coincé est une pause, pas un arrêt —
-ce qui est censé être le sens du mot « idle ».
+**L'or ne tombe que des monstres tués.** Attendre n'est pas un revenu : un chat
+bloqué doit redescendre farmer les salles qu'il sait battre, pas regarder le
+compteur monter tout seul.
 
 **Ce qui tombe se met tout seul.** Une pièce meilleure que celle portée est
 équipée dans la foulée, y compris pendant une absence. Un jeu idle qui exige de
@@ -375,6 +374,53 @@ que le joueur a acheté en vie, sans jamais pouvoir le dépasser.
 Courbe obtenue, joueur naïf : étage 10 à 14 min, étage 20 à 49 min, étage 25 à
 2 h 10, étage 30 à 6 h 30 — 200 défaites réparties sur douze heures, et aucun
 étage qui retienne le chat pour toujours.
+
+### L'or ne tombe que des morts, et un Gardien soigne
+
+Deux règles qui tiennent ensemble.
+
+**Aucun revenu passif.** L'or vient des ennemis vaincus et de rien d'autre. Une
+rente de présence rendait l'attente rentable : il suffisait de laisser l'écran
+ouvert quelques minutes pour s'acheter la sortie de n'importe quel mur.
+
+**Un Gardien vaincu rend 100 % de la vie.** C'est la récompense de l'étage.
+Sans elle, chaque boss ouvrait l'étage suivant sur un chat déjà à moitié mort et
+le mur tombait sur la salle *d'après* plutôt que sur le Gardien lui-même.
+
+Retirer la rente ouvre une impasse qu'il faut fermer explicitement : un chat qui
+meurt sur la première salle de son étage n'y tue rien, ne gagne donc rien, et
+boucle indéfiniment sans moyen d'acheter sa sortie. **Tomber deux fois sans un
+seul kill entre les deux fait redescendre d'un étage** — jusqu'à retrouver des
+ennemis à sa portée. Le compteur démarre à un plutôt qu'à zéro, pour qu'un joueur
+qui ouvre l'application pile sur une défaite ne soit pas rétrogradé pour avoir
+regardé.
+
+Effet mesuré du retrait de la rente : étage 43 → 35 en douze heures, et 130 → 245
+défaites. C'est plus dur, et c'est le but.
+
+### Ce qui reste de l'application
+
+La Descente est le jeu. Tout ce qui l'entourait appartenait à un autre jeu et a
+été supprimé : le hub Vault, le mini-jeu, le coffre quotidien, les séries, les
+missions, l'Armurerie, la Forge, l'exploration, la galerie des rangs — routes,
+API, moteurs, contenu et composants.
+
+Il reste **trois écrans** :
+
+| Écran | Ce qu'il fait |
+| --- | --- |
+| **Descente** | le combat et le sac, deux onglets d'un même jeu qui tourne |
+| **Classement** | profondeur, Gardiens, fortune — trois tables lues sur `IdleProfile` |
+| **Profil** | le chat, ses chiffres, le compte et ses moyens de connexion |
+
+Le dictionnaire est passé de 404 à 189 clés, élagué par un script qui garde les
+préfixes construits à l'exécution — `t(`idle.slot.${slot}`)` n'est pas une
+chaîne littérale et une recherche naïve aurait supprimé les six emplacements.
+
+**Le schéma n'est pas touché.** Les tables de l'ancien jeu ne reçoivent plus
+d'écritures mais ne sont pas supprimées : une table vide ne coûte rien, alors
+qu'un `DROP` est irréversible et mérite d'être une décision prise pour
+elle-même plutôt qu'un effet de bord d'un changement de gameplay.
 
 ### Six statistiques, et une définition de « aussi forte »
 

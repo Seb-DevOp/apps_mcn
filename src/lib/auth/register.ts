@@ -1,8 +1,6 @@
 import { prisma } from "../db";
 import { startSessionFor, normalizeHandle } from "./session";
 import { hashPassword, checkPassword, normalizeEmail, isEmailShaped } from "./password";
-import { ensureMissions } from "../engine/missions";
-import { grantStarterEquipment } from "../engine/loadout";
 import { track } from "../engine/analytics";
 
 /**
@@ -103,8 +101,8 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
     throw error;
   }
 
-  await ensureMissions(user.id, user.rankKey);
-  await grantStarterEquipment(user.id);
+  // A new cat starts bare, at the first chamber. The Descent creates its own
+  // profile on the first read, so registration has nothing left to hand out.
   await startSessionFor(user.id);
   await track("account.registered", user.id, { locale: user.locale });
 

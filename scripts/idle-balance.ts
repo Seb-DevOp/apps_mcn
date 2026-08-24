@@ -68,14 +68,14 @@ const marks = new Map<number, number>();
 /** What one more level of this upgrade would multiply its own axis by. */
 function marginalGain(key: UpgradeKey): number {
   const trial: Upgrades = { ...upgrades, [key]: upgrades[key] + 1 };
-  const before = derive(items, upgrades, highestLevel);
-  const after = derive(items, trial, highestLevel);
+  const before = derive(items, upgrades);
+  const after = derive(items, trial);
   const def = UPGRADES.find((entry) => entry.key === key)!;
   return def.axis === "SURVIVAL" ? after.maxHp / before.maxHp : after.power / before.power;
 }
 
 for (let minute = 1; minute <= HOURS * 60; minute++) {
-  const stats = derive(items, upgrades, highestLevel);
+  const stats = derive(items, upgrades);
   const result = simulate(MINUTE, { level, enemyHp, hp, recoverFor, highestLevel }, stats);
 
   level = result.level;
@@ -101,7 +101,7 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   }
 
   for (let spree = 0; spree < 60; spree++) {
-    const now = derive(items, upgrades, highestLevel);
+    const now = derive(items, upgrades);
     const info = levelInfo(level);
     const net = now.regen - info.enemyDamage;
     const timeToFall = net < 0 ? now.maxHp / -net : Number.POSITIVE_INFINITY;
@@ -137,7 +137,7 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   if (!marks.has(floor)) marks.set(floor, minute);
 }
 
-const stats = derive(items, upgrades, highestLevel);
+const stats = derive(items, upgrades);
 const here = levelInfo(level);
 const totalSpent = Object.values(spent).reduce((sum, value) => sum + value, 0);
 
@@ -193,6 +193,6 @@ const net = stats.regen - here.enemyDamage;
 const stuck = net < 0 && stats.maxHp / -net < here.enemyHp / stats.power;
 console.log(
   stuck
-    ? "\nétat final : le chat perd son combat actuel — l'or passif doit le débloquer"
+    ? "\nétat final : le chat perd son combat actuel — il doit redescendre farmer son étage"
     : "\nétat final : le chat gagne son combat actuel",
 );

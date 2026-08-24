@@ -518,3 +518,21 @@ export const RECOVERY_SECONDS = 4;
  */
 export const ATTACK_INTERVAL = 0.75;
 export const ENEMY_ATTACK_INTERVAL = 1.05;
+
+// ---------------------------------------------------------------------------
+// How a rarity looks
+// ---------------------------------------------------------------------------
+
+/**
+ * Colour is the fastest thing a player reads about a drop — before the name,
+ * before the numbers. It lives here with the rarities themselves rather than in a
+ * catalogue of items that the Descent no longer has.
+ */
+export const RARITY_STYLE: Record<Rarity, { color: string; glow: string }> = {
+  COMMON: { color: "#9aa6bf", glow: "rgba(154,166,191,0.35)" },
+  UNCOMMON: { color: "#69c39a", glow: "rgba(105,195,154,0.40)" },
+  RARE: { color: "#4f93ff", glow: "rgba(79,147,255,0.50)" },
+  EPIC: { color: "#a06bff", glow: "rgba(160,107,255,0.50)" },
+  MYTHIC: { color: "#37d5ff", glow: "rgba(55,213,255,0.60)" },
+  LEGENDARY: { color: "#f0c14b", glow: "rgba(240,193,75,0.65)" },
+};
