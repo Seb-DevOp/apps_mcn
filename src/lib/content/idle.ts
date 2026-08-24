@@ -777,3 +777,137 @@ export const MAX_STRIKES_PER_SECOND = 8;
  */
 export const ROAR_COOLDOWN_SECONDS = 180;
 export const ROAR_DAMAGE_SECONDS = 60;
+
+// ---------------------------------------------------------------------------
+// The ladder: what each life brings back
+// ---------------------------------------------------------------------------
+
+/**
+ * Each rebirth asks for a deeper record than the last.
+ *
+ * Without this the record advances a little, a life is spent, and the whole
+ * five-rung ladder is climbed in two days — which is the opposite of spreading
+ * it. Twelve floors per rung puts the rungs at 15, 27, 39, 51 and 63 — measured, that
+ * is about a week of uninterrupted idling for the fifth and rather longer for
+ * anyone who sleeps. The requirement keeps growing afterwards, so late lives
+ * stay rare too.
+ */
+export function rebirthFloorFor(rebirths: number): number {
+  return REBIRTH_MIN_FLOOR + 12 * rebirths;
+}
+
+export type UnlockKey = "flair" | "seals" | "breath" | "elites" | "pack";
+
+export interface UnlockDef {
+  key: UnlockKey;
+  /** Lives that must have been spent before this exists. */
+  rebirths: number;
+  nameEn: string;
+  nameFr: string;
+  descEn: string;
+  descFr: string;
+  icon: string;
+}
+
+/**
+ * Five rungs, each a system rather than a multiplier.
+ *
+ * A rebirth that only made numbers larger would be a chore with a ceremony
+ * around it; one that hands over something the game could not do before is worth
+ * spending a life on. After the fifth, rebirth keeps paying relics for ever —
+ * stopping it would leave a single decelerating arc, which is the problem the
+ * whole second arc exists to solve.
+ */
+export const UNLOCKS: UnlockDef[] = [
+  {
+    key: "flair",
+    rebirths: 1,
+    nameEn: "The Nose",
+    nameFr: "Le Flair",
+    descEn: "Anything below a rarity you choose sells itself as it drops.",
+    descFr: "Tout ce qui tombe sous une rareté choisie se vend tout seul.",
+    icon: "gold",
+  },
+  {
+    key: "seals",
+    rebirths: 2,
+    nameEn: "The Seals",
+    nameFr: "Les Sceaux",
+    descEn: "Worn pieces that share a rarity strengthen each other.",
+    descFr: "Les pièces portées qui partagent une rareté se renforcent entre elles.",
+    icon: "sigil",
+  },
+  {
+    key: "breath",
+    rebirths: 3,
+    nameEn: "The Breath",
+    nameFr: "Le Souffle",
+    descEn: "Heal completely and take nothing for fifteen seconds.",
+    descFr: "Soin complet, et plus rien n'atteint le chat pendant quinze secondes.",
+    icon: "essence",
+  },
+  {
+    key: "elites",
+    rebirths: 4,
+    nameEn: "The Elites",
+    nameFr: "Les Élites",
+    descEn: "Some enemies come back wrong. Far harder, and they always leave something good.",
+    descFr: "Certains ennemis reviennent difformes. Bien plus coriaces, et ils laissent toujours quelque chose.",
+    icon: "crown",
+  },
+  {
+    key: "pack",
+    rebirths: 5,
+    nameEn: "The Pack",
+    nameFr: "La Meute",
+    descEn: "A second cat, dressed from what the first one left in the bag.",
+    descFr: "Un second chat, habillé de ce que le premier a laissé dans le sac.",
+    icon: "badge",
+  },
+];
+
+export function unlocked(key: UnlockKey, rebirths: number): boolean {
+  const def = UNLOCKS.find((entry) => entry.key === key);
+  return def !== undefined && rebirths >= def.rebirths;
+}
+
+// ---------------------------------------------------------------------------
+// The Seals: worn pieces that agree
+// ---------------------------------------------------------------------------
+
+/**
+ * How much a matching set is worth, by how many pieces match.
+ *
+ * Three is the first rung on purpose: two matching pieces happen by accident,
+ * and a bonus you get by accident teaches nothing. From three it becomes a
+ * reason to keep a slightly weaker piece — which is the first time the bag has
+ * ever argued with the recommendation button, and the point of the system.
+ */
+const SEAL_STEPS = [0, 0, 0, 0.08, 0.15, 0.25, 0.4];
+
+export interface SealBonus {
+  count: number;
+  rarity: Rarity | null;
+  bonus: number;
+}
+
+export function sealBonus(worn: Rarity[]): SealBonus {
+  let best: SealBonus = { count: 0, rarity: null, bonus: 0 };
+
+  for (const rarity of RARITIES) {
+    const count = worn.filter((entry) => entry === rarity).length;
+    if (count < 3) continue;
+    // Rarer sets are worth more, so a full common set never beats four legendaries.
+    const bonus = SEAL_STEPS[Math.min(count, 6)] * (1 + RARITIES.indexOf(rarity) * 0.16);
+    if (bonus > best.bonus) best = { count, rarity, bonus };
+  }
+
+  return best;
+}
+
+// ---------------------------------------------------------------------------
+// The Breath
+// ---------------------------------------------------------------------------
+
+export const BREATH_COOLDOWN_SECONDS = 120;
+export const BREATH_SHIELD_SECONDS = 15;

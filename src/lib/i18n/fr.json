@@ -209,5 +209,16 @@
   "rebirth.shop": "Ce qui survit à une vie",
   "rebirth.shopHint": "Acheté une fois, gardé à travers toutes les renaissances suivantes.",
   "rebirth.cost": "{n} reliques",
-  "common.cancel": "Annuler"
+  "common.cancel": "Annuler",
+  "idle.breath": "Souffle",
+  "idle.breathIn": "Souffle dans {s}s",
+  "idle.shielded": "Intouchable {s}s",
+  "idle.sealActive": "Sceau {rarity} · {n} pièces · +{bonus} % de dégâts et de vie",
+  "flair.title": "Le Flair",
+  "flair.hint": "Tout ce qui tombe sous ce seuil se vend sur place. Ça n'arrive jamais dans le sac.",
+  "flair.off": "Tout garder",
+  "rebirth.ladder": "Ce que chaque vie rapporte",
+  "rebirth.ladderHint": "Cinq marches, chacune un système plutôt qu'un plus gros chiffre. Après la cinquième, les vies continuent de payer des reliques.",
+  "rebirth.open": "acquis",
+  "rebirth.atLife": "vie {n}"
 }

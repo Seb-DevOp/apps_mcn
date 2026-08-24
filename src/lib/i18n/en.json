@@ -209,5 +209,16 @@
   "rebirth.shop": "What outlives a life",
   "rebirth.shopHint": "Bought once, kept through every rebirth after.",
   "rebirth.cost": "{n} relics",
-  "common.cancel": "Cancel"
+  "common.cancel": "Cancel",
+  "idle.breath": "Breath",
+  "idle.breathIn": "Breath in {s}s",
+  "idle.shielded": "Untouchable {s}s",
+  "idle.sealActive": "Seal of {rarity} · {n} pieces · +{bonus}% damage and health",
+  "flair.title": "The Nose",
+  "flair.hint": "Anything below this sells itself where it falls. It never reaches the bag.",
+  "flair.off": "Keep everything",
+  "rebirth.ladder": "What each life brings back",
+  "rebirth.ladderHint": "Five rungs, each a system rather than a bigger number. After the fifth, lives keep paying relics.",
+  "rebirth.open": "open",
+  "rebirth.atLife": "life {n}"
 }

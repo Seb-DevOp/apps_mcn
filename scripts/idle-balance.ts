@@ -25,7 +25,7 @@ import {
   relicsForFloor,
   levelInfo,
   BASE_MAX_HP,
-  REBIRTH_MIN_FLOOR,
+  rebirthFloorFor,
   type UpgradeKey,
 } from "../src/lib/content/idle";
 import {
@@ -38,6 +38,7 @@ import {
 
 interface Worn {
   slot: string;
+  rarity: string;
   power: number;
   vitality: number;
   goldBonus: number;
@@ -61,6 +62,7 @@ let highestLevel = 1;
 let enemyHp = levelInfo(1).enemyHp;
 let hp = BASE_MAX_HP;
 let recoverFor = 0;
+let shieldFor = 0;
 let defeats = 0;
 
 // --- Rebirth ---------------------------------------------------------------
@@ -90,20 +92,21 @@ const marks = new Map<number, number>();
 /** What one more level of this upgrade would multiply its own axis by. */
 function marginalGain(key: UpgradeKey): number {
   const trial: Upgrades = { ...upgrades, [key]: upgrades[key] + 1 };
-  const before = derive(items, upgrades, relics);
-  const after = derive(items, trial, relics);
+  const before = derive(items, upgrades, relics, rebirths);
+  const after = derive(items, trial, relics, rebirths);
   const def = UPGRADES.find((entry) => entry.key === key)!;
   return def.axis === "SURVIVAL" ? after.maxHp / before.maxHp : after.power / before.power;
 }
 
 for (let minute = 1; minute <= HOURS * 60; minute++) {
-  const stats = derive(items, upgrades, relics);
-  const result = simulate(MINUTE, { level, enemyHp, hp, recoverFor, highestLevel }, stats);
+  const stats = derive(items, upgrades, relics, rebirths);
+  const result = simulate(MINUTE, { level, enemyHp, hp, recoverFor, shieldFor, highestLevel }, stats);
 
   level = result.level;
   enemyHp = result.enemyHp;
   hp = result.hp;
   recoverFor = result.recoverFor;
+  shieldFor = result.shieldFor;
   highestLevel = result.highestLevel;
   gold += result.goldEarned;
   defeats += result.defeats;
@@ -113,13 +116,14 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   for (const drop of result.drops) {
     const candidate: Worn = {
       slot: drop.slot,
+      rarity: drop.rarity,
       power: drop.power,
       vitality: drop.vitality,
       goldBonus: drop.goldBonus,
       affixesJson: JSON.stringify(drop.affixes),
       equippedSlot: null,
     };
-    const now = derive(items, upgrades, relics);
+    const now = derive(items, upgrades, relics, rebirths);
     if (scoreWith(items, upgrades, candidate, relics) > now.power * now.maxHp) {
       items = items.filter((item) => item.equippedSlot !== drop.slot);
       items.push({ ...candidate, equippedSlot: drop.slot });
@@ -127,7 +131,7 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   }
 
   for (let spree = 0; spree < 60; spree++) {
-    const now = derive(items, upgrades, relics);
+    const now = derive(items, upgrades, relics, rebirths);
     const info = levelInfo(level);
     const net = now.regen - info.enemyDamage;
     const timeToFall = net < 0 ? now.maxHp / -net : Number.POSITIVE_INFINITY;
@@ -170,7 +174,7 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   // A run that has not moved its record in forty-five minutes has given what it
   // had. Spending it is the whole second arc.
   const owed = Math.max(0, relicsForFloor(floor) - relicsEarned);
-  if (stalledFor >= REBIRTH_AFTER_STALLED && owed > 0 && floor >= REBIRTH_MIN_FLOOR) {
+  if (stalledFor >= REBIRTH_AFTER_STALLED && owed > 0 && floor >= rebirthFloorFor(rebirths)) {
     relicBank += owed;
     relicsEarned += owed;
     rebirths += 1;
@@ -197,14 +201,14 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   }
 }
 
-const stats = derive(items, upgrades, relics);
+const stats = derive(items, upgrades, relics, rebirths);
 const here = levelInfo(level);
 const totalSpent = Object.values(spent).reduce((sum, value) => sum + value, 0);
 
 console.log(`après ${HOURS} h de jeu passif`);
 console.log(`  étage atteint      ${levelInfo(highestLevel).floor}`);
 console.log(`  défaites           ${defeats}`);
-console.log(`  renaissances       ${rebirths}`);
+console.log(`  renaissances       ${rebirths} · prochaine à l étage ${rebirthFloorFor(rebirths)}`);
 console.log(
   `  reliques           ${RELICS.map((def) => `${def.nameFr} ${relics[def.key]}`).join(" · ")}`,
 );

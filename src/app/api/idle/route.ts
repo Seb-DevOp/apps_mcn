@@ -12,6 +12,8 @@ import {
   buyRelic,
   strike,
   roar,
+  breath,
+  setAutoSell,
 } from "@/lib/engine/idle";
 
 /**
@@ -40,6 +42,8 @@ const Schema = z.discriminatedUnion("action", [
   // The count is a claim, not a fact: the engine clamps it by elapsed time.
   z.object({ action: z.literal("strike"), count: z.number().int().min(1).max(40) }),
   z.object({ action: z.literal("roar") }),
+  z.object({ action: z.literal("breath") }),
+  z.object({ action: z.literal("autoSell"), rarity: z.string().max(20) }),
 ]);
 
 export async function POST(request: Request) {
@@ -79,5 +83,9 @@ function run(userId: string, input: z.infer<typeof Schema>) {
       return strike(userId, input.count);
     case "roar":
       return roar(userId);
+    case "breath":
+      return breath(userId);
+    case "autoSell":
+      return setAutoSell(userId, input.rarity);
   }
 }

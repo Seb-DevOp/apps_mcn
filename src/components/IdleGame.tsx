@@ -67,6 +67,8 @@ interface World {
   gold: number;
   catTimer: number;
   enemyTimer: number;
+  /** Seconds of immunity left, mirrored from the server so the bar can say so. */
+  shield: number;
   /** Reset on every defeat, so a fruitless death loop can be detected. */
   killsSinceDefeat: number;
 }
@@ -87,6 +89,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     hp: initial.hp,
     gold: initial.gold,
     recovering: initial.recoverFor,
+    shield: initial.shieldFor,
   });
 
   const [hits, setHits] = useState<Hit[]>([]);
@@ -117,6 +120,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     gold: initial.gold,
     catTimer: 0,
     enemyTimer: 0,
+    shield: initial.shieldFor,
     killsSinceDefeat: 1,
   });
 
@@ -170,6 +174,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
       hp: next.hp,
       recovering: next.recoverFor,
       gold: next.gold,
+      shield: next.shieldFor,
     };
   }, []);
 
@@ -315,10 +320,12 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           w.enemyTimer += dt;
           if (w.enemyTimer >= ENEMY_ATTACK_INTERVAL) {
             w.enemyTimer -= ENEMY_ATTACK_INTERVAL;
-            const blow = info.enemyDamage * ENEMY_ATTACK_INTERVAL;
-            w.hp -= blow;
-            addHit("CAT", blow);
-            setCatWounds((n) => n + 1);
+            if (w.shield <= 0) {
+              const blow = info.enemyDamage * ENEMY_ATTACK_INTERVAL;
+              w.hp -= blow;
+              addHit("CAT", blow);
+              setCatWounds((n) => n + 1);
+            }
 
             if (w.hp <= 0) {
               // Falling twice with nothing killed in between means this floor's
@@ -343,12 +350,15 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         w.hp = Math.min(stats.maxHp, w.hp + stats.regen * dt);
       }
 
+      w.shield = Math.max(0, w.shield - dt);
+
       setShown({
         level: w.level,
         enemyHp: Math.max(0, w.enemyHp),
         hp: Math.max(0, w.hp),
         gold: w.gold,
         recovering: w.recovering,
+        shield: w.shield,
       });
     }, STEP_MS);
 
@@ -368,6 +378,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   );
 
   const spareCount = state.items.filter((item) => !item.equipped).length;
+  const breathOpen = state.unlocks.some((entry) => entry.key === "breath" && entry.open);
   const showRebirth =
     state.rebirth.ready || state.rebirth.relics > 0 || state.rebirth.rebirths > 0;
 
@@ -486,7 +497,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
             <div className="relative z-10 mt-2 grid grid-cols-2 gap-3">
               <Bar
-                label={t("idle.catHp")}
+                label={shown.shield > 0 ? t("idle.shielded", { s: Math.ceil(shown.shield) }) : t("idle.catHp")}
                 value={shown.hp}
                 max={stats.maxHp}
                 fill="linear-gradient(90deg,#3f8f5a,#7ed08f)"
@@ -525,7 +536,27 @@ export function IdleGame({ initial }: { initial: IdleState }) {
             </AnimatePresence>
           </motion.section>
 
-          <Roar state={state} busy={busy} act={act} />
+          <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: breathOpen ? "1fr 1fr" : "1fr" }}>
+            <Ability
+              label={t("idle.roar")}
+              waiting={t("idle.roarIn", { s: Math.ceil(state.roarIn) })}
+              left={state.roarIn}
+              cooldown={state.roarCooldown}
+              busy={busy}
+              onCast={() => act({ action: "roar" }, "roar")}
+            />
+            {breathOpen && (
+              <Ability
+                label={t("idle.breath")}
+                waiting={t("idle.breathIn", { s: Math.ceil(state.breathIn) })}
+                left={state.breathIn}
+                cooldown={state.breathCooldown}
+                busy={busy}
+                tone="#7ed08f"
+                onCast={() => act({ action: "breath" }, "breath")}
+              />
+            )}
+          </div>
 
           <Verdict outcome={state.outcome} isBoss={here.isBoss} />
 
@@ -538,6 +569,16 @@ export function IdleGame({ initial }: { initial: IdleState }) {
             <Stat label={t("idle.critDamage")} value={`×${formatNumber(stats.critMultiplier)}`} />
             <Stat label={t("idle.double")} value={`×${(1 + stats.extraStrikes).toFixed(2)}`} />
           </section>
+
+          {stats.seal.rarity && (
+            <p className="mt-2 text-center text-[0.68rem]" style={{ color: "var(--sapphire-pale)" }}>
+              {t("idle.sealActive", {
+                n: stats.seal.count,
+                rarity: t(`idle.rarity.${stats.seal.rarity}`),
+                bonus: Math.round(stats.seal.bonus * 100),
+              })}
+            </p>
+          )}
 
           <p className="dim mt-2 text-center text-[0.64rem]">
             {t("idle.incomingHere", { n: formatNumber(here.enemyDamage) })}
@@ -785,36 +826,43 @@ function Bar({
  * rather than a fixed number, so it stays worth pressing at any depth without
  * ever being the thing that clears a floor by itself.
  */
-function Roar({
-  state,
+function Ability({
+  label,
+  waiting,
+  left: given,
+  cooldown,
   busy,
-  act,
+  tone = "var(--gold-bright)",
+  onCast,
 }: {
-  state: IdleState;
+  label: string;
+  waiting: string;
+  left: number;
+  cooldown: number;
   busy: string | null;
-  act: (body: Record<string, unknown>, key: string) => void;
+  tone?: string;
+  onCast: () => void;
 }) {
-  const { t } = useI18n();
-  const [left, setLeft] = useState(state.roarIn);
+  const [left, setLeft] = useState(given);
 
-  useEffect(() => setLeft(state.roarIn), [state.roarIn]);
+  useEffect(() => setLeft(given), [given]);
   useEffect(() => {
     const timer = window.setInterval(() => setLeft((n) => Math.max(0, n - 1)), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
   const ready = left <= 0;
-  const share = 1 - left / state.roarCooldown;
+  const share = 1 - left / cooldown;
 
   return (
     <button
       type="button"
       disabled={!ready || busy !== null}
-      onClick={() => act({ action: "roar" }, "roar")}
-      className="panel relative mt-3 w-full overflow-hidden py-2.5 text-[0.8rem] uppercase tracking-widest transition disabled:opacity-60"
+      onClick={onCast}
+      className="panel relative w-full overflow-hidden py-2.5 text-[0.72rem] uppercase tracking-widest transition disabled:opacity-60"
       style={{
-        borderColor: ready ? "rgba(240,193,75,0.6)" : undefined,
-        color: ready ? "var(--gold-bright)" : "var(--text-dim)",
+        borderColor: ready ? `${tone}99` : undefined,
+        color: ready ? tone : "var(--text-dim)",
       }}
     >
       {/* The cooldown as a filling bar rather than a number alone: a button that
@@ -827,9 +875,7 @@ function Roar({
           transition: "width 1s linear",
         }}
       />
-      <span className="relative">
-        {ready ? t("idle.roar") : t("idle.roarIn", { s: Math.ceil(left) })}
-      </span>
+      <span className="relative">{ready ? label : waiting}</span>
     </button>
   );
 }

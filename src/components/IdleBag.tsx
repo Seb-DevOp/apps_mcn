@@ -194,6 +194,41 @@ export function IdleBag({
         )}
       </div>
 
+      {/* --- The Nose: what never reaches the bag at all ----------------- */}
+      {state.unlocks.some((entry) => entry.key === "flair" && entry.open) && (
+        <section className="mt-5">
+          <h2 className="eyebrow">{t("flair.title")}</h2>
+          <p className="dim mt-1 text-[0.68rem] italic">{t("flair.hint")}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {["", ...RARITIES.slice(1, 5)].map((rarity) => {
+              const active = state.autoSellBelow === rarity;
+              const style = rarity ? RARITY_STYLE[rarity as Rarity] : null;
+              return (
+                <button
+                  key={rarity || "off"}
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => act({ action: "autoSell", rarity }, `flair-${rarity}`)}
+                  className="panel flex items-center gap-1.5 px-2 py-1.5 text-[0.66rem] transition"
+                  style={{
+                    borderColor: active ? "rgba(201,162,77,0.6)" : undefined,
+                    color: active ? "var(--gold-bright)" : "var(--text-dim)",
+                  }}
+                >
+                  {style && (
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ background: style.color }}
+                    />
+                  )}
+                  {rarity ? t(`idle.rarity.${rarity}`) : t("flair.off")}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* --- Everything else it owns ------------------------------------ */}
       <h2 className="eyebrow mt-6">{t("idle.spares", { n: spares.length })}</h2>
 

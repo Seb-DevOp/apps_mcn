@@ -106,6 +106,38 @@ export function IdleRebirth({
         )}
       </section>
 
+      <h2 className="eyebrow mt-6">{t("rebirth.ladder")}</h2>
+      <p className="dim mt-1 text-[0.68rem] italic">{t("rebirth.ladderHint")}</p>
+
+      <div className="mt-2 space-y-1.5">
+        {state.unlocks.map((entry) => (
+          <div
+            key={entry.key}
+            className="panel flex items-start gap-2.5 p-2.5"
+            style={{
+              borderColor: entry.open ? "rgba(201,162,77,0.45)" : undefined,
+              opacity: entry.open ? 1 : 0.55,
+            }}
+          >
+            <span
+              className="mt-0.5 shrink-0"
+              style={{ color: entry.open ? "var(--gold)" : "var(--text-faint)" }}
+            >
+              <ItemIcon icon={entry.icon} size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[0.78rem] text-[var(--parchment)]">
+                {L(entry.nameEn, entry.nameFr)}
+              </p>
+              <p className="dim text-[0.65rem] leading-snug">{L(entry.descEn, entry.descFr)}</p>
+            </div>
+            <span className="tabular shrink-0 text-[0.65rem]" style={{ color: "var(--text-faint)" }}>
+              {entry.open ? t("rebirth.open") : t("rebirth.atLife", { n: entry.rebirths })}
+            </span>
+          </div>
+        ))}
+      </div>
+
       <h2 className="eyebrow mt-6">{t("rebirth.shop")}</h2>
       <p className="dim mt-1 text-[0.68rem] italic">{t("rebirth.shopHint")}</p>
 

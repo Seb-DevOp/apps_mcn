@@ -136,6 +136,13 @@ model IdleProfile {
   /// Both clamped server-side: taps by elapsed time, the Roar by its cooldown.
   lastStrikeAt DateTime @default(now())
   lastRoarAt   DateTime @default(now())
+  lastBreathAt DateTime @default(now())
+  /// Seconds of immunity still owed to the cat, carried between ticks.
+  shieldFor    Float    @default(0)
+
+  /// --- The Nose ------------------------------------------------------
+  /// Rarity below which a find sells itself. Empty means keep everything.
+  autoSellBelow String @default("")
 
   lastTickAt DateTime @default(now())
   createdAt  DateTime @default(now())

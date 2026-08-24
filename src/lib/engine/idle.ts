@@ -38,12 +38,19 @@ import {
   MAX_STRIKES_PER_SECOND,
   ROAR_COOLDOWN_SECONDS,
   ROAR_DAMAGE_SECONDS,
+  BREATH_COOLDOWN_SECONDS,
+  BREATH_SHIELD_SECONDS,
+  UNLOCKS,
+  unlocked,
+  sealBonus,
+  rebirthFloorFor,
   type Affix,
   type RelicKey,
   type Slot,
   type Rarity,
 } from "@/lib/content/idle";
 import { track } from "./analytics";
+import type { SealBonus } from "@/lib/content/idle";
 
 /**
  * The idle engine.
@@ -103,6 +110,8 @@ export interface DerivedStats {
   critMultiplier: number;
   /** Expected extra blows per swing. Unbounded: past 1 they are guaranteed. */
   extraStrikes: number;
+  /** The matching set currently worn, if any — shown, not just applied. */
+  seal: SealBonus;
   /** The product of all four — what the fight is actually resolved with. */
   power: number;
   maxHp: number;
@@ -117,6 +126,7 @@ interface ItemRow {
   power: number;
   vitality: number;
   goldBonus: number;
+  rarity: string;
   affixesJson: string;
   equippedSlot: string | null;
 }
@@ -153,6 +163,8 @@ export function derive(
   items: ItemRow[],
   upgrades: Upgrades,
   relics: Relics = NO_RELICS,
+  /** Lives spent, because some of what the cat can do was brought back by them. */
+  rebirths = 0,
 ): DerivedStats {
   const worn = items.filter((item) => item.equippedSlot);
   const level = (key: keyof Upgrades) => upgrades[key];
@@ -183,11 +195,19 @@ export function derive(
    */
   const relic = (key: RelicKey) => 1 + relics[key] * RELIC_BY_KEY[key].perLevel;
 
+  // Matching rarities across worn pieces. Zero until the second life brings the
+  // Seals back, and zero below three matching — two happen by accident, and a
+  // bonus you get by accident teaches nothing.
+  const seal = unlocked("seals", rebirths)
+    ? sealBonus(worn.map((item) => item.rarity as Rarity))
+    : { count: 0, rarity: null, bonus: 0 };
+
   const hitDamage =
     (BASE_ATTACK_DAMAGE + worn.reduce((sum, item) => sum + item.power, 0)) *
     Math.pow(1 + per("attack"), level("attack")) *
     (1 + bonus("attack")) *
-    relic("memory");
+    relic("memory") *
+    (1 + seal.bonus);
 
   const attacksPerSecond =
     BASE_ATTACK_SPEED * Math.pow(1 + per("speed"), level("speed")) * (1 + bonus("speed"));
@@ -227,7 +247,8 @@ export function derive(
     (BASE_MAX_HP + worn.reduce((sum, item) => sum + item.vitality, 0)) *
     Math.pow(1 + per("health"), level("health")) *
     (1 + bonus("health")) *
-    relic("tenacity");
+    relic("tenacity") *
+    (1 + seal.bonus);
 
   // Healing is deliberately not purchasable. Bought without limit it eventually
   // exceeds any damage at any depth, and an immortal cat has no losing condition
@@ -248,6 +269,7 @@ export function derive(
     critChance,
     critMultiplier,
     extraStrikes,
+    seal,
     power: Math.max(1, power),
     maxHp: Math.max(1, maxHp),
     regen,
@@ -281,11 +303,12 @@ export function scoreWith(
   upgrades: Upgrades,
   candidate: ItemRow,
   relics: Relics = NO_RELICS,
+  rebirths = 0,
 ): number {
   // Everything else the cat is wearing, minus whatever occupies this slot today.
   const rest = items.filter((item) => item.equippedSlot && item.slot !== candidate.slot);
   return combatScore(
-    derive([...rest, { ...candidate, equippedSlot: candidate.slot }], upgrades, relics),
+    derive([...rest, { ...candidate, equippedSlot: candidate.slot }], upgrades, relics, rebirths),
   );
 }
 
@@ -302,6 +325,8 @@ export interface Drop {
   affixes: Affix[];
   /** True when it went straight on — which now only happens on a bare slot. */
   equipped: boolean;
+  /** True when the Nose turned it into gold instead. */
+  sold: boolean;
 }
 
 export interface TickReport {
@@ -316,6 +341,9 @@ export interface TickReport {
   defeats: number;
   /** Guardians felled, each one healing the cat outright. */
   heals: number;
+  /** Finds the Nose turned into gold before they reached the bag. */
+  autoSold: number;
+  autoGold: number;
   drops: Drop[];
 }
 
@@ -359,6 +387,7 @@ export function simulate(
     enemyHp: number;
     hp: number;
     recoverFor: number;
+    shieldFor: number;
     highestLevel: number;
   },
   stats: DerivedStats,
@@ -367,9 +396,10 @@ export function simulate(
   enemyHp: number;
   hp: number;
   recoverFor: number;
+  shieldFor: number;
   highestLevel: number;
 } {
-  let { level, enemyHp, hp, recoverFor, highestLevel } = state;
+  let { level, enemyHp, hp, recoverFor, shieldFor, highestLevel } = state;
   let remaining = seconds;
   // Gold comes from kills and from nothing else. Waiting is not an income.
   let goldEarned = 0;
@@ -410,18 +440,39 @@ export function simulate(
 
     // Regeneration and the enemy's damage are one net rate. Positive means the
     // cat is winning the exchange of blows and cannot lose this fight at all.
-    const netHealth = stats.regen - info.enemyDamage;
+    // While the Breath holds, the enemy's half of that rate is simply absent.
+    const shielded = shieldFor > 0;
+    const netHealth = shielded ? stats.regen : stats.regen - info.enemyDamage;
     const timeToFall = netHealth < 0 ? hp / -netHealth : Number.POSITIVE_INFINITY;
 
-    const decidedAt = Math.min(timeToKill, timeToFall);
+    // The shield running out is an event like any other: the rates change when it
+    // does, so the step has to stop there rather than average across it.
+    const decidedAt = Math.min(
+      timeToKill,
+      timeToFall,
+      shielded ? shieldFor : Number.POSITIVE_INFINITY,
+    );
 
     if (remaining < decidedAt) {
       // The tick runs out mid-fight: carry the wound and the enemy's wound over.
       enemyHp = Math.max(0.0001, enemyHp - stats.power * remaining);
       hp = clampHp(hp + netHealth * remaining);
+      if (shielded) shieldFor = Math.max(0, shieldFor - remaining);
       remaining = 0;
       break;
     }
+
+    if (shielded && shieldFor < timeToKill && shieldFor < timeToFall) {
+      // Nothing died and nobody fell — the Breath simply stopped. Chip what the
+      // cat managed in that window and let the loop reprice the fight.
+      remaining -= shieldFor;
+      enemyHp = Math.max(0.0001, enemyHp - stats.power * shieldFor);
+      hp = clampHp(hp + netHealth * shieldFor);
+      shieldFor = 0;
+      continue;
+    }
+
+    if (shielded) shieldFor = Math.max(0, shieldFor - decidedAt);
 
     if (timeToFall < timeToKill) {
       // Beaten. Back to the first chamber of this floor, full health, but the
@@ -440,6 +491,7 @@ export function simulate(
       enemyHp = 0;
       hp = stats.maxHp;
       recoverFor = RECOVERY_SECONDS;
+      shieldFor = 0;
       continue;
     }
 
@@ -474,6 +526,7 @@ export function simulate(
         goldBonus: rolled.goldBonus,
         affixes: rollAffixes(rarity),
         equipped: false,
+        sold: false,
       });
     }
 
@@ -492,11 +545,14 @@ export function simulate(
     levelsCleared,
     defeats,
     heals,
+    autoSold: 0,
+    autoGold: 0,
     drops,
     level,
     enemyHp,
     hp,
     recoverFor,
+    shieldFor,
     highestLevel,
   };
 }
@@ -543,13 +599,15 @@ export async function getIdleState(userId: string) {
           levelsCleared: 0,
           defeats: 0,
           heals: 0,
+          autoSold: 0,
+          autoGold: 0,
           drops: [],
         } as TickReport,
       };
     }
 
     const relics = parseRelics(profile.relicsJson);
-    const stats = derive(items, upgrades, relics);
+    const stats = derive(items, upgrades, relics, profile.rebirths);
     const result = simulate(
       seconds,
       {
@@ -557,6 +615,7 @@ export async function getIdleState(userId: string) {
         enemyHp: profile.enemyHp,
         hp: profile.hp,
         recoverFor: profile.recoverFor,
+        shieldFor: profile.shieldFor,
         highestLevel: profile.highestLevel,
       },
       stats,
@@ -570,8 +629,26 @@ export async function getIdleState(userId: string) {
     // wearing nothing has no decision to make and a new player should see the
     // first six pieces appear on it. After that, choosing is the game.
     const wornBySlot = new Map(items.filter((i) => i.equippedSlot).map((i) => [i.slot, i]));
+
+    // The Nose. A find below the chosen rarity never reaches the bag at all —
+    // it is turned into gold where it lies, which is the whole point of not
+    // having to open the bag after every absence.
+    const sellBelowIndex =
+      unlocked("flair", profile.rebirths) && profile.autoSellBelow
+        ? RARITIES.indexOf(profile.autoSellBelow as Rarity)
+        : -1;
+    let autoSold = 0;
+    let autoGold = 0;
+
     for (const drop of result.drops) {
       const bareSlot = !wornBySlot.has(drop.slot);
+
+      if (!bareSlot && sellBelowIndex > 0 && RARITIES.indexOf(drop.rarity) < sellBelowIndex) {
+        autoSold += 1;
+        autoGold += Math.max(1, Math.round(drop.power * 4));
+        drop.sold = true;
+        continue;
+      }
 
       const created = await tx.idleItem.create({
         data: {
@@ -592,6 +669,9 @@ export async function getIdleState(userId: string) {
       if (bareSlot) wornBySlot.set(drop.slot, created);
     }
 
+    result.autoSold = autoSold;
+    result.autoGold = autoGold;
+
     const updated = await tx.idleProfile.update({
       where: { userId },
       data: {
@@ -600,9 +680,10 @@ export async function getIdleState(userId: string) {
         enemyHp: result.enemyHp,
         hp: result.hp,
         recoverFor: result.recoverFor,
+        shieldFor: result.shieldFor,
         defeats: profile.defeats + result.defeats,
-        gold: profile.gold + result.goldEarned,
-        totalGold: profile.totalGold + result.goldEarned,
+        gold: profile.gold + result.goldEarned + autoGold,
+        totalGold: profile.totalGold + result.goldEarned + autoGold,
         kills: profile.kills + result.kills,
         bossKills: profile.bossKills + result.bossKills,
         lastTickAt: now,
@@ -638,13 +719,16 @@ function view(
     rebirths: number;
     relicsJson: string;
     lastRoarAt: Date;
+    lastBreathAt: Date;
+    shieldFor: number;
+    autoSellBelow: string;
   },
   items: (ItemRow & { id: string; floor: number; rarity: string; shape: string; foundAt: Date })[],
   report: TickReport,
 ) {
   const upgrades = parseUpgrades(profile.upgradesJson);
   const relics = parseRelics(profile.relicsJson);
-  const stats = derive(items, upgrades, relics);
+  const stats = derive(items, upgrades, relics, profile.rebirths);
   const info = levelInfo(profile.level);
   const enemyHp = profile.enemyHp > 0 ? profile.enemyHp : info.enemyHp;
   const hp = Math.min(stats.maxHp, profile.hp > 0 ? profile.hp : stats.maxHp);
@@ -691,10 +775,10 @@ function view(
         earned: profile.relicsEarned,
         rebirths: profile.rebirths,
         bestFloor,
-        minFloor: REBIRTH_MIN_FLOOR,
+        minFloor: rebirthFloorFor(profile.rebirths),
         /** Granted the moment a life is spent — zero until a record is beaten. */
         owed,
-        ready: bestFloor >= REBIRTH_MIN_FLOOR,
+        ready: bestFloor >= rebirthFloorFor(profile.rebirths),
       };
     })(),
 
@@ -710,6 +794,26 @@ function view(
       descFr: def.descFr,
       icon: def.icon,
     })),
+
+    /** The five rungs, and which of them this cat has climbed. */
+    unlocks: UNLOCKS.map((def) => ({
+      key: def.key,
+      rebirths: def.rebirths,
+      open: profile.rebirths >= def.rebirths,
+      nameEn: def.nameEn,
+      nameFr: def.nameFr,
+      descEn: def.descEn,
+      descFr: def.descFr,
+      icon: def.icon,
+    })),
+
+    autoSellBelow: profile.autoSellBelow,
+    shieldFor: profile.shieldFor,
+    breathIn: Math.max(
+      0,
+      BREATH_COOLDOWN_SECONDS - (Date.now() - profile.lastBreathAt.getTime()) / 1000,
+    ),
+    breathCooldown: BREATH_COOLDOWN_SECONDS,
 
     /** Seconds left on the Roar, so the button can show a ring rather than a lie. */
     roarIn: Math.max(
@@ -742,7 +846,7 @@ function view(
       affixes: parseAffixes(item.affixesJson),
       // What wearing it would multiply the cat by. Above one is an upgrade, and
       // the screen can say so without the player doing the arithmetic.
-      gain: item.equippedSlot ? 1 : scoreWith(items, upgrades, item, relics) / baseline,
+      gain: item.equippedSlot ? 1 : scoreWith(items, upgrades, item, relics, profile.rebirths) / baseline,
       equipped: Boolean(item.equippedSlot),
     })),
     report,
@@ -838,6 +942,8 @@ export async function equipBest(userId: string) {
     const items = await tx.idleItem.findMany({ where: { userId } });
     const profile = await tx.idleProfile.findUnique({ where: { userId } });
     const upgrades = parseUpgrades(profile?.upgradesJson ?? "{}");
+    const relics = parseRelics(profile?.relicsJson ?? "{}");
+    const rebirths = profile?.rebirths ?? 0;
     let changed = 0;
 
     // One slot at a time, keeping each choice before making the next: bonuses
@@ -852,7 +958,9 @@ export async function equipBest(userId: string) {
       if (forSlot.length === 0) continue;
 
       const best = forSlot.reduce((a, b) =>
-        scoreWith(worn, upgrades, b) > scoreWith(worn, upgrades, a) ? b : a,
+        scoreWith(worn, upgrades, b, relics, rebirths) > scoreWith(worn, upgrades, a, relics, rebirths)
+          ? b
+          : a,
       );
       if (best.equippedSlot) continue;
 
@@ -935,7 +1043,7 @@ export async function rebirth(userId: string) {
     const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
     const bestFloor = levelInfo(profile.highestLevel).floor;
 
-    if (bestFloor < REBIRTH_MIN_FLOOR) {
+    if (bestFloor < rebirthFloorFor(profile.rebirths)) {
       return { ok: false as const, error: "TOO_SHALLOW" as const };
     }
 
@@ -1042,5 +1150,62 @@ export async function roar(userId: string) {
       },
     });
     return { ok: true as const, damage };
+  });
+}
+
+/**
+ * The Breath: heal completely, and let nothing land for fifteen seconds.
+ *
+ * The immunity is stored as seconds owed rather than an expiry timestamp,
+ * because the tick resolver works in elapsed spans and not in wall clock — the
+ * same reason everything else here does.
+ */
+export async function breath(userId: string) {
+  await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    if (!unlocked("breath", profile.rebirths)) {
+      return { ok: false as const, error: "LOCKED" as const };
+    }
+
+    const since = (Date.now() - profile.lastBreathAt.getTime()) / 1000;
+    if (since < BREATH_COOLDOWN_SECONDS) {
+      return { ok: false as const, error: "COOLING_DOWN" as const };
+    }
+
+    const items = await tx.idleItem.findMany({ where: { userId } });
+    const stats = derive(
+      items,
+      parseUpgrades(profile.upgradesJson),
+      parseRelics(profile.relicsJson),
+      profile.rebirths,
+    );
+
+    await tx.idleProfile.update({
+      where: { userId },
+      data: {
+        hp: stats.maxHp,
+        shieldFor: BREATH_SHIELD_SECONDS,
+        recoverFor: 0,
+        lastBreathAt: new Date(),
+      },
+    });
+    return { ok: true as const };
+  });
+}
+
+/** Chooses what the Nose sells on sight. An empty string keeps everything. */
+export async function setAutoSell(userId: string, rarity: string) {
+  const valid = rarity === "" || RARITIES.includes(rarity as Rarity);
+  if (!valid) return { ok: false as const, error: "NOT_FOUND" as const };
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    if (!unlocked("flair", profile.rebirths)) {
+      return { ok: false as const, error: "LOCKED" as const };
+    }
+    await tx.idleProfile.update({ where: { userId }, data: { autoSellBelow: rarity } });
+    return { ok: true as const };
   });
 }
