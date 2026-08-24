@@ -24,13 +24,14 @@ import {
   BASE_MAX_HP,
   type UpgradeKey,
 } from "../src/lib/content/idle";
-import { derive, simulate, type Upgrades } from "../src/lib/engine/idle";
+import { derive, scoreWith, simulate, type Upgrades } from "../src/lib/engine/idle";
 
 interface Worn {
   slot: string;
   power: number;
   vitality: number;
   goldBonus: number;
+  affixesJson: string;
   equippedSlot: string | null;
 }
 
@@ -86,17 +87,21 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   gold += result.goldEarned;
   defeats += result.defeats;
 
+  // Nothing equips itself any more, so the simulated player does what the
+  // recommendation button does: wear it if the whole cat comes out stronger.
   for (const drop of result.drops) {
-    const worn = items.find((item) => item.equippedSlot === drop.slot);
-    if (!worn || drop.power > worn.power) {
+    const candidate: Worn = {
+      slot: drop.slot,
+      power: drop.power,
+      vitality: drop.vitality,
+      goldBonus: drop.goldBonus,
+      affixesJson: JSON.stringify(drop.affixes),
+      equippedSlot: null,
+    };
+    const now = derive(items, upgrades);
+    if (scoreWith(items, upgrades, candidate) > now.power * now.maxHp) {
       items = items.filter((item) => item.equippedSlot !== drop.slot);
-      items.push({
-        slot: drop.slot,
-        power: drop.power,
-        vitality: drop.vitality,
-        goldBonus: drop.goldBonus,
-        equippedSlot: drop.slot,
-      });
+      items.push({ ...candidate, equippedSlot: drop.slot });
     }
   }
 

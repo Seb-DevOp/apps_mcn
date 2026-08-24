@@ -13,6 +13,7 @@ import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
 import { FloorBackdrop, themeFor } from "./FloorBackdrop";
 import { IdleBag } from "./IdleBag";
+import { LootPrompt, type LootEntry } from "./LootPrompt";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
@@ -93,6 +94,16 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   const [defeats, setDefeats] = useState(0);
   const [heals, setHeals] = useState(0);
 
+  /**
+   * Finds waiting for an answer, and the ids already offered.
+   *
+   * The seen set is what stops a card reappearing: a tick's report is returned
+   * again by every action that follows it, so without it selling one piece would
+   * re-prompt for the other two from the same tick.
+   */
+  const [loot, setLoot] = useState<LootEntry[]>([]);
+  const seenDrops = useRef(new Set<string>());
+
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -128,6 +139,28 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
   const adopt = useCallback((next: IdleState) => {
     setState(next);
+
+    // Only finds from a tick the player was present for. Twelve hours of absence
+    // is a summary, not twenty-five cards.
+    if (next.report.seconds <= 60) {
+      const fresh = next.report.drops.filter((drop) => !seenDrops.current.has(drop.id));
+      for (const drop of fresh) seenDrops.current.add(drop.id);
+      if (fresh.length > 0) {
+        setLoot((current) =>
+          [
+            ...current,
+            ...fresh.map((drop) => ({
+              id: drop.id,
+              slot: drop.slot,
+              floor: drop.floor,
+              rarity: drop.rarity,
+              equipped: drop.equipped,
+            })),
+          ].slice(-3),
+        );
+      }
+    }
+
     world.current = {
       ...world.current,
       level: next.level.level,
@@ -136,6 +169,10 @@ export function IdleGame({ initial }: { initial: IdleState }) {
       recovering: next.recoverFor,
       gold: next.gold,
     };
+  }, []);
+
+  const dismissLoot = useCallback((id: string) => {
+    setLoot((current) => current.filter((entry) => entry.id !== id));
   }, []);
 
   const sync = useCallback(async () => {
@@ -496,6 +533,14 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           )}
         </>
       )}
+
+      <LootPrompt
+        queue={loot}
+        items={state.items}
+        busy={busy}
+        onAct={act}
+        onDismiss={dismissLoot}
+      />
 
       {/* --- What happened while away ---------------------------------- */}
       <AnimatePresence>

@@ -140,6 +140,11 @@ model IdleItem {
   vitality  Float @default(0)
   goldBonus Float @default(0)
 
+  /// [{ "key": "attack", "value": 0.12 }] — bonuses to the six bought statistics.
+  /// A string rather than a Json column, like upgradesJson: the schema stays
+  /// portable to any Prisma provider, which was the point of avoiding them.
+  affixesJson String @default("[]")
+
   /// Null when owned but not worn. Postgres treats NULLs as distinct, so the
   /// unique index below allows any number of spares and exactly one worn piece
   /// per slot — the constraint lives in the database, not in a code path.

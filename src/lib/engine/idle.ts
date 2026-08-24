@@ -25,6 +25,11 @@ import {
   BASE_CRIT_MULTIPLIER,
   BASE_DOUBLE_CHANCE,
   RECOVERY_SECONDS,
+  AFFIX_KEYS,
+  AFFIX_SLOTS,
+  affixValue,
+  parseAffixes,
+  type Affix,
   type Slot,
   type Rarity,
 } from "@/lib/content/idle";
@@ -83,6 +88,7 @@ interface ItemRow {
   power: number;
   vitality: number;
   goldBonus: number;
+  affixesJson: string;
   equippedSlot: string | null;
 }
 
@@ -119,23 +125,36 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
   const level = (key: keyof Upgrades) => upgrades[key];
   const per = (key: keyof Upgrades) => UPGRADE_BY_KEY[key].perLevel;
 
+  // Bonuses stack by addition across worn pieces. Multiplying them would let a
+  // full set of six compound into a factor nothing else in the game can answer;
+  // added, a set is a sum the player can read off the screen and predict.
+  const woreAffixes = worn.flatMap((item) => parseAffixes(item.affixesJson));
+  const bonus = (key: keyof Upgrades) =>
+    woreAffixes.reduce((sum, affix) => (affix.key === key ? sum + affix.value : sum), 0);
+
   // Equipment adds flat damage; Attack multiplies whatever that came to. A stat
   // that only added would be worthless by floor ten, and one that only multiplied
   // would make found gear pointless — both together is what keeps looting and
   // spending worth doing at the same time.
   const hitDamage =
     (BASE_ATTACK_DAMAGE + worn.reduce((sum, item) => sum + item.power, 0)) *
-    Math.pow(1 + per("attack"), level("attack"));
+    Math.pow(1 + per("attack"), level("attack")) *
+    (1 + bonus("attack"));
 
   const attacksPerSecond =
-    BASE_ATTACK_SPEED * Math.pow(1 + per("speed"), level("speed"));
+    BASE_ATTACK_SPEED * Math.pow(1 + per("speed"), level("speed")) * (1 + bonus("speed"));
 
   // A probability, so certainty is its ceiling. That is arithmetic, not a design
   // decision, and the upgrade's last level is exactly the one that reaches it.
-  const critChance = Math.min(1, BASE_CRIT_CHANCE + level("crit") * per("crit"));
+  const critChance = Math.min(
+    1,
+    BASE_CRIT_CHANCE + level("crit") * per("crit") + bonus("crit"),
+  );
 
   const critMultiplier =
-    BASE_CRIT_MULTIPLIER * Math.pow(1 + per("critDamage"), level("critDamage"));
+    BASE_CRIT_MULTIPLIER *
+    Math.pow(1 + per("critDamage"), level("critDamage")) *
+    (1 + bonus("critDamage"));
 
   /**
    * Extra blows per swing, as an expectation.
@@ -145,7 +164,7 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
    * a third. Linear in levels bought — logarithmic in gold — so it never stops
    * paying and never disturbs the curve the exponential stats set.
    */
-  const extraStrikes = BASE_DOUBLE_CHANCE + level("double") * per("double");
+  const extraStrikes = BASE_DOUBLE_CHANCE + level("double") * per("double") + bonus("double");
 
   // The four offence stats meet here, and only here. Expected damage per second
   // is their product, which is why each of them is worth buying and why none of
@@ -158,7 +177,8 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
 
   const maxHp =
     (BASE_MAX_HP + worn.reduce((sum, item) => sum + item.vitality, 0)) *
-    Math.pow(1 + per("health"), level("health"));
+    Math.pow(1 + per("health"), level("health")) *
+    (1 + bonus("health"));
 
   // Healing is deliberately not purchasable. Bought without limit it eventually
   // exceeds any damage at any depth, and an immortal cat has no losing condition
@@ -182,7 +202,35 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
   };
 }
 
+/**
+ * One number for "is this cat stronger".
+ *
+ * Damage and health answer different curves and cannot be added, but a floor is
+ * cleared by doing enough of one before running out of the other — so their
+ * product is what a piece of equipment actually moves. It is a heuristic and is
+ * named as one, but it is the same heuristic everywhere: what the recommendation
+ * button optimises is exactly what the arrow next to an item promises.
+ */
+export function combatScore(stats: DerivedStats): number {
+  return stats.power * stats.maxHp;
+}
+
+/**
+ * What wearing this piece would do to that number, as a ratio.
+ *
+ * Computed by deriving the whole cat twice rather than comparing the item's own
+ * numbers: with bonuses in play a weaker piece carrying +20% health can easily
+ * beat a stronger plain one, and only the full derivation knows that.
+ */
+export function scoreWith(items: ItemRow[], upgrades: Upgrades, candidate: ItemRow): number {
+  // Everything else the cat is wearing, minus whatever occupies this slot today.
+  const rest = items.filter((item) => item.equippedSlot && item.slot !== candidate.slot);
+  return combatScore(derive([...rest, { ...candidate, equippedSlot: candidate.slot }], upgrades));
+}
+
 export interface Drop {
+  /** Filled in once the row exists, so the loot prompt can act on it. */
+  id: string;
   slot: Slot;
   floor: number;
   rarity: Rarity;
@@ -190,7 +238,8 @@ export interface Drop {
   power: number;
   vitality: number;
   goldBonus: number;
-  /** True when it beat what the cat was wearing and went straight on. */
+  affixes: Affix[];
+  /** True when it went straight on — which now only happens on a bare slot. */
   equipped: boolean;
 }
 
@@ -207,6 +256,24 @@ export interface TickReport {
   /** Guardians felled, each one healing the cat outright. */
   heals: number;
   drops: Drop[];
+}
+
+/**
+ * Picks distinct bonuses for a piece. Distinct on purpose: two helpings of the
+ * same statistic on one item read as one bigger number, which wastes the slot
+ * that was supposed to make this piece different from the last one.
+ */
+function rollAffixes(rarity: Rarity): Affix[] {
+  const slots = AFFIX_SLOTS[rarity];
+  if (slots === 0) return [];
+
+  const pool = [...AFFIX_KEYS];
+  const picked: Affix[] = [];
+  for (let n = 0; n < slots && pool.length > 0; n++) {
+    const [key] = pool.splice(randomInt(0, pool.length - 1), 1);
+    picked.push({ key, value: affixValue(key, rarity) });
+  }
+  return picked;
 }
 
 function rollRarity(floor: number): Rarity {
@@ -339,10 +406,12 @@ export function simulate(
         slot,
         floor: info.floor,
         rarity,
+        id: "",
         shape: shapeFor(slot, info.floor),
         power: rolled.power,
         vitality: rolled.vitality,
         goldBonus: rolled.goldBonus,
+        affixes: rollAffixes(rarity),
         equipped: false,
       });
     }
@@ -431,19 +500,16 @@ export async function getIdleState(userId: string) {
       stats,
     );
 
-    // Store the drops, equipping anything that beats what is worn. Comparing on
-    // power alone is enough: within one slot, power and vitality are generated
-    // from the same floor and rarity, so they never disagree about which piece is
-    // the better one. An idle game that needs manual sorting after every absence
-    // is not idle.
+    // Store the drops. Only an *empty* slot fills itself.
+    //
+    // Everything better used to go on automatically, which made the whole
+    // equipment system invisible: pieces arrived, replaced themselves and were
+    // never looked at. Filling a bare slot is still automatic, because a cat
+    // wearing nothing has no decision to make and a new player should see the
+    // first six pieces appear on it. After that, choosing is the game.
     const wornBySlot = new Map(items.filter((i) => i.equippedSlot).map((i) => [i.slot, i]));
     for (const drop of result.drops) {
-      const worn = wornBySlot.get(drop.slot);
-      const better = !worn || drop.power > worn.power;
-
-      if (better && worn) {
-        await tx.idleItem.update({ where: { id: worn.id }, data: { equippedSlot: null } });
-      }
+      const bareSlot = !wornBySlot.has(drop.slot);
 
       const created = await tx.idleItem.create({
         data: {
@@ -455,11 +521,13 @@ export async function getIdleState(userId: string) {
           power: drop.power,
           vitality: drop.vitality,
           goldBonus: drop.goldBonus,
-          equippedSlot: better ? drop.slot : null,
+          affixesJson: JSON.stringify(drop.affixes),
+          equippedSlot: bareSlot ? drop.slot : null,
         },
       });
-      drop.equipped = better;
-      if (better) wornBySlot.set(drop.slot, created);
+      drop.id = created.id;
+      drop.equipped = bareSlot;
+      if (bareSlot) wornBySlot.set(drop.slot, created);
     }
 
     const updated = await tx.idleProfile.update({
@@ -513,6 +581,8 @@ function view(
   const enemyHp = profile.enemyHp > 0 ? profile.enemyHp : info.enemyHp;
   const hp = Math.min(stats.maxHp, profile.hp > 0 ? profile.hp : stats.maxHp);
 
+  const baseline = combatScore(stats);
+
   const secondsToKill = Math.max(MIN_KILL_SECONDS, enemyHp / stats.power);
   const netHealth = stats.regen - info.enemyDamage;
   const secondsToFall = netHealth < 0 ? hp / -netHealth : Number.POSITIVE_INFINITY;
@@ -565,6 +635,10 @@ function view(
       power: item.power,
       vitality: item.vitality,
       goldBonus: item.goldBonus,
+      affixes: parseAffixes(item.affixesJson),
+      // What wearing it would multiply the cat by. Above one is an upgrade, and
+      // the screen can say so without the player doing the arithmetic.
+      gain: item.equippedSlot ? 1 : scoreWith(items, upgrades, item) / baseline,
       equipped: Boolean(item.equippedSlot),
     })),
     report,
@@ -658,14 +732,29 @@ export async function sellItem(userId: string, itemId: string) {
 export async function equipBest(userId: string) {
   return prisma.$transaction(async (tx) => {
     const items = await tx.idleItem.findMany({ where: { userId } });
+    const profile = await tx.idleProfile.findUnique({ where: { userId } });
+    const upgrades = parseUpgrades(profile?.upgradesJson ?? "{}");
     let changed = 0;
+
+    // One slot at a time, keeping each choice before making the next: bonuses
+    // add across the whole set, so the best hat depends on what is already on the
+    // shoulders. Solving all six at once would be the honest answer and a far
+    // larger search; taking them in order, with the previous picks kept, gets the
+    // same result in practice for a bag this size.
+    const worn = [...items];
 
     for (const slot of SLOTS) {
       const forSlot = items.filter((item) => item.slot === slot);
       if (forSlot.length === 0) continue;
 
-      const best = forSlot.reduce((a, b) => (b.power > a.power ? b : a));
+      const best = forSlot.reduce((a, b) =>
+        scoreWith(worn, upgrades, b) > scoreWith(worn, upgrades, a) ? b : a,
+      );
       if (best.equippedSlot) continue;
+
+      for (const item of worn) {
+        if (item.slot === slot) item.equippedSlot = item.id === best.id ? slot : null;
+      }
 
       // The slot has to be emptied first: the unique index allows exactly one
       // worn piece per slot, and it is the database that enforces it.

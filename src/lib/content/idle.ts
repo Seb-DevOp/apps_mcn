@@ -543,3 +543,98 @@ export const RARITY_STYLE: Record<Rarity, { color: string; glow: string }> = {
   MYTHIC: { color: "#37d5ff", glow: "rgba(55,213,255,0.60)" },
   LEGENDARY: { color: "#f0c14b", glow: "rgba(240,193,75,0.65)" },
 };
+
+// ---------------------------------------------------------------------------
+// Affixes: what makes one piece different from another
+// ---------------------------------------------------------------------------
+
+/**
+ * A piece can carry bonuses to the same six statistics the shop sells.
+ *
+ * They are deliberately **not scaled by floor**. Power and vitality already grow
+ * 1.75× per floor; a percentage that grew with depth as well would compound twice
+ * and outrun the enemy curve within a few floors. As a flat multiplier on top of
+ * an exponential, affixes are a ceiling the player approaches by collecting rather
+ * than a second exponential — which is exactly what a chase should be.
+ */
+export type AffixKey = UpgradeKey;
+
+export interface Affix {
+  key: AffixKey;
+  value: number;
+}
+
+/** How many bonuses a piece of this rarity carries. */
+export const AFFIX_SLOTS: Record<Rarity, number> = {
+  COMMON: 0,
+  UNCOMMON: 1,
+  RARE: 1,
+  EPIC: 2,
+  MYTHIC: 2,
+  LEGENDARY: 3,
+};
+
+const AFFIX_SCALE: Record<Rarity, number> = {
+  COMMON: 0,
+  UNCOMMON: 1,
+  RARE: 1.7,
+  EPIC: 2.5,
+  MYTHIC: 3.5,
+  LEGENDARY: 5,
+};
+
+/**
+ * Value of one bonus at scale 1. Percentages for the multiplying statistics,
+ * absolute points for the two that are already probabilities.
+ */
+const AFFIX_BASE: Record<AffixKey, number> = {
+  attack: 0.04,
+  health: 0.04,
+  speed: 0.03,
+  crit: 0.015,
+  critDamage: 0.05,
+  double: 0.03,
+};
+
+/** Bonuses stack by addition across pieces, so a full set is a sum, not a product. */
+export const AFFIX_KEYS: AffixKey[] = ["attack", "health", "speed", "crit", "critDamage", "double"];
+
+export function affixValue(key: AffixKey, rarity: Rarity): number {
+  return Math.round(AFFIX_BASE[key] * AFFIX_SCALE[rarity] * 1000) / 1000;
+}
+
+/** Which of the six a bonus reads as, and how it should be written. */
+export function affixLabel(affix: Affix, locale: string): string {
+  const def = UPGRADE_BY_KEY[affix.key];
+  const name = locale === "fr" ? def.nameFr : def.nameEn;
+  // All six read as percentages, because that is how the shop describes the same
+  // statistics — "+2 % chance the blow lands twice" and "+0.02 extra strikes" are
+  // the same number, and only one of them is a sentence. Critical Chance and
+  // Double Strike keep a decimal: their steps are small enough that rounding to
+  // whole points would print several different bonuses as the same figure, and a
+  // bare "+3" alongside them reads as three whole blows rather than three percent.
+  const fine = affix.key === "crit" || affix.key === "double";
+  const written = fine
+    ? `+${(affix.value * 100).toFixed(1)} %`
+    : `+${Math.round(affix.value * 100)} %`;
+  return `${written} ${name}`;
+}
+
+/** Parses the stored blob. A corrupt one means a plain item, never a crash. */
+export function parseAffixes(json: string): Affix[] {
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (entry): entry is Affix =>
+          typeof entry === "object" &&
+          entry !== null &&
+          AFFIX_KEYS.includes((entry as Affix).key) &&
+          Number.isFinite((entry as Affix).value),
+      )
+      .slice(0, 3);
+  } catch {
+    return [];
+  }
+}

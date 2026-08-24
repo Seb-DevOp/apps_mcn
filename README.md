@@ -296,10 +296,9 @@ la lit, et aucune tâche de fond à maintenir en vie sur un hébergement serverl
 bloqué doit redescendre farmer les salles qu'il sait battre, pas regarder le
 compteur monter tout seul.
 
-**Ce qui tombe se met tout seul.** Une pièce meilleure que celle portée est
-équipée dans la foulée, y compris pendant une absence. Un jeu idle qui exige de
-trier son sac après chaque absence n'est pas idle. Le reste part au sac, revendable
-d'un bouton.
+**Ce qui tombe va dans le sac.** Seul un emplacement *vide* se remplit tout seul —
+un chat qui ne porte rien n'a pas de décision à prendre, et un nouveau joueur doit
+voir ses six premières pièces apparaître sur lui. Après ça, choisir est le jeu.
 
 ### Les six emplacements, visibles sur le chat
 
@@ -526,6 +525,50 @@ moteur retombe alors sur le plancher de durée d'un combat plutôt que de produi
 une sauvegarde cassée. C'est un horizon théorique — la sonde met vingt-quatre
 heures à atteindre l'étage 32 — mais un jeu annoncé sans fin doit savoir ce qu'il
 fait à sa propre fin.
+
+### L'équipement redevient une décision
+
+Trois choses manquaient pour que le système existe : des bonus qui distinguent
+les pièces, un moment où on les regarde, et l'arrêt de l'équipement automatique.
+
+**Des bonus sur les six mêmes statistiques que la boutique.** Une pièce peut
+porter jusqu'à trois bonus — Attaque, Vie, Vitesse, Chance Critique, Dégâts
+Critiques, Double Coup — selon sa rareté : aucun sur un commun, trois sur un
+légendaire.
+
+Ils ne sont **délibérément pas mis à l'échelle de l'étage**. Puissance et vitalité
+croissent déjà ×1,75 par étage ; un pourcentage qui grandirait avec la profondeur
+composerait deux fois et dépasserait la courbe ennemie en quelques étages. Comme
+multiplicateur plat au-dessus d'une exponentielle, les bonus sont un plafond qu'on
+approche en collectionnant — c'est exactement ce qu'une chasse doit être.
+
+Ils s'additionnent entre pièces plutôt que de se multiplier : un set complet est
+une somme que le joueur peut lire sur l'écran et prévoir, là où six facteurs
+composés donneraient un chiffre que plus rien dans le jeu ne peut équilibrer.
+
+**« Meilleur » se calcule maintenant, il ne se lit plus.** Avec des bonus en jeu,
+une pièce plus faible portant +20 % de Vie bat facilement une pièce brute plus
+forte, et seule la dérivation complète du chat le sait. `scoreWith()` dérive le
+chat deux fois — avec et sans — et compare `puissance × vie`. C'est une
+heuristique, elle est nommée comme telle, mais c'est **la même partout** : ce que le
+bouton « Équiper le recommandé » optimise est exactement ce que la flèche verte à
+côté d'un objet promet. Deux réponses différentes à la même question seraient pires
+que n'importe laquelle des deux.
+
+**Une carte de butin, pas une boîte de dialogue.** Le chat enchaîne plusieurs
+ennemis par seconde ; une fenêtre qu'il faudrait fermer serait un mur toutes les
+quelques secondes. La carte glisse au-dessus de l'arène, s'empile jusqu'à trois, et
+se retire d'elle-même au bout de treize secondes. **L'ignorer est une réponse
+valable** et vaut « garder » — rien n'est perdu à laisser une pièce dans le sac.
+Trois boutons : Porter · Vendre (+or exact) · Garder.
+
+Les trouvailles hors-ligne n'y passent jamais. Revenir de douze heures d'absence et
+se voir tendre vingt-cinq cartes une par une n'est pas une récompense : le rapport
+de retour les compte, le sac les garde.
+
+Un détail qui ne se voit que quand il manque : le rapport d'un tick est renvoyé par
+**chaque action** qui le suit, donc sans mémoire des identifiants déjà proposés,
+vendre une pièce ferait réapparaître les deux autres du même tick.
 
 ### Le sac
 

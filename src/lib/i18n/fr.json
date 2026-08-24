@@ -187,5 +187,10 @@
   "profile.guardians": "Gardiens",
   "profile.defeats": "Défaites",
   "profile.totalGold": "Or gagné",
-  "profile.items": "Pièces"
+  "profile.items": "Pièces",
+  "loot.found": "Trouvé",
+  "loot.equipped": "Équipé — l'emplacement était vide",
+  "loot.keep": "Garder",
+  "loot.worse": "moins bon",
+  "loot.marginal": "à peine mieux"
 }

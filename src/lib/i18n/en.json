@@ -187,5 +187,10 @@
   "profile.guardians": "Guardians",
   "profile.defeats": "Defeats",
   "profile.totalGold": "Gold earned",
-  "profile.items": "Pieces held"
+  "profile.items": "Pieces held",
+  "loot.found": "Found",
+  "loot.equipped": "Worn — the slot was empty",
+  "loot.keep": "Keep",
+  "loot.worse": "weaker",
+  "loot.marginal": "a shade better"
 }

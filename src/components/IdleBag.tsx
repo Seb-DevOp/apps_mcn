@@ -6,6 +6,7 @@ import {
   RARITIES,
   RARITY_STYLE,
   SLOTS,
+  affixLabel,
   itemName,
   type Rarity,
   type Slot,
@@ -56,15 +57,19 @@ export function IdleBag({
     [state.items],
   );
 
-  /** Slots where the bag holds something better than what is on the cat. */
-  const upgradesWaiting = useMemo(() => {
-    let count = 0;
-    for (const slot of SLOTS) {
-      const current = wornBySlot.get(slot)?.power ?? 0;
-      if (spares.some((item) => item.slot === slot && item.power > current)) count += 1;
-    }
-    return count;
-  }, [spares, wornBySlot]);
+/**
+   * Slots where the bag holds something better.
+   *
+   * "Better" is the server's own verdict, carried on each spare as `gain` — the
+   * ratio the whole cat's combat score would move by. Comparing raw power here
+   * would disagree with the recommendation button the moment a weaker piece
+   * carries a bonus, and two different answers to the same question is worse than
+   * either of them.
+   */
+  const upgradesWaiting = useMemo(
+    () => SLOTS.filter((slot) => spares.some((i) => i.slot === slot && i.gain > 1.0001)).length,
+    [spares],
+  );
 
   /**
    * What each "sell everything under this" button would take and pay.
@@ -101,9 +106,7 @@ export function IdleBag({
         {SLOTS.map((slot) => {
           const item = wornBySlot.get(slot);
           const style = item ? RARITY_STYLE[item.rarity] : null;
-          const better = spares.some(
-            (spare) => spare.slot === slot && spare.power > (item?.power ?? 0),
-          );
+          const better = spares.some((spare) => spare.slot === slot && spare.gain > 1.0001);
           return (
             <div
               key={slot}
@@ -129,6 +132,14 @@ export function IdleBag({
                     <span className="dim"> · </span>
                     <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
                   </p>
+                  {item.affixes.map((affix, index) => (
+                    <p
+                      key={`${affix.key}-${index}`}
+                      className="mt-0.5 truncate text-[0.58rem] text-[var(--sapphire-pale)]"
+                    >
+                      {affixLabel(affix, locale)}
+                    </p>
+                  ))}
                 </>
               ) : (
                 <p className="dim mt-1 text-[0.68rem]">{t("idle.empty")}</p>
@@ -193,9 +204,8 @@ export function IdleBag({
           {SLOTS.map((slot) => {
             const forSlot = spares
               .filter((item) => item.slot === slot)
-              .sort((a, b) => b.power - a.power);
+              .sort((a, b) => b.gain - a.gain);
             if (forSlot.length === 0) return null;
-            const current = wornBySlot.get(slot)?.power ?? 0;
 
             return (
               <div key={slot}>
@@ -208,7 +218,7 @@ export function IdleBag({
                       key={item.id}
                       item={item}
                       index={index}
-                      better={item.power > current}
+                      better={item.gain > 1.0001}
                       busy={busy !== null}
                       onEquip={() => act({ action: "equip", itemId: item.id }, item.id)}
                       onSell={() => act({ action: "sell", itemId: item.id }, item.id)}
@@ -267,9 +277,17 @@ function Row({
           {itemName(item.slot as Slot, item.floor, item.rarity as Rarity, locale)}
         </p>
         <p className="dim tabular text-[0.64rem]">
-          {formatNumber(item.power)} · <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
-          {better && <span className="text-[#7ed08f]"> · {t("idle.better")}</span>}
+          {formatNumber(item.power)} ·{" "}
+          <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
+          {better && Math.round((item.gain - 1) * 100) >= 1 && (
+            <span className="text-[#7ed08f]"> · +{Math.round((item.gain - 1) * 100)}%</span>
+          )}
         </p>
+        {item.affixes.length > 0 && (
+          <p className="truncate text-[0.6rem] text-[var(--sapphire-pale)]">
+            {item.affixes.map((affix) => affixLabel(affix, locale)).join(" · ")}
+          </p>
+        )}
       </div>
       <button
         type="button"
