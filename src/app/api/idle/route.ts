@@ -15,6 +15,8 @@ import {
   roar,
   breath,
   setAutoSell,
+  buyChest,
+  buySkin,
 } from "@/lib/engine/idle";
 
 /**
@@ -50,6 +52,8 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("roar") }),
   z.object({ action: z.literal("breath") }),
   z.object({ action: z.literal("autoSell"), rarity: z.string().max(20) }),
+  z.object({ action: z.literal("chest") }),
+  z.object({ action: z.literal("skin"), key: z.string().min(1).max(32) }),
 ]);
 
 export async function POST(request: Request) {
@@ -95,5 +99,9 @@ function run(userId: string, input: z.infer<typeof Schema>) {
       return breath(userId);
     case "autoSell":
       return setAutoSell(userId, input.rarity);
+    case "chest":
+      return buyChest(userId);
+    case "skin":
+      return buySkin(userId, input.key);
   }
 }

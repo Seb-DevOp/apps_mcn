@@ -689,6 +689,55 @@ bat avec les mêmes améliorations et les mêmes reliques — c'est le même jou
 mais seul un tiers de ce que ça donne atteint le combat : un second chat entier
 doublerait chaque nombre à l'écran et diviserait par deux le sens du premier.
 
+### Huit raretés, dont deux qu'il faut mériter
+
+Gris, vert, bleu, violet, orange, rouge, diamant — et au-dessus, le Souverain.
+
+Les deux du haut **n'existent pas** pour un chat neuf. Les probabilités les
+ouvrent à mesure que les vies s'accumulent : Diamant à partir de la deuxième
+renaissance, Souverain à partir de la quatrième, et chaque vie ensuite décale
+toute la distribution vers le haut en amincissant les communs.
+
+C'est ce qui fait qu'une renaissance change ce à quoi le jeu **ressemble**, et pas
+seulement la vitesse à laquelle ses nombres bougent. Un premier Diamant est un
+événement plutôt qu'une lente dérive des probabilités — parce que son poids est
+exactement zéro avant, et non « très faible ».
+
+Un Souverain porte cinq bonus contre trois pour un Légendaire, et multiplie ses
+chiffres par 8,4 contre 4,6. Le Sceau suit : six pièces souveraines assorties
+valent nettement plus que six communes.
+
+### La boutique
+
+**Le Coffre.** Une pièce de l'étage où l'on se trouve, tirée sur ses *propres*
+probabilités — celles que les vies ont ouvertes, pas une table séparée.
+
+Il est facturé sur l'étage courant et non sur le record, et c'était un vrai écart
+entre le commentaire et le code : facturer sur le record pendant que le coffre
+donne une pièce de l'étage courant rendait la boutique inachetable juste après une
+renaissance et gratuite juste avant. Le prix vaut environ trois minutes de l'étage
+où l'on est, parce que l'or est multiplié par mille tous les huit étages — n'importe
+quel prix fixe est inatteignable à l'étage cinq et offert à l'étage vingt-cinq.
+
+**Un coffre sur dix est garanti**, à une rareté que les renaissances déterminent :
+Épique, puis Légendaire à deux vies, Diamant à quatre. Le compteur est affiché en
+dix pastilles dont la dixième porte la couleur promise — une promesse qu'on voit
+approcher vaut mieux qu'une promesse écrite dans une description. Un tirage qui
+peut être malchanceux quarante fois de suite n'est pas une boutique, c'est un
+grief.
+
+**Les pelages.** Huit robes, couleur seulement, gardées à travers chaque
+renaissance : faire racheter la même couleur deux fois n'est pas un puits à or.
+Chacune vaut environ dix fois la précédente, et comme l'or croît d'un facteur mille
+tous les huit étages, une robe se débloque **en descendant** plutôt qu'en
+économisant — la boutique a toujours exactement une chose presque abordable.
+
+Une robe est cinq couleurs et rien d'autre : chaque tracé du chat les lit, donc une
+nouvelle robe est une ligne dans une table plutôt qu'un second dessin à tenir en
+phase avec le premier chaque fois qu'une pièce d'armure bouge. Et la vignette de la
+boutique est **le chat lui-même** — une pastille de couleur ne montrerait pas ce
+qu'une robe fait à la collerette, aux oreilles et aux yeux.
+
 ### Le sac
 
 Un onglet à part, parce que trier n'est pas se battre — et le combat continue côté

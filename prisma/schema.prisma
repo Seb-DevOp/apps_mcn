@@ -142,6 +142,14 @@ model IdleProfile {
   /// Seconds of immunity still owed to the cat, carried between ticks.
   shieldFor    Float    @default(0)
 
+  /// --- The shop ------------------------------------------------------
+  /// Chests bought. Only its remainder matters: every tenth one is guaranteed.
+  chestsOpened Int    @default(0)
+  /// The coat currently worn, and every coat ever bought. Cosmetics survive a
+  /// rebirth — making a player buy the same colour twice is not a gold sink.
+  skinKey      String @default("classic")
+  skinsJson    String @default("[]")
+
   /// --- The Nose ------------------------------------------------------
   /// Rarity below which a find sells itself. Empty means keep everything.
   autoSellBelow String @default("")

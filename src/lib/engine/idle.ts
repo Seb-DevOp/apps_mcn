@@ -46,6 +46,11 @@ import {
   rebirthFloorFor,
   eliteLevel,
   ELITE_CHANCE,
+  chestPrice,
+  chestFloorRarity,
+  CHEST_PITY,
+  SKINS,
+  SKIN_BY_KEY,
   PACK_SHARE,
   isPackSlot,
   packSlot,
@@ -394,8 +399,8 @@ function rollAffixes(rarity: Rarity): Affix[] {
   return picked;
 }
 
-function rollRarity(floor: number): Rarity {
-  const weights = rarityWeights(floor);
+function rollRarity(floor: number, rebirths: number): Rarity {
+  const weights = rarityWeights(floor, rebirths);
   const total = weights.reduce((sum, entry) => sum + entry.weight, 0);
   let roll = (randomInt(0, 1_000_000) / 1_000_000) * total;
   for (const entry of weights) {
@@ -423,6 +428,8 @@ export function simulate(
   stats: DerivedStats,
   /** Elites only exist once a fourth life has brought them back. */
   elitesOpen = false,
+  /** Lives spent — the top two rarities do not exist below theirs. */
+  rebirths = 0,
 ): TickReport & {
   level: number;
   enemyHp: number;
@@ -555,7 +562,7 @@ export function simulate(
       // An Elite always leaves something, and something better than the floor
       // would otherwise give — one tier up, which is the whole reward for the
       // six times the health.
-      const rolled = rollRarity(info.floor);
+      const rolled = rollRarity(info.floor, rebirths);
       const rarity = elite
         ? RARITIES[Math.min(RARITIES.length - 1, RARITIES.indexOf(rolled) + 1)]
         : rolled;
@@ -668,6 +675,7 @@ export async function getIdleState(userId: string) {
       },
       stats,
       unlocked("elites", profile.rebirths),
+      profile.rebirths,
     );
 
     // Store the drops. Only an *empty* slot fills itself.
@@ -773,6 +781,9 @@ function view(
     lastBreathAt: Date;
     shieldFor: number;
     autoSellBelow: string;
+    chestsOpened: number;
+    skinKey: string;
+    skinsJson: string;
   },
   items: (ItemRow & { id: string; floor: number; rarity: string; shape: string; foundAt: Date })[],
   report: TickReport,
@@ -859,6 +870,24 @@ function view(
       descFr: def.descFr,
       icon: def.icon,
     })),
+
+    shop: {
+      chestPrice: chestPrice(profile.level),
+      chestsOpened: profile.chestsOpened,
+      /** How many more before the guaranteed one. Shown, not implied. */
+      untilGuaranteed: CHEST_PITY - (profile.chestsOpened % CHEST_PITY),
+      guaranteedRarity: chestFloorRarity(profile.rebirths),
+      pity: CHEST_PITY,
+      skinKey: profile.skinKey,
+      skins: SKINS.map((skin) => ({
+        key: skin.key,
+        nameEn: skin.nameEn,
+        nameFr: skin.nameFr,
+        price: skin.price,
+        owned: skin.price === 0 || parseSkins(profile.skinsJson).includes(skin.key),
+        worn: profile.skinKey === skin.key,
+      })),
+    },
 
     autoSellBelow: profile.autoSellBelow,
     shieldFor: profile.shieldFor,
@@ -1283,4 +1312,105 @@ export async function setAutoSell(userId: string, rarity: string) {
     await tx.idleProfile.update({ where: { userId }, data: { autoSellBelow: rarity } });
     return { ok: true as const };
   });
+}
+
+// ---------------------------------------------------------------------------
+// The shop
+// ---------------------------------------------------------------------------
+
+/**
+ * Buys one chest: a piece from the floor you have reached, rolled on your own
+ * odds — the ones lives have opened, not a separate table.
+ *
+ * Every tenth is guaranteed to floor at a rarity your rebirths have earned.
+ * Randomness that can be unlucky forty times running is not a shop, it is a
+ * grievance, and the counter is shown so the promise can be watched arriving.
+ */
+export async function buyChest(userId: string) {
+  await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    const price = chestPrice(profile.level);
+    if (profile.gold < price) return { ok: false as const, error: "NOT_ENOUGH_GOLD" as const };
+
+    const guaranteed = (profile.chestsOpened + 1) % CHEST_PITY === 0;
+    // The floor you are on, for the same reason as the price: buying a record
+    // floor piece at a first floor price is a rebirth away from free.
+    const floor = levelInfo(profile.level).floor;
+
+    const rolled = rollRarity(floor, profile.rebirths);
+    const rarity = guaranteed
+      ? RARITIES[
+          Math.max(
+            RARITIES.indexOf(rolled),
+            RARITIES.indexOf(chestFloorRarity(profile.rebirths)),
+          )
+        ]
+      : rolled;
+
+    const slot = SLOTS[randomInt(0, SLOTS.length - 1)];
+    const stats = itemStats(slot, floor, rarity);
+
+    const item = await tx.idleItem.create({
+      data: {
+        userId,
+        slot,
+        floor,
+        rarity,
+        shape: shapeFor(slot, floor),
+        power: stats.power,
+        vitality: stats.vitality,
+        goldBonus: stats.goldBonus,
+        affixesJson: JSON.stringify(rollAffixes(rarity)),
+        equippedSlot: null,
+      },
+    });
+
+    await tx.idleProfile.update({
+      where: { userId },
+      data: { gold: profile.gold - price, chestsOpened: profile.chestsOpened + 1 },
+    });
+
+    await track("idle.chest", userId, { rarity, guaranteed });
+    return { ok: true as const, itemId: item.id, rarity, guaranteed };
+  });
+}
+
+/** Buys a coat, or puts one already owned back on. */
+export async function buySkin(userId: string, key: string) {
+  const def = SKIN_BY_KEY[key];
+  if (!def) return { ok: false as const, error: "NOT_FOUND" as const };
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    const owned = parseSkins(profile.skinsJson);
+
+    if (owned.includes(key) || def.price === 0) {
+      await tx.idleProfile.update({ where: { userId }, data: { skinKey: key } });
+      return { ok: true as const, worn: true };
+    }
+
+    if (profile.gold < def.price) return { ok: false as const, error: "NOT_ENOUGH_GOLD" as const };
+
+    await tx.idleProfile.update({
+      where: { userId },
+      data: {
+        gold: profile.gold - def.price,
+        skinKey: key,
+        skinsJson: JSON.stringify([...owned, key]),
+      },
+    });
+    return { ok: true as const, worn: true };
+  });
+}
+
+/** A corrupt blob costs the player their wardrobe display, not their session. */
+export function parseSkins(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
 }

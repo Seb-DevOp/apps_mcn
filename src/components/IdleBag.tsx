@@ -124,7 +124,7 @@ export function IdleBag({
 
       {/* --- The cat, as it currently stands --------------------------- */}
       <div className="panel panel-sapphire mt-4 flex justify-center py-3">
-        <CatCanvas worn={worn} size={190} />
+        <CatCanvas worn={worn} size={190} skin={state.shop.skinKey} />
       </div>
 
       <h2 className="eyebrow mt-5">{t("idle.equipped")}</h2>

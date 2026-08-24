@@ -224,5 +224,18 @@
   "idle.eliteHp": "Elite",
   "idle.packShare": "The Pack adds {n}/s · {pct}% of the damage",
   "pack.first": "The cat",
-  "pack.second": "The Pack"
+  "pack.second": "The Pack",
+  "idle.rarity.DIAMOND": "Diamond",
+  "idle.rarity.SOVEREIGN": "Sovereign",
+  "idle.tabShop": "Shop",
+  "shop.chest": "The Chest",
+  "shop.chestHint": "One piece from the floor you are standing on, rolled on your own odds — the ones your lives have opened.",
+  "shop.buyChest": "Open · {n}",
+  "shop.untilGuaranteed": "{n} more before a guaranteed {rarity}",
+  "shop.nextIsGuaranteed": "The next one is a guaranteed {rarity}",
+  "shop.chestsBought": "{n} chests opened",
+  "shop.coats": "Coats",
+  "shop.coatsHint": "Colour only, and kept through every rebirth. Each is about ten times the last.",
+  "shop.worn": "worn",
+  "shop.wear": "wear"
 }

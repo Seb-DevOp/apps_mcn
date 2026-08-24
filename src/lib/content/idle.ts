@@ -16,7 +16,23 @@ export type Slot = "HEAD" | "SHOULDERS" | "CHEST" | "HANDS" | "LEGS" | "TRINKET"
 
 export const SLOTS: Slot[] = ["HEAD", "SHOULDERS", "CHEST", "HANDS", "LEGS", "TRINKET"];
 
-export type Rarity = "COMMON" | "UNCOMMON" | "RARE" | "EPIC" | "MYTHIC" | "LEGENDARY";
+/**
+ * Eight tiers, read by colour before they are read by name: grey, green, blue,
+ * violet, orange, red, diamond, and the one above them.
+ *
+ * The top two do not exist for a new cat. They are what a life brings back —
+ * the odds below open them as rebirths accumulate, so the ladder is a reason to
+ * spend a life rather than a list that was always there.
+ */
+export type Rarity =
+  | "COMMON"
+  | "UNCOMMON"
+  | "RARE"
+  | "EPIC"
+  | "MYTHIC"
+  | "LEGENDARY"
+  | "DIAMOND"
+  | "SOVEREIGN";
 
 export const RARITIES: Rarity[] = [
   "COMMON",
@@ -25,6 +41,8 @@ export const RARITIES: Rarity[] = [
   "EPIC",
   "MYTHIC",
   "LEGENDARY",
+  "DIAMOND",
+  "SOVEREIGN",
 ];
 
 /** How much a rarity multiplies an item's numbers. */
@@ -35,6 +53,8 @@ export const RARITY_MULTIPLIER: Record<Rarity, number> = {
   EPIC: 2.5,
   MYTHIC: 3.4,
   LEGENDARY: 4.6,
+  DIAMOND: 6.2,
+  SOVEREIGN: 8.4,
 };
 
 // ---------------------------------------------------------------------------
@@ -432,6 +452,8 @@ const RARITY_QUALIFIER: Record<Rarity, { en: string; fr: Record<Agreement, strin
     en: "Celestial",
     fr: { ms: "Céleste", fs: "Céleste", mp: "Célestes", fp: "Célestes" },
   },
+  DIAMOND: { en: "Adamant", fr: { ms: "Adamantin", fs: "Adamantine", mp: "Adamantins", fp: "Adamantines" } },
+  SOVEREIGN: { en: "Sovereign", fr: "du Souverain" },
 };
 
 export function itemName(slot: Slot, floor: number, rarity: Rarity, locale: string) {
@@ -458,15 +480,33 @@ export const BASE_DROP_CHANCE = 0.11;
  * Rarity odds, by how far past its floor the drop is. Deeper floors do not make
  * common items rarer so much as they make great ones possible.
  */
-export function rarityWeights(floor: number): { rarity: Rarity; weight: number }[] {
+/**
+ * Rarity odds, by depth and by lives spent.
+ *
+ * Depth has always opened the middle of the ladder. Lives open the top of it:
+ * Diamond does not exist before the second rebirth and Sovereign before the
+ * fourth, and every life after that shifts the whole distribution upward by
+ * thinning the commons. That is what makes a rebirth change what the game *looks*
+ * like rather than only how fast its numbers move.
+ */
+export function rarityWeights(
+  floor: number,
+  rebirths = 0,
+): { rarity: Rarity; weight: number }[] {
   const depth = Math.max(0, floor - 1);
+  const lives = Math.max(0, rebirths);
+
   return [
-    { rarity: "COMMON", weight: Math.max(8, 60 - depth * 3) },
-    { rarity: "UNCOMMON", weight: 25 },
+    { rarity: "COMMON", weight: Math.max(4, 60 - depth * 3 - lives * 6) },
+    { rarity: "UNCOMMON", weight: Math.max(6, 25 - lives * 2) },
     { rarity: "RARE", weight: Math.min(30, 10 + depth * 1.5) },
-    { rarity: "EPIC", weight: Math.min(20, 3 + depth * 1.1) },
-    { rarity: "MYTHIC", weight: Math.min(12, depth * 0.6) },
-    { rarity: "LEGENDARY", weight: Math.min(6, depth * 0.25) },
+    { rarity: "EPIC", weight: Math.min(22, 3 + depth * 1.1 + lives) },
+    { rarity: "MYTHIC", weight: Math.min(14, depth * 0.6 + lives * 1.2) },
+    { rarity: "LEGENDARY", weight: Math.min(8, depth * 0.25 + lives * 0.9) },
+    // Nothing at all until the lives that unlock them have been spent, so the
+    // first Diamond is an event rather than a slow drift in the odds.
+    { rarity: "DIAMOND", weight: lives < 2 ? 0 : Math.min(5, (lives - 1) * 0.7 + depth * 0.06) },
+    { rarity: "SOVEREIGN", weight: lives < 4 ? 0 : Math.min(2.5, (lives - 3) * 0.4 + depth * 0.03) },
   ];
 }
 
@@ -540,8 +580,12 @@ export const RARITY_STYLE: Record<Rarity, { color: string; glow: string }> = {
   UNCOMMON: { color: "#69c39a", glow: "rgba(105,195,154,0.40)" },
   RARE: { color: "#4f93ff", glow: "rgba(79,147,255,0.50)" },
   EPIC: { color: "#a06bff", glow: "rgba(160,107,255,0.50)" },
-  MYTHIC: { color: "#37d5ff", glow: "rgba(55,213,255,0.60)" },
-  LEGENDARY: { color: "#f0c14b", glow: "rgba(240,193,75,0.65)" },
+  MYTHIC: { color: "#ff8f3d", glow: "rgba(255,143,61,0.55)" },
+  LEGENDARY: { color: "#ff4d5e", glow: "rgba(255,77,94,0.60)" },
+  DIAMOND: { color: "#8ef0ff", glow: "rgba(142,240,255,0.75)" },
+  // The one above them all reads as gold rather than as another hue: a ladder
+  // that ends on one more colour ends quietly.
+  SOVEREIGN: { color: "#ffd76a", glow: "rgba(255,215,106,0.9)" },
 };
 
 // ---------------------------------------------------------------------------
@@ -572,6 +616,8 @@ export const AFFIX_SLOTS: Record<Rarity, number> = {
   EPIC: 2,
   MYTHIC: 2,
   LEGENDARY: 3,
+  DIAMOND: 4,
+  SOVEREIGN: 5,
 };
 
 const AFFIX_SCALE: Record<Rarity, number> = {
@@ -581,6 +627,8 @@ const AFFIX_SCALE: Record<Rarity, number> = {
   EPIC: 2.5,
   MYTHIC: 3.5,
   LEGENDARY: 5,
+  DIAMOND: 6.8,
+  SOVEREIGN: 9,
 };
 
 /**
@@ -962,3 +1010,161 @@ export function packSlot(slot: Slot): string {
 export function isPackSlot(worn: string | null): boolean {
   return typeof worn === "string" && worn.startsWith(PACK_PREFIX);
 }
+
+// ---------------------------------------------------------------------------
+// The shop
+// ---------------------------------------------------------------------------
+
+/**
+ * A chest costs about three minutes of the floor you are on.
+ *
+ * Priced against the floor you are standing on — not the record. Pricing on the
+ * record while the chest gives a piece from the current floor would make a fresh
+ * rebirth an unaffordable shop and a deep one a free one, in the same run.
+ *
+ * Against the floor's own reward rather than a fixed number,
+ * because gold inflates by a factor of a thousand every eight floors: any fixed
+ * price is either unaffordable at floor five or free at floor twenty-five.
+ */
+export function chestPrice(level: number): number {
+  return Math.ceil(levelInfo(level).goldReward * 40);
+}
+
+/**
+ * Every tenth chest is guaranteed.
+ *
+ * Randomness that can be unlucky forty times in a row is not a shop, it is a
+ * grievance. The counter is stored and shown, so the guarantee is a promise the
+ * player can watch approaching rather than a claim in a description.
+ */
+export const CHEST_PITY = 10;
+
+/** What a guaranteed chest floors the roll at, by how many lives were spent. */
+export function chestFloorRarity(rebirths: number): Rarity {
+  if (rebirths >= 4) return "DIAMOND";
+  if (rebirths >= 2) return "LEGENDARY";
+  return "EPIC";
+}
+
+export interface SkinDef {
+  key: string;
+  nameEn: string;
+  nameFr: string;
+  price: number;
+  fur: string;
+  furDark: string;
+  furDeep: string;
+  furLight: string;
+  ear: string;
+  eyes: string;
+}
+
+/**
+ * Coats, priced along the curve rather than on a flat list.
+ *
+ * Each is roughly ten times the last, and gold grows by a thousand every eight
+ * floors — so a coat unlocks by descending rather than by saving, and the shop
+ * always has exactly one thing that is nearly affordable.
+ */
+export const SKINS: SkinDef[] = [
+  {
+    key: "classic",
+    nameEn: "Maine Coon",
+    nameFr: "Maine Coon",
+    price: 0,
+    fur: "#8b8072",
+    furDark: "#655c50",
+    furDeep: "#4d463c",
+    furLight: "#b3a894",
+    ear: "#c2949a",
+    eyes: "#8fd14f",
+  },
+  {
+    key: "ember",
+    nameEn: "Ember",
+    nameFr: "Braise",
+    price: 5_000,
+    fur: "#c2703a",
+    furDark: "#94502a",
+    furDeep: "#6b3a1e",
+    furLight: "#e0a06a",
+    ear: "#d99a86",
+    eyes: "#ffd05e",
+  },
+  {
+    key: "shadow",
+    nameEn: "Shadow",
+    nameFr: "Ombre",
+    price: 60_000,
+    fur: "#3a3a42",
+    furDark: "#26262c",
+    furDeep: "#17171b",
+    furLight: "#55555f",
+    ear: "#7a5a62",
+    eyes: "#ffb03d",
+  },
+  {
+    key: "snow",
+    nameEn: "Snow",
+    nameFr: "Neige",
+    price: 700_000,
+    fur: "#e2e0da",
+    furDark: "#c2bfb6",
+    furDeep: "#9d9a91",
+    furLight: "#f6f5f1",
+    ear: "#e8b4bc",
+    eyes: "#5ec8ff",
+  },
+  {
+    key: "siamese",
+    nameEn: "Siamese",
+    nameFr: "Siamois",
+    price: 8_000_000,
+    fur: "#ddd0b8",
+    furDark: "#6b5a4a",
+    furDeep: "#453a30",
+    furLight: "#f0e6d2",
+    ear: "#c99a92",
+    eyes: "#4f93ff",
+  },
+  {
+    key: "spectre",
+    nameEn: "Spectre",
+    nameFr: "Fantôme",
+    price: 90_000_000,
+    fur: "#6f86a8",
+    furDark: "#4a5c78",
+    furDeep: "#2f3c52",
+    furLight: "#9fb6d4",
+    ear: "#8fa8c4",
+    eyes: "#b9f0ff",
+  },
+  {
+    key: "gilded",
+    nameEn: "Gilded",
+    nameFr: "Doré",
+    price: 1_000_000_000,
+    fur: "#d4a94e",
+    furDark: "#a67f30",
+    furDeep: "#75581e",
+    furLight: "#f3d68f",
+    ear: "#e0b98a",
+    eyes: "#ffffff",
+  },
+  {
+    key: "vault",
+    nameEn: "Vault Heart",
+    nameFr: "Cœur du Vault",
+    price: 12_000_000_000,
+    fur: "#5a4b9c",
+    furDark: "#3d3270",
+    furDeep: "#26204a",
+    furLight: "#8f7fd4",
+    ear: "#a98fd4",
+    eyes: "#8ef0ff",
+  },
+];
+
+export const SKIN_BY_KEY: Record<string, SkinDef> = Object.fromEntries(
+  SKINS.map((skin) => [skin.key, skin]),
+);

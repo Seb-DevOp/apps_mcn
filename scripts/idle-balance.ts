@@ -107,6 +107,7 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
     { level, enemyHp, elite, hp, recoverFor, shieldFor, highestLevel },
     stats,
     unlocked("elites", rebirths),
+    rebirths,
   );
 
   level = result.level;

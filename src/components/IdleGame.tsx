@@ -16,6 +16,7 @@ import { FloorBackdrop, themeFor } from "./FloorBackdrop";
 import { IdleBag } from "./IdleBag";
 import { LootPrompt, type LootEntry } from "./LootPrompt";
 import { IdleRebirth } from "./IdleRebirth";
+import { IdleShop } from "./IdleShop";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
@@ -77,7 +78,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   const { t, L } = useI18n();
 
   const [state, setState] = useState(initial);
-  const [tab, setTab] = useState<"FIGHT" | "BAG" | "REBIRTH">("FIGHT");
+  const [tab, setTab] = useState<"FIGHT" | "BAG" | "REBIRTH" | "SHOP">("FIGHT");
   const [busy, setBusy] = useState<string | null>(null);
   const [welcome, setWelcome] = useState(
     initial.report.seconds > 60 && initial.report.goldEarned > 0,
@@ -406,7 +407,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
       {/* --- Two tabs, one running game --------------------------------- */}
       <div
         className="mt-4 grid gap-2"
-        style={{ gridTemplateColumns: `repeat(${showRebirth ? 3 : 2}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${showRebirth ? 4 : 3}, minmax(0, 1fr))` }}
       >
         <TabButton active={tab === "FIGHT"} onClick={() => setTab("FIGHT")}>
           {t("idle.tabFight")}
@@ -418,6 +419,9 @@ export function IdleGame({ initial }: { initial: IdleState }) {
             is a worse first impression than no tab. And no count on it — three
             tabs plus a five-figure relic total overflows the row, and the panel
             behind it shows the number in large type anyway. */}
+        <TabButton active={tab === "SHOP"} onClick={() => setTab("SHOP")}>
+          {t("idle.tabShop")}
+        </TabButton>
         {showRebirth && (
           <TabButton active={tab === "REBIRTH"} onClick={() => setTab("REBIRTH")}>
             {t("idle.tabRebirth")}
@@ -429,6 +433,8 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         <IdleBag state={state} busy={busy} act={act} />
       ) : tab === "REBIRTH" ? (
         <IdleRebirth state={state} busy={busy} act={act} />
+      ) : tab === "SHOP" ? (
+        <IdleShop state={state} busy={busy} act={act} />
       ) : (
         <>
           {/* --- The arena -------------------------------------------- */}
@@ -456,7 +462,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                     animate={fallen ? { rotate: -12, y: 10 } : { rotate: 0, y: 0 }}
                     transition={{ type: "spring", stiffness: 200, damping: 18 }}
                   >
-                    <CatCanvas worn={worn} size={150} breathing={!fallen} />
+                    <CatCanvas worn={worn} size={150} breathing={!fallen} skin={state.shop.skinKey} />
                   </motion.div>
                 </motion.div>
                 {/* A Guardian's fall lights the cat up for a moment. The number
@@ -472,7 +478,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                 <HitStream hits={hits} target="CAT" tone="#ff6b6b" />
                 {packWorn.length > 0 && (
                   <div className="pointer-events-none absolute -left-1 bottom-0 opacity-80">
-                    <CatCanvas worn={packWorn} size={92} breathing={!fallen} />
+                    <CatCanvas worn={packWorn} size={92} breathing={!fallen} skin={state.shop.skinKey} />
                   </div>
                 )}
                 <HitStream hits={hits} target="HEAL" tone="#7ed08f" from="feet" prefix="+" />

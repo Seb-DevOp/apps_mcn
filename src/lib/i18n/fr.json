@@ -224,5 +224,18 @@
   "idle.eliteHp": "Élite",
   "idle.packShare": "La Meute ajoute {n}/s · {pct} % des dégâts",
   "pack.first": "Le chat",
-  "pack.second": "La Meute"
+  "pack.second": "La Meute",
+  "idle.rarity.DIAMOND": "Diamant",
+  "idle.rarity.SOVEREIGN": "Souverain",
+  "idle.tabShop": "Boutique",
+  "shop.chest": "Le Coffre",
+  "shop.chestHint": "Une pièce de l'étage où tu te trouves, tirée sur tes propres odds — celles que tes vies ont ouvertes.",
+  "shop.buyChest": "Ouvrir · {n}",
+  "shop.untilGuaranteed": "Encore {n} avant un {rarity} garanti",
+  "shop.nextIsGuaranteed": "Le prochain est un {rarity} garanti",
+  "shop.chestsBought": "{n} coffres ouverts",
+  "shop.coats": "Pelages",
+  "shop.coatsHint": "Couleur seulement, gardée à travers chaque renaissance. Chacun vaut environ dix fois le précédent.",
+  "shop.worn": "porté",
+  "shop.wear": "porter"
 }

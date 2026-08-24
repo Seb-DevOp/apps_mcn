@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { RARITY_STYLE, type Slot, type Rarity } from "@/lib/content/idle";
+import { RARITY_STYLE, SKIN_BY_KEY, type Slot, type Rarity } from "@/lib/content/idle";
 
 /**
  * The cat, wearing what it found.
@@ -26,21 +26,27 @@ export interface WornPiece {
   rarity: Rarity;
 }
 
-const FUR = "#8b8072";
-const FUR_DARK = "#655c50";
-const FUR_DEEP = "#4d463c";
-const FUR_LIGHT = "#b3a894";
-const EAR_PINK = "#c2949a";
-
 export function CatCanvas({
   worn,
   size = 260,
   breathing = true,
+  skin = "classic",
 }: {
   worn: WornPiece[];
   size?: number;
   breathing?: boolean;
+  /** Which coat. Cosmetic only — no drawing changes, only its five colours. */
+  skin?: string;
 }) {
+  // The coat is five colours and nothing else. Every path below reads from these,
+  // so a new coat is a row in a table rather than a second drawing to keep in step
+  // with the first whenever a piece of armour moves.
+  const coat = SKIN_BY_KEY[skin] ?? SKIN_BY_KEY.classic;
+  const FUR = coat.fur;
+  const FUR_DARK = coat.furDark;
+  const FUR_DEEP = coat.furDeep;
+  const FUR_LIGHT = coat.furLight;
+  const EAR_PINK = coat.ear;
   const bySlot = new Map(worn.map((piece) => [piece.slot, piece]));
   const colour = (slot: Slot) => {
     const piece = bySlot.get(slot);
@@ -157,8 +163,8 @@ export function CatCanvas({
         <path d="M100 44 v13 M87 46 l4 12 M113 46 l-4 12" stroke={FUR_DEEP} strokeWidth="2.6" strokeLinecap="round" />
 
         {/* Eyes: the one bright thing on the whole figure. */}
-        <ellipse cx="85" cy="76" rx="8" ry="9.5" fill="#8fd14f" />
-        <ellipse cx="115" cy="76" rx="8" ry="9.5" fill="#8fd14f" />
+        <ellipse cx="85" cy="76" rx="8" ry="9.5" fill={coat.eyes} />
+        <ellipse cx="115" cy="76" rx="8" ry="9.5" fill={coat.eyes} />
         <ellipse cx="85" cy="76" rx="2.8" ry="7.5" fill="#12200f" />
         <ellipse cx="115" cy="76" rx="2.8" ry="7.5" fill="#12200f" />
         <circle cx="87.5" cy="72" r="1.8" fill="#ffffff" opacity="0.8" />
@@ -291,7 +297,8 @@ function Chest({ shape, colour }: { shape: string; colour: string }) {
     return (
       <g>
         <path d={body} fill={colour} />
-        <path d="M70 156 h60 M69 172 h62 M71 188 h58" stroke={FUR_DEEP} strokeWidth="1.6" opacity="0.45" />
+        {/* Shading on the mail, not on the cat: it stays dark whatever coat is worn. */}
+        <path d="M70 156 h60 M69 172 h62 M71 188 h58" stroke="#1b1a18" strokeWidth="1.6" opacity="0.45" />
       </g>
     );
   }
