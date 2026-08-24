@@ -67,7 +67,8 @@ export interface DerivedStats {
   attacksPerSecond: number;
   critChance: number;
   critMultiplier: number;
-  doubleChance: number;
+  /** Expected extra blows per swing. Unbounded: past 1 they are guaranteed. */
+  extraStrikes: number;
   /** The product of all four — what the fight is actually resolved with. */
   power: number;
   maxHp: number;
@@ -126,11 +127,25 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
     (BASE_ATTACK_DAMAGE + worn.reduce((sum, item) => sum + item.power, 0)) *
     Math.pow(1 + per("attack"), level("attack"));
 
-  const attacksPerSecond = BASE_ATTACK_SPEED + level("speed") * per("speed");
-  const critChance = Math.min(0.95, BASE_CRIT_CHANCE + level("crit") * per("crit"));
+  const attacksPerSecond =
+    BASE_ATTACK_SPEED * Math.pow(1 + per("speed"), level("speed"));
+
+  // A probability, so certainty is its ceiling. That is arithmetic, not a design
+  // decision, and the upgrade's last level is exactly the one that reaches it.
+  const critChance = Math.min(1, BASE_CRIT_CHANCE + level("crit") * per("crit"));
+
   const critMultiplier =
     BASE_CRIT_MULTIPLIER * Math.pow(1 + per("critDamage"), level("critDamage"));
-  const doubleChance = Math.min(1, BASE_DOUBLE_CHANCE + level("double") * per("double"));
+
+  /**
+   * Extra blows per swing, as an expectation.
+   *
+   * Below one it reads as a chance of striking twice. Past one it keeps its
+   * meaning without a ceiling: 2.4 is two more certain blows and a 40% chance of
+   * a third. Linear in levels bought — logarithmic in gold — so it never stops
+   * paying and never disturbs the curve the exponential stats set.
+   */
+  const extraStrikes = BASE_DOUBLE_CHANCE + level("double") * per("double");
 
   // The four offence stats meet here, and only here. Expected damage per second
   // is their product, which is why each of them is worth buying and why none of
@@ -139,7 +154,7 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
     hitDamage *
     attacksPerSecond *
     (1 + critChance * (critMultiplier - 1)) *
-    (1 + doubleChance);
+    (1 + extraStrikes);
 
   const maxHp =
     (BASE_MAX_HP + worn.reduce((sum, item) => sum + item.vitality, 0)) *
@@ -158,7 +173,7 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
     attacksPerSecond,
     critChance,
     critMultiplier,
-    doubleChance,
+    extraStrikes,
     power: Math.max(1, power),
     maxHp: Math.max(1, maxHp),
     regen,
@@ -257,7 +272,13 @@ export function simulate(
     const info = levelInfo(level);
     if (enemyHp <= 0) enemyHp = info.enemyHp;
 
-    const timeToKill = Math.max(MIN_KILL_SECONDS, enemyHp / stats.power);
+    // Both sides grow exponentially, so at absurd depth both overflow to
+    // Infinity and their ratio becomes NaN. Falling back to the floor keeps the
+    // loop finite instead of silently producing a broken save.
+    const ratio = enemyHp / stats.power;
+    const timeToKill = Number.isFinite(ratio)
+      ? Math.max(MIN_KILL_SECONDS, ratio)
+      : MIN_KILL_SECONDS;
 
     // Regeneration and the enemy's damage are one net rate. Positive means the
     // cat is winning the exchange of blows and cannot lose this fight at all.

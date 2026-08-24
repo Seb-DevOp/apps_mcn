@@ -149,7 +149,7 @@ console.log(`  attaques / s       ${stats.attacksPerSecond.toFixed(2)}`);
 console.log(
   `  critique           ${(stats.critChance * 100).toFixed(0)} % · ×${stats.critMultiplier.toFixed(1)}`,
 );
-console.log(`  double coup        ${(stats.doubleChance * 100).toFixed(0)} %`);
+console.log(`  coups par frappe   ${(1 + stats.extraStrikes).toFixed(2)}`);
 console.log(`  dps effectif       ${stats.power.toExponential(2)}`);
 console.log(`  vie                ${stats.maxHp.toExponential(2)} (+${stats.regen.toExponential(2)}/s)`);
 console.log(`  dégâts subis ici   ${here.enemyDamage.toExponential(2)}/s`);

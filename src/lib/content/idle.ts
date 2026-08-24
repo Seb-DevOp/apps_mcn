@@ -156,18 +156,27 @@ export interface UpgradeDef {
  * and nothing else — decides how strong an upgrade is in the long run, so two
  * uncapped upgrades are equal exactly when their ln m / ln c match.
  *
- * Attack and Critical Damage are the two uncapped offence stats and share an
- * exponent of ~0.14. Health answers a different curve (incoming damage grows at
- * 1.17 per level, enemy health at 1.19) so it is matched against that instead —
- * being "equal" to Attack would leave the cat unable to survive what it can
- * already kill.
+ * Attack, Attack Speed and Critical Damage are the three uncapped offence stats.
+ * They share an exponent of ~0.09 each, summing to the ~0.27 the pacing needs:
+ * adding a third uncapped multiplier without lowering all three would have made
+ * progress accelerate instead of decelerate, and an idle game whose floors get
+ * cheaper is over.
  *
- * Speed, Critical Chance and Double Strike are capped: each buys a bounded total
- * multiplier, so they cannot change the long-run curve at all. They are priced so
- * that the whole ladder costs about what the same multiplier costs on Attack —
- * which makes them the better purchase early, and finished later. That is a shape,
- * not an advantage, and `npm run balance` checks that every one of the six is the
- * best buy at some point rather than a trap nobody should ever take.
+ * Health answers a different curve (incoming damage grows at 1.152 per level,
+ * enemy health at 1.19) so it is matched against that instead — being "equal" to
+ * Attack would leave the cat unable to survive what it can already kill.
+ *
+ * Only Critical Chance stops, and not by choice: it is a probability, and 100% is
+ * arithmetic rather than a design decision. Its maximum level is exactly the one
+ * that reaches certainty, so nothing is ever sold that does nothing.
+ *
+ * Double Strike deliberately keeps going past 100%: beyond certainty each whole
+ * point is one more guaranteed blow. Its effect is linear in levels bought, which
+ * is logarithmic in gold, so it stays worth buying for ever without disturbing
+ * the long-run curve the three exponentials set.
+ *
+ * `npm run balance` checks that every one of the six is the best buy at some
+ * point rather than a trap nobody should ever take.
  */
 export const UPGRADES: UpgradeDef[] = [
   {
@@ -177,7 +186,7 @@ export const UPGRADES: UpgradeDef[] = [
     descEn: "×1.10 damage per hit, per level. Never stops being worth it.",
     descFr: "×1,10 de dégâts par coup et par niveau. Ne cesse jamais de payer.",
     baseCost: 30,
-    costGrowth: 2,
+    costGrowth: 2.88,
     perLevel: 0.1,
     axis: "OFFENCE",
     icon: "sword",
@@ -198,12 +207,11 @@ export const UPGRADES: UpgradeDef[] = [
     key: "speed",
     nameEn: "Attack Speed",
     nameFr: "Vitesse",
-    descEn: "+0.1 attacks per second. From one blow a second up to five.",
-    descFr: "+0,1 attaque par seconde. D'un coup par seconde jusqu'à cinq.",
+    descEn: "×1.06 attacks per second, per level. No ceiling.",
+    descFr: "×1,06 attaque par seconde et par niveau. Sans plafond.",
     baseCost: 45,
-    costGrowth: 1.36,
-    perLevel: 0.1,
-    maxLevel: 40,
+    costGrowth: 1.91,
+    perLevel: 0.06,
     axis: "OFFENCE",
     icon: "boost-xp",
   },
@@ -211,12 +219,12 @@ export const UPGRADES: UpgradeDef[] = [
     key: "crit",
     nameEn: "Critical Chance",
     nameFr: "Chance Critique",
-    descEn: "+1.5% chance to strike critically. Worthless without critical damage.",
-    descFr: "+1,5 % de chance de coup critique. Sans intérêt sans dégâts critiques.",
+    descEn: "+1.5% chance to strike critically. Stops at certainty, and nowhere earlier.",
+    descFr: "+1,5 % de chance de coup critique. S'arrête à la certitude, pas avant.",
     baseCost: 25,
     costGrowth: 1.27,
     perLevel: 0.015,
-    maxLevel: 45,
+    maxLevel: 64,
     axis: "OFFENCE",
     icon: "aura",
   },
@@ -227,7 +235,7 @@ export const UPGRADES: UpgradeDef[] = [
     descEn: "×1.08 on a critical hit, per level. Grows with how often you crit.",
     descFr: "×1,08 sur un coup critique, par niveau. Vaut ce que vaut ta chance critique.",
     baseCost: 150,
-    costGrowth: 1.78,
+    costGrowth: 2.35,
     perLevel: 0.08,
     axis: "OFFENCE",
     icon: "legend",
@@ -236,12 +244,11 @@ export const UPGRADES: UpgradeDef[] = [
     key: "double",
     nameEn: "Double Strike",
     nameFr: "Double Coup",
-    descEn: "+2% chance the blow lands twice. Doubles the critical with it.",
-    descFr: "+2 % de chance que le coup parte deux fois. Double aussi le critique.",
+    descEn: "+2% chance the blow lands twice. Past 100%, every whole point is another certain blow.",
+    descFr: "+2 % de chance que le coup parte deux fois. Au-delà de 100 %, chaque point entier est un coup de plus garanti.",
     baseCost: 60,
-    costGrowth: 1.33,
+    costGrowth: 1.55,
     perLevel: 0.02,
-    maxLevel: 45,
     axis: "OFFENCE",
     icon: "magic-sword",
   },

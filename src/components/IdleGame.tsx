@@ -11,6 +11,7 @@ import {
 } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
+import { FloorBackdrop, themeFor } from "./FloorBackdrop";
 import { IdleBag } from "./IdleBag";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
@@ -50,6 +51,8 @@ interface Hit {
   drift: number;
   /** And a vertical one, for the same reason. */
   lift: number;
+  /** How many blows this one number stands for, when several were merged. */
+  strikes: number;
 }
 
 /** The predicted world. Kept in a ref: it changes far faster than it renders. */
@@ -106,7 +109,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
   const nextHitId = useRef(0);
   const addHit = useCallback(
-    (target: Hit["target"], value: number, crit = false, side = 0) => {
+    (target: Hit["target"], value: number, crit = false, side = 0, strikes = 1) => {
       const id = nextHitId.current++;
       // A double strike puts its two numbers on opposite sides on purpose; every
       // other blow is scattered. Landing them all on one line made four hits look
@@ -114,7 +117,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
       const drift = side === 0 ? Math.random() * 56 - 28 : side * (16 + Math.random() * 16);
       setHits((current) => [
         ...current.slice(-13),
-        { id, target, value, crit, drift, lift: Math.random() * 16 - 8 },
+        { id, target, value, crit, drift, lift: Math.random() * 16 - 8, strikes },
       ]);
       window.setTimeout(() => {
         setHits((current) => current.filter((hit) => hit.id !== id));
@@ -192,19 +195,36 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         if (w.enemyHp <= 0) w.enemyHp = info.enemyHp;
 
         let killed = false;
-        const swing = Math.max(MIN_SWING_SECONDS, 1 / Math.max(0.1, stats.attacksPerSecond));
+
+        // Speed has no ceiling, and a screen does. Past about seven swings a
+        // second one drawn swing stands for several real ones and carries their
+        // damage together — otherwise the bar would drain at a fraction of the
+        // true rate and the replay would disagree with the server by an order of
+        // magnitude rather than by a rounding error.
+        const trueSwing = 1 / Math.max(0.1, stats.attacksPerSecond);
+        const swing = Math.max(MIN_SWING_SECONDS, trueSwing);
+        const batch = swing / trueSwing;
 
         w.catTimer += dt;
         if (w.catTimer >= swing) {
           w.catTimer -= swing;
 
           const crit = Math.random() < stats.critChance;
-          const blows = Math.random() < stats.doubleChance ? 2 : 1;
-          const damage = stats.hitDamage * (crit ? stats.critMultiplier : 1);
+          // 2.4 extra strikes is two certain extra blows and a 40% chance of a third.
+          const whole = Math.floor(stats.extraStrikes);
+          const blows = 1 + whole + (Math.random() < stats.extraStrikes - whole ? 1 : 0);
+          const damage = stats.hitDamage * (crit ? stats.critMultiplier : 1) * batch;
 
-          for (let blow = 0; blow < blows; blow++) {
-            w.enemyHp -= damage;
-            addHit("ENEMY", damage, crit, blows === 2 ? (blow === 0 ? -1 : 1) : 0);
+          // Up to three blows are worth seeing separately; beyond that they are
+          // one number with a count on it.
+          if (blows <= 3) {
+            for (let blow = 0; blow < blows; blow++) {
+              w.enemyHp -= damage;
+              addHit("ENEMY", damage, crit, blows === 1 ? 0 : blow === 0 ? -1 : 1);
+            }
+          } else {
+            w.enemyHp -= damage * blows;
+            addHit("ENEMY", damage * blows, crit, 0, blows);
           }
           setCatSwings((n) => n + 1);
 
@@ -297,6 +317,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         <h1 className="display mt-1 text-2xl">
           {here.isBoss ? t("idle.guardian") : t("idle.chamber", { n: here.position })}
         </h1>
+        <p className="dim mt-1 text-[0.7rem] italic">{L(themeFor(here.floor).nameEn, themeFor(here.floor).nameFr)}</p>
         <FloorPips position={here.position} />
         <p className="gold-text tabular mt-3 text-lg">{formatNumber(shown.gold)}</p>
         <p className="dim text-[0.6rem] uppercase tracking-widest">{t("idle.gold")}</p>
@@ -324,7 +345,10 @@ export function IdleGame({ initial }: { initial: IdleState }) {
             animate={{ x: catWounds % 2 === 0 ? 0 : -3 }}
             transition={{ type: "spring", stiffness: 900, damping: 14 }}
           >
-            <div className="relative flex items-end justify-between gap-1">
+            <FloorBackdrop floor={here.floor} />
+
+
+            <div className="relative z-10 flex items-end justify-between gap-1">
               <div className="relative">
                 <motion.div
                   animate={{ x: fallen ? 0 : catSwings % 2 === 0 ? 0 : 12 }}
@@ -372,7 +396,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
               </div>
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-3">
+            <div className="relative z-10 mt-2 grid grid-cols-2 gap-3">
               <Bar
                 label={t("idle.catHp")}
                 value={shown.hp}
@@ -396,7 +420,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
             <AnimatePresence>
               {fallen && (
                 <motion.div
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-[#05080f]/72 backdrop-blur-[1px]"
+                  className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#05080f]/72 backdrop-blur-[1px]"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -419,10 +443,10 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           <section className="mt-3 grid grid-cols-3 gap-2">
             <Stat label={t("idle.dps")} value={`${formatNumber(stats.power)}/s`} tone="gold" />
             <Stat label={t("idle.health")} value={formatNumber(stats.maxHp)} tone="life" />
-            <Stat label={t("idle.speed")} value={`${stats.attacksPerSecond.toFixed(1)}/s`} />
+            <Stat label={t("idle.speed")} value={`${stats.attacksPerSecond < 100 ? stats.attacksPerSecond.toFixed(1) : formatNumber(stats.attacksPerSecond)}/s`} />
             <Stat label={t("idle.crit")} value={`${Math.round(stats.critChance * 100)}%`} />
             <Stat label={t("idle.critDamage")} value={`×${formatNumber(stats.critMultiplier)}`} />
-            <Stat label={t("idle.double")} value={`${Math.round(stats.doubleChance * 100)}%`} />
+            <Stat label={t("idle.double")} value={`×${(1 + stats.extraStrikes).toFixed(2)}`} />
           </section>
 
           <p className="dim mt-2 text-center text-[0.64rem]">
@@ -612,6 +636,9 @@ function HitStream({
             >
               {prefix}
               {formatNumber(hit.value)}
+              {hit.strikes > 1 && (
+                <span className="ml-0.5 text-[0.7em] opacity-80">×{hit.strikes}</span>
+              )}
             </motion.span>
           ))}
       </AnimatePresence>

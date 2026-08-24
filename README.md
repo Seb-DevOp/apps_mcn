@@ -438,23 +438,34 @@ coïncident.
 
 | Statistique | Effet par niveau | Coût | Plafond | Exposant |
 | --- | --- | --- | --- | --- |
-| Attaque | ×1,10 dégâts | ×2,00 | — | 0,138 |
-| Dégâts Critiques | ×1,08 sur un crit | ×1,78 | — | 0,133 |
+| Attaque | ×1,10 dégâts | ×2,88 | — | 0,090 |
+| Vitesse | ×1,06 attaques/s | ×1,91 | — | 0,090 |
+| Dégâts Critiques | ×1,08 sur un crit | ×2,35 | — | 0,090 |
 | Points de Vie | ×1,12 vie | ×1,46 | — | 0,299 |
-| Vitesse | +0,1 attaque/s | ×1,36 | 5,0/s | borné |
-| Chance Critique | +1,5 % | ×1,27 | 72,5 % | borné |
-| Double Coup | +2 % | ×1,33 | 90 % | borné |
+| Double Coup | +2 % de coup en plus | ×1,55 | — | linéaire |
+| Chance Critique | +1,5 % | ×1,27 | 100 % (niv. 64) | borné |
 
-Attaque et Dégâts Critiques sont les deux offensives sans plafond et partagent le
-même exposant. **Points de Vie répond à une autre courbe** — les dégâts ennemis
-croissent en 1,152 par niveau, leur vie en 1,19 — et est calée sur celle-là : lui
-donner l'exposant de l'Attaque laisserait le chat incapable de survivre à ce qu'il
-sait déjà tuer.
+Attaque, Vitesse et Dégâts Critiques sont les trois offensives sans plafond et
+partagent un exposant de 0,090 — dont la somme fait les 0,27 dont le rythme a
+besoin. Ajouter une troisième exponentielle sans abaisser les trois aurait fait
+*accélérer* la progression, et un idle dont les étages deviennent moins chers est
+terminé.
 
-Les trois bornées achètent un multiplicateur total fini : elles ne peuvent pas
-changer la courbe de fond, et sont tarifées pour que l'échelle entière coûte à peu
-près ce que le même multiplicateur coûte en Attaque. C'est une **forme**, pas un
-avantage : elles sont le meilleur achat au début et terminées ensuite.
+**Points de Vie répond à une autre courbe** — les dégâts ennemis croissent en
+1,152 par niveau, leur vie en 1,19 — et est calée sur celle-là : lui donner
+l'exposant de l'Attaque laisserait le chat incapable de survivre à ce qu'il sait
+déjà tuer.
+
+**Une seule statistique s'arrête, et pas par choix.** La Chance Critique est une
+probabilité : 100 % est de l'arithmétique, pas une décision de conception. Son
+niveau maximum est exactement celui qui atteint la certitude, pour que rien ne
+soit jamais vendu qui ne fasse rien.
+
+**Le Double Coup dépasse volontiers la certitude** : au-delà de 100 %, chaque
+point entier est un coup garanti de plus. 2,4 se lit « deux coups de plus, et 40 %
+de chances d'un troisième ». Son effet est linéaire dans les niveaux achetés —
+donc logarithmique dans l'or — ce qui le rend éternellement achetable sans
+déranger la courbe que les trois exponentielles fixent.
 
 `npm run balance` le vérifie plutôt que de l'affirmer. La sonde simule un joueur
 qui achète à chaque instant ce qui rend le plus par pièce d'or, et rapporte la part
@@ -467,6 +478,54 @@ Une mesure a changé la conception elle-même : avec des dégâts ennemis croiss
 défaites en douze heures, une toutes les 25 secondes. Ramener la croissance des
 dégâts à 1,152 sépare les deux : le chat ralentit avant de mourir, et les 130
 défaites restantes tombent là où elles doivent, sur les Gardiens.
+
+### Seize chambres, dessinées
+
+Chaque étage a son décor, et ils tournent.
+
+La photographie était la réponse évidente et la mauvaise : un jeu d'images assez
+grand pour compter pèse des mégaoctets, demande des licences, et se retrouverait
+derrière un chat dessiné à la main en donnant l'impression de deux jeux collés.
+Ce sont donc **seize scènes en SVG** — quelques dizaines de formes chacune. Elles
+ne coûtent rien à envoyer, elles sont faites de la même matière que le reste de
+l'écran, et un jeu sans dernier étage peut les faire tourner indéfiniment.
+
+Crypte, Cavités, Forge, Givre, Rayonnages, Frondaison, Abîme, Salle Dorée, Fange,
+Géode, Ossuaire, Sanctuaire, Ruine, Tempête, Nécropole, Cœur du Vault.
+
+La rotation seule rendrait l'étage 17 identique à l'étage 1, donc **chaque tour
+complet décale la teinte et baisse la lumière**. Le Vault devient plus étrange et
+plus sombre à mesure qu'on descend, sans dix-septième dessin. Le décalage est
+borné : les étages profonds sont singuliers, pas illisibles.
+
+Deux détails qui ne se voient que quand ils manquent. Les poussières qui flottent
+tirent leur position de l'indice du thème et non de `Math.random` : un décor
+aléatoire est une divergence d'hydratation qui attend son heure. Et le décor est
+positionné, donc sans `z-index` explicite il se peindrait **par-dessus** les barres
+de vie, qui elles ne le sont pas.
+
+### Presque sans fin
+
+Les plafonds arbitraires ont sauté. La Vitesse était additive et s'arrêtait à
+5 coups par seconde ; elle est maintenant multiplicative et sans limite. Le Double
+Coup s'arrêtait à 90 % ; il continue au-delà de la certitude.
+
+Ce qui oblige à regarder ce que « sans limite » fait ailleurs :
+
+**À mille attaques par seconde, un écran n'en montre que sept.** Au-delà d'environ
+sept frappes par seconde, une frappe dessinée en représente plusieurs et porte
+leurs dégâts ensemble. Sans ce regroupement la barre se viderait à une fraction du
+rythme réel et la rejouabilité contredirait le serveur d'un ordre de grandeur au
+lieu d'un arrondi. Au-delà de trois coups par frappe, les nombres fusionnent en un
+seul portant son compte : `1,2M ×5`.
+
+**Et à profondeur absurde, les deux côtés débordent.** Vie de l'ennemi et
+puissance du chat croissent toutes deux exponentiellement ; passé environ l'étage
+600 elles valent `Infinity` toutes les deux et leur rapport devient `NaN`. Le
+moteur retombe alors sur le plancher de durée d'un combat plutôt que de produire
+une sauvegarde cassée. C'est un horizon théorique — la sonde met vingt-quatre
+heures à atteindre l'étage 32 — mais un jeu annoncé sans fin doit savoir ce qu'il
+fait à sa propre fin.
 
 ### Le sac
 
