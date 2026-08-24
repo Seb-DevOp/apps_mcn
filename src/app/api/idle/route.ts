@@ -8,6 +8,10 @@ import {
   sellItem,
   sellBelow,
   sellAllSpares,
+  rebirth,
+  buyRelic,
+  strike,
+  roar,
 } from "@/lib/engine/idle";
 
 /**
@@ -31,11 +35,16 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("sell"), itemId: z.string().min(1).max(64) }),
   z.object({ action: z.literal("sellBelow"), rarity: z.string().min(1).max(20) }),
   z.object({ action: z.literal("sellAll") }),
+  z.object({ action: z.literal("rebirth") }),
+  z.object({ action: z.literal("relic"), key: z.string().min(1).max(32) }),
+  // The count is a claim, not a fact: the engine clamps it by elapsed time.
+  z.object({ action: z.literal("strike"), count: z.number().int().min(1).max(40) }),
+  z.object({ action: z.literal("roar") }),
 ]);
 
 export async function POST(request: Request) {
   return withUser(async (user) => {
-    if (!rateLimit(`idle:${user.id}`, 120, 60_000)) return fail("RATE_LIMITED", 429);
+    if (!rateLimit(`idle:${user.id}`, 400, 60_000)) return fail("RATE_LIMITED", 429);
 
     const body = Schema.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail("INVALID_BODY", 400);
@@ -62,5 +71,13 @@ function run(userId: string, input: z.infer<typeof Schema>) {
       return sellBelow(userId, input.rarity);
     case "sellAll":
       return sellAllSpares(userId);
+    case "rebirth":
+      return rebirth(userId);
+    case "relic":
+      return buyRelic(userId, input.key);
+    case "strike":
+      return strike(userId, input.count);
+    case "roar":
+      return roar(userId);
   }
 }

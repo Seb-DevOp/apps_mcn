@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ENEMY_ATTACK_INTERVAL,
   LEVELS_PER_FLOOR,
+  STRIKE_DAMAGE_MULTIPLIER,
   RECOVERY_SECONDS,
   floorStart,
   levelInfo,
@@ -14,6 +15,7 @@ import { CatCanvas, type WornPiece } from "./CatCanvas";
 import { FloorBackdrop, themeFor } from "./FloorBackdrop";
 import { IdleBag } from "./IdleBag";
 import { LootPrompt, type LootEntry } from "./LootPrompt";
+import { IdleRebirth } from "./IdleRebirth";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
@@ -73,7 +75,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   const { t, L } = useI18n();
 
   const [state, setState] = useState(initial);
-  const [tab, setTab] = useState<"FIGHT" | "BAG">("FIGHT");
+  const [tab, setTab] = useState<"FIGHT" | "BAG" | "REBIRTH">("FIGHT");
   const [busy, setBusy] = useState<string | null>(null);
   const [welcome, setWelcome] = useState(
     initial.report.seconds > 60 && initial.report.goldEarned > 0,
@@ -185,9 +187,19 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     }
   }, [adopt]);
 
+  /**
+   * Taps are batched rather than sent one by one.
+   *
+   * A request per tap would be several a second for one thumb; a flush twice a
+   * second is the same damage with a fraction of the traffic. The
+   * server clamps the count by elapsed time either way, so batching cannot be
+   * used to claim more than a thumb could produce.
+   */
+  const pendingStrikes = useRef(0);
+
   const act = useCallback(
-    async (body: Record<string, unknown>, key: string) => {
-      setBusy(key);
+    async (body: Record<string, unknown>, key: string, quiet = false) => {
+      if (!quiet) setBusy(key);
       try {
         const response = await fetch("/api/idle", {
           method: "POST",
@@ -199,11 +211,21 @@ export function IdleGame({ initial }: { initial: IdleState }) {
       } catch {
         // Silent: the next sync repairs the display either way.
       } finally {
-        setBusy(null);
+        if (!quiet) setBusy(null);
       }
     },
     [adopt],
   );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const count = Math.min(40, pendingStrikes.current);
+      if (count <= 0) return;
+      pendingStrikes.current = 0;
+      void act({ action: "strike", count }, "strike", true);
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [act]);
 
   useEffect(() => {
     const timer = window.setInterval(sync, SYNC_INTERVAL_MS);
@@ -346,6 +368,8 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   );
 
   const spareCount = state.items.filter((item) => !item.equipped).length;
+  const showRebirth =
+    state.rebirth.ready || state.rebirth.relics > 0 || state.rebirth.rebirths > 0;
 
   return (
     <div className="pb-4">
@@ -361,17 +385,31 @@ export function IdleGame({ initial }: { initial: IdleState }) {
       </header>
 
       {/* --- Two tabs, one running game --------------------------------- */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div
+        className="mt-4 grid gap-2"
+        style={{ gridTemplateColumns: `repeat(${showRebirth ? 3 : 2}, minmax(0, 1fr))` }}
+      >
         <TabButton active={tab === "FIGHT"} onClick={() => setTab("FIGHT")}>
           {t("idle.tabFight")}
         </TabButton>
         <TabButton active={tab === "BAG"} onClick={() => setTab("BAG")} badge={spareCount}>
           {t("idle.tabBag")}
         </TabButton>
+        {/* Hidden until it can do something: a tab that only ever says "not yet"
+            is a worse first impression than no tab. And no count on it — three
+            tabs plus a five-figure relic total overflows the row, and the panel
+            behind it shows the number in large type anyway. */}
+        {showRebirth && (
+          <TabButton active={tab === "REBIRTH"} onClick={() => setTab("REBIRTH")}>
+            {t("idle.tabRebirth")}
+          </TabButton>
+        )}
       </div>
 
       {tab === "BAG" ? (
         <IdleBag state={state} busy={busy} act={act} />
+      ) : tab === "REBIRTH" ? (
+        <IdleRebirth state={state} busy={busy} act={act} />
       ) : (
         <>
           {/* --- The arena -------------------------------------------- */}
@@ -420,6 +458,19 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                 <AnimatePresence mode="popLayout">
                   <motion.div
                     key={enemyDeaths}
+                    onPointerDown={() => {
+                      if (fallen) return;
+                      pendingStrikes.current += 1;
+                      // Shown at once and reconciled by the next answer: a tap
+                      // that waits a third of a second to appear does not feel
+                      // like a tap.
+                      const blow =
+                        stateRef.current.stats.hitDamage * STRIKE_DAMAGE_MULTIPLIER;
+                      world.current.enemyHp -= blow;
+                      addHit("ENEMY", blow, false, 0);
+                      setCatSwings((n) => n + 1);
+                    }}
+                    className="cursor-pointer select-none"
                     initial={{ opacity: 0, x: 34, scale: 0.85 }}
                     animate={{ opacity: 1, x: 0, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.4, rotate: 18, y: 20 }}
@@ -473,6 +524,8 @@ export function IdleGame({ initial }: { initial: IdleState }) {
               )}
             </AnimatePresence>
           </motion.section>
+
+          <Roar state={state} busy={busy} act={act} />
 
           <Verdict outcome={state.outcome} isBoss={here.isBoss} />
 
@@ -724,6 +777,60 @@ function Bar({
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * One minute of the cat's own damage, every three. A share of current output
+ * rather than a fixed number, so it stays worth pressing at any depth without
+ * ever being the thing that clears a floor by itself.
+ */
+function Roar({
+  state,
+  busy,
+  act,
+}: {
+  state: IdleState;
+  busy: string | null;
+  act: (body: Record<string, unknown>, key: string) => void;
+}) {
+  const { t } = useI18n();
+  const [left, setLeft] = useState(state.roarIn);
+
+  useEffect(() => setLeft(state.roarIn), [state.roarIn]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setLeft((n) => Math.max(0, n - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const ready = left <= 0;
+  const share = 1 - left / state.roarCooldown;
+
+  return (
+    <button
+      type="button"
+      disabled={!ready || busy !== null}
+      onClick={() => act({ action: "roar" }, "roar")}
+      className="panel relative mt-3 w-full overflow-hidden py-2.5 text-[0.8rem] uppercase tracking-widest transition disabled:opacity-60"
+      style={{
+        borderColor: ready ? "rgba(240,193,75,0.6)" : undefined,
+        color: ready ? "var(--gold-bright)" : "var(--text-dim)",
+      }}
+    >
+      {/* The cooldown as a filling bar rather than a number alone: a button that
+          is nearly ready should look nearly ready. */}
+      <span
+        className="absolute inset-y-0 left-0"
+        style={{
+          width: `${share * 100}%`,
+          background: "rgba(201,162,77,0.14)",
+          transition: "width 1s linear",
+        }}
+      />
+      <span className="relative">
+        {ready ? t("idle.roar") : t("idle.roarIn", { s: Math.ceil(left) })}
+      </span>
+    </button>
   );
 }
 

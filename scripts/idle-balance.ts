@@ -19,12 +19,22 @@
  */
 import {
   UPGRADES,
+  RELICS,
   upgradeCost,
+  relicCost,
+  relicsForFloor,
   levelInfo,
   BASE_MAX_HP,
+  REBIRTH_MIN_FLOOR,
   type UpgradeKey,
 } from "../src/lib/content/idle";
-import { derive, scoreWith, simulate, type Upgrades } from "../src/lib/engine/idle";
+import {
+  derive,
+  scoreWith,
+  simulate,
+  type Relics,
+  type Upgrades,
+} from "../src/lib/engine/idle";
 
 interface Worn {
   slot: string;
@@ -53,6 +63,17 @@ let hp = BASE_MAX_HP;
 let recoverFor = 0;
 let defeats = 0;
 
+// --- Rebirth ---------------------------------------------------------------
+const relics: Relics = { memory: 0, tenacity: 0, greed: 0, luck: 0 };
+let relicBank = 0;
+let relicsEarned = 0;
+let rebirths = 0;
+/** Minutes since the record last moved. A stalled run is one worth spending. */
+let stalledFor = 0;
+// `npm run balance 48 norebirth` measures the same hours without the second arc,
+// which is the only way to know whether the second arc is worth having.
+const REBIRTH_AFTER_STALLED = process.argv[3] === "norebirth" ? Infinity : 45;
+
 const spent: Record<string, number> = {};
 const chosen: Record<string, number> = {};
 const firstBought: Record<string, number> = {};
@@ -69,14 +90,14 @@ const marks = new Map<number, number>();
 /** What one more level of this upgrade would multiply its own axis by. */
 function marginalGain(key: UpgradeKey): number {
   const trial: Upgrades = { ...upgrades, [key]: upgrades[key] + 1 };
-  const before = derive(items, upgrades);
-  const after = derive(items, trial);
+  const before = derive(items, upgrades, relics);
+  const after = derive(items, trial, relics);
   const def = UPGRADES.find((entry) => entry.key === key)!;
   return def.axis === "SURVIVAL" ? after.maxHp / before.maxHp : after.power / before.power;
 }
 
 for (let minute = 1; minute <= HOURS * 60; minute++) {
-  const stats = derive(items, upgrades);
+  const stats = derive(items, upgrades, relics);
   const result = simulate(MINUTE, { level, enemyHp, hp, recoverFor, highestLevel }, stats);
 
   level = result.level;
@@ -98,15 +119,15 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
       affixesJson: JSON.stringify(drop.affixes),
       equippedSlot: null,
     };
-    const now = derive(items, upgrades);
-    if (scoreWith(items, upgrades, candidate) > now.power * now.maxHp) {
+    const now = derive(items, upgrades, relics);
+    if (scoreWith(items, upgrades, candidate, relics) > now.power * now.maxHp) {
       items = items.filter((item) => item.equippedSlot !== drop.slot);
       items.push({ ...candidate, equippedSlot: drop.slot });
     }
   }
 
   for (let spree = 0; spree < 60; spree++) {
-    const now = derive(items, upgrades);
+    const now = derive(items, upgrades, relics);
     const info = levelInfo(level);
     const net = now.regen - info.enemyDamage;
     const timeToFall = net < 0 ? now.maxHp / -net : Number.POSITIVE_INFINITY;
@@ -139,16 +160,54 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   }
 
   const floor = levelInfo(highestLevel).floor;
-  if (!marks.has(floor)) marks.set(floor, minute);
+  if (marks.has(floor)) {
+    stalledFor += 1;
+  } else {
+    marks.set(floor, minute);
+    stalledFor = 0;
+  }
+
+  // A run that has not moved its record in forty-five minutes has given what it
+  // had. Spending it is the whole second arc.
+  const owed = Math.max(0, relicsForFloor(floor) - relicsEarned);
+  if (stalledFor >= REBIRTH_AFTER_STALLED && owed > 0 && floor >= REBIRTH_MIN_FLOOR) {
+    relicBank += owed;
+    relicsEarned += owed;
+    rebirths += 1;
+    stalledFor = 0;
+
+    level = 1;
+    enemyHp = levelInfo(1).enemyHp;
+    hp = 0;
+    recoverFor = 0;
+    gold = 0;
+    items = [];
+    for (const key of Object.keys(upgrades) as (keyof Upgrades)[]) upgrades[key] = 0;
+  }
+
+  // Relics are spent as soon as they are held: hoarding them helps nobody.
+  for (let spree = 0; spree < 40; spree++) {
+    const options = RELICS.filter((def) => {
+      if (def.maxLevel !== undefined && relics[def.key] >= def.maxLevel) return false;
+      return relicCost(def, relics[def.key]) <= relicBank;
+    }).sort((a, b) => relicCost(a, relics[a.key]) - relicCost(b, relics[b.key]));
+    if (options.length === 0) break;
+    relicBank -= relicCost(options[0], relics[options[0].key]);
+    relics[options[0].key] += 1;
+  }
 }
 
-const stats = derive(items, upgrades);
+const stats = derive(items, upgrades, relics);
 const here = levelInfo(level);
 const totalSpent = Object.values(spent).reduce((sum, value) => sum + value, 0);
 
 console.log(`après ${HOURS} h de jeu passif`);
 console.log(`  étage atteint      ${levelInfo(highestLevel).floor}`);
 console.log(`  défaites           ${defeats}`);
+console.log(`  renaissances       ${rebirths}`);
+console.log(
+  `  reliques           ${RELICS.map((def) => `${def.nameFr} ${relics[def.key]}`).join(" · ")}`,
+);
 console.log(`  dégâts par coup    ${stats.hitDamage.toExponential(2)}`);
 console.log(`  attaques / s       ${stats.attacksPerSecond.toFixed(2)}`);
 console.log(

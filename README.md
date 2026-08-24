@@ -570,6 +570,79 @@ Un détail qui ne se voit que quand il manque : le rapport d'un tick est renvoy�
 **chaque action** qui le suit, donc sans mémoire des identifiants déjà proposés,
 vendre une pièce ferait réapparaître les deux autres du même tick.
 
+### La Renaissance, ou pourquoi un idle a besoin d'un second arc
+
+Un joueur a plafonné la Chance Critique en deux jours. Ce n'est pas que les gains
+soient trop généreux — c'est qu'il n'y avait qu'un seul arc, et qu'un arc qui
+décélère finit toujours par ressembler à une fin.
+
+**Ralentir les gains a été écarté délibérément.** Le même contenu, plus lentement,
+ajoute de l'attente et pas de la profondeur : le joueur ferait exactement les mêmes
+choses en y passant plus de temps. C'est le seul levier qui coûte du plaisir sans
+rien rendre.
+
+Un chat a neuf vies. En dépenser une remet à zéro l'étage, l'or, les six
+améliorations et tout l'équipement ; elle rapporte des **reliques**, qui ne
+disparaissent jamais.
+
+**Les reliques sont dues sur le record de profondeur, et sur rien d'autre.** Payer
+par partie ferait de la renaissance à l'étage 15 une ferme, et une ferme est le
+contraire d'une raison de descendre. L'écran le dit, plutôt que de laisser le
+joueur le découvrir en étant déçu.
+
+#### Deux erreurs symétriques, toutes deux mesurées
+
+Le premier réglage donnait des reliques **polynomiales** en fonction de l'étage.
+Sur sept jours simulés, la Renaissance rapportait exactement **un étage** — parce
+que ce qu'une vie coûte croît de ×2,84 par étage pendant que ce qu'elle payait
+croissait comme un carré. C'est le même piège que les améliorations additives du
+début, sur un autre axe.
+
+Le correctif évident — reliques exponentielles **et** effet composé — a produit
+l'inverse : **étage 366 en 48 heures**. La raison est nette : des reliques en
+`1,55^étage` donnent un nombre de niveaux linéaire en l'étage, et un effet composé
+sur un compte linéaire achète une *fraction constante du record* à chaque vie —
+donc le record devient géométrique.
+
+La forme juste est **exponentielle dans ce qui est dû, additive dans ce que ça
+fait**. Les reliques suivent `1,55^étage`, largement sous les 2,84 de la difficulté ;
+leur effet est `1 + 0,15 × n` et non `1,15^n`. Chaque vie achète une avance qui
+grandit lentement et ne devient jamais la partie entière.
+
+Mesuré, joueur naïf qui renaît après quarante-cinq minutes sans nouveau record :
+
+| | 48 h | 7 jours |
+| --- | --- | --- |
+| sans Renaissance | étage 41 | étage 46 |
+| avec | **étage 50** | **étage 55** |
+
+`npm run balance 168 norebirth` rejoue les mêmes heures sans le second arc, parce
+que c'est la seule façon de savoir si le second arc mérite d'exister.
+
+### Deux choses à faire avec ses mains
+
+**Taper l'ennemi.** Chaque tape vaut deux coups ordinaires. Énorme dans les
+premières minutes, quand le chat frappe une fois par seconde ; négligeable quand il
+en est à vingt — ce qui est la bonne forme. Ça donne une raison d'ouvrir
+l'application sans jamais devenir la raison de la garder ouverte, et ça ne peut pas
+dépasser la courbe idle parce que c'est plafonné par la vitesse d'un pouce.
+
+Les tapes sont **groupées** : une requête par tape ferait plusieurs appels par
+seconde pour un seul doigt, un envoi toutes les demi-secondes fait les mêmes dégâts
+pour une fraction du trafic. Le compte envoyé est une *prétention*, pas un fait —
+le serveur le rogne au temps écoulé depuis la dernière tape, donc un script ne
+gagne rien qu'un pouce rapide n'obtiendrait.
+
+**Le Rugissement.** Une minute des dégâts du chat, d'un coup, toutes les trois
+minutes. Une part de la production courante plutôt qu'un nombre fixe, pour qu'il
+reste digne d'être pressé à n'importe quelle profondeur sans jamais être ce qui
+libère un étage à lui seul.
+
+Ni l'un ni l'autre ne tue quoi que ce soit directement : ils **blessent** l'ennemi
+et laissent le tick suivant l'achever. Faire mourir l'ennemi ici demanderait une
+seconde copie de la logique de récompense — or, deux copies d'un chemin de
+récompense, c'est ainsi qu'un jeu finit par payer deux fois.
+
 ### Le sac
 
 Un onglet à part, parce que trier n'est pas se battre — et le combat continue côté

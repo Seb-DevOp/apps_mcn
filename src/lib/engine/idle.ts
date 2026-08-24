@@ -29,7 +29,17 @@ import {
   AFFIX_SLOTS,
   affixValue,
   parseAffixes,
+  RELICS,
+  RELIC_BY_KEY,
+  relicCost,
+  relicsForFloor,
+  REBIRTH_MIN_FLOOR,
+  STRIKE_DAMAGE_MULTIPLIER,
+  MAX_STRIKES_PER_SECOND,
+  ROAR_COOLDOWN_SECONDS,
+  ROAR_DAMAGE_SECONDS,
   type Affix,
+  type RelicKey,
   type Slot,
   type Rarity,
 } from "@/lib/content/idle";
@@ -65,6 +75,25 @@ export interface Upgrades {
   critDamage: number;
   double: number;
 }
+
+export type Relics = Record<RelicKey, number>;
+
+/** Permanent bonuses. Same shape as the gold upgrades, different lifetime. */
+export function parseRelics(json: string): Relics {
+  const base: Relics = { memory: 0, tenacity: 0, greed: 0, luck: 0 };
+  try {
+    const parsed = JSON.parse(json) as Partial<Relics>;
+    for (const key of Object.keys(base) as RelicKey[]) {
+      const value = Number(parsed[key]);
+      if (Number.isFinite(value) && value > 0) base[key] = Math.floor(value);
+    }
+  } catch {
+    // A corrupt blob costs the player their relics' effect, not their session.
+  }
+  return base;
+}
+
+const NO_RELICS: Relics = { memory: 0, tenacity: 0, greed: 0, luck: 0 };
 
 export interface DerivedStats {
   /** Damage of one ordinary blow. */
@@ -120,7 +149,11 @@ export function parseUpgrades(json: string): Upgrades {
  * looked small early keeps mattering later, which is what keeps a long game from
  * flattening out.
  */
-export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
+export function derive(
+  items: ItemRow[],
+  upgrades: Upgrades,
+  relics: Relics = NO_RELICS,
+): DerivedStats {
   const worn = items.filter((item) => item.equippedSlot);
   const level = (key: keyof Upgrades) => upgrades[key];
   const per = (key: keyof Upgrades) => UPGRADE_BY_KEY[key].perLevel;
@@ -136,10 +169,25 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
   // that only added would be worthless by floor ten, and one that only multiplied
   // would make found gear pointless — both together is what keeps looting and
   // spending worth doing at the same time.
+  /**
+   * Relics multiply on top of everything else and survive the rebirth that wipes
+   * the rest. They are the only thing in the game that does.
+   *
+   * Their effect **adds** with the count, where every other multiplier in the
+   * game compounds — and that inversion is deliberate. Relics owed grow
+   * exponentially with the record floor, so the number of levels a player can
+   * afford grows linearly with it; compounding on top of that would buy a fixed
+   * *fraction* of the record every life, which makes the record itself geometric.
+   * Measured, that ran to floor 366 in two days. Adding instead buys a head start
+   * that grows slowly and never becomes the whole game.
+   */
+  const relic = (key: RelicKey) => 1 + relics[key] * RELIC_BY_KEY[key].perLevel;
+
   const hitDamage =
     (BASE_ATTACK_DAMAGE + worn.reduce((sum, item) => sum + item.power, 0)) *
     Math.pow(1 + per("attack"), level("attack")) *
-    (1 + bonus("attack"));
+    (1 + bonus("attack")) *
+    relic("memory");
 
   const attacksPerSecond =
     BASE_ATTACK_SPEED * Math.pow(1 + per("speed"), level("speed")) * (1 + bonus("speed"));
@@ -178,15 +226,21 @@ export function derive(items: ItemRow[], upgrades: Upgrades): DerivedStats {
   const maxHp =
     (BASE_MAX_HP + worn.reduce((sum, item) => sum + item.vitality, 0)) *
     Math.pow(1 + per("health"), level("health")) *
-    (1 + bonus("health"));
+    (1 + bonus("health")) *
+    relic("tenacity");
 
   // Healing is deliberately not purchasable. Bought without limit it eventually
   // exceeds any damage at any depth, and an immortal cat has no losing condition
   // left to play against.
   const regen = maxHp * BASE_REGEN_SHARE;
 
-  const goldMultiplier = 1 + worn.reduce((sum, item) => sum + item.goldBonus, 0);
-  const dropChance = BASE_DROP_CHANCE;
+  const goldMultiplier =
+    (1 + worn.reduce((sum, item) => sum + item.goldBonus, 0)) * relic("greed");
+
+  const dropChance = Math.min(
+    0.75,
+    BASE_DROP_CHANCE + relics.luck * RELIC_BY_KEY.luck.perLevel,
+  );
 
   return {
     hitDamage,
@@ -222,10 +276,17 @@ export function combatScore(stats: DerivedStats): number {
  * numbers: with bonuses in play a weaker piece carrying +20% health can easily
  * beat a stronger plain one, and only the full derivation knows that.
  */
-export function scoreWith(items: ItemRow[], upgrades: Upgrades, candidate: ItemRow): number {
+export function scoreWith(
+  items: ItemRow[],
+  upgrades: Upgrades,
+  candidate: ItemRow,
+  relics: Relics = NO_RELICS,
+): number {
   // Everything else the cat is wearing, minus whatever occupies this slot today.
   const rest = items.filter((item) => item.equippedSlot && item.slot !== candidate.slot);
-  return combatScore(derive([...rest, { ...candidate, equippedSlot: candidate.slot }], upgrades));
+  return combatScore(
+    derive([...rest, { ...candidate, equippedSlot: candidate.slot }], upgrades, relics),
+  );
 }
 
 export interface Drop {
@@ -487,7 +548,8 @@ export async function getIdleState(userId: string) {
       };
     }
 
-    const stats = derive(items, upgrades);
+    const relics = parseRelics(profile.relicsJson);
+    const stats = derive(items, upgrades, relics);
     const result = simulate(
       seconds,
       {
@@ -571,12 +633,18 @@ function view(
     kills: number;
     bossKills: number;
     upgradesJson: string;
+    relics: number;
+    relicsEarned: number;
+    rebirths: number;
+    relicsJson: string;
+    lastRoarAt: Date;
   },
   items: (ItemRow & { id: string; floor: number; rarity: string; shape: string; foundAt: Date })[],
   report: TickReport,
 ) {
   const upgrades = parseUpgrades(profile.upgradesJson);
-  const stats = derive(items, upgrades);
+  const relics = parseRelics(profile.relicsJson);
+  const stats = derive(items, upgrades, relics);
   const info = levelInfo(profile.level);
   const enemyHp = profile.enemyHp > 0 ? profile.enemyHp : info.enemyHp;
   const hp = Math.min(stats.maxHp, profile.hp > 0 ? profile.hp : stats.maxHp);
@@ -614,6 +682,42 @@ function view(
         : secondsToKill > 90
           ? ("SLOW" as const)
           : ("WINNING" as const),
+    /** Rebirth: what a life is worth, and whether one can be spent yet. */
+    rebirth: (() => {
+      const bestFloor = levelInfo(profile.highestLevel).floor;
+      const owed = Math.max(0, relicsForFloor(bestFloor) - profile.relicsEarned);
+      return {
+        relics: profile.relics,
+        earned: profile.relicsEarned,
+        rebirths: profile.rebirths,
+        bestFloor,
+        minFloor: REBIRTH_MIN_FLOOR,
+        /** Granted the moment a life is spent — zero until a record is beaten. */
+        owed,
+        ready: bestFloor >= REBIRTH_MIN_FLOOR,
+      };
+    })(),
+
+    relicShop: RELICS.map((def) => ({
+      key: def.key,
+      level: relics[def.key],
+      cost: relicCost(def, relics[def.key]),
+      maxed: def.maxLevel !== undefined && relics[def.key] >= def.maxLevel,
+      affordable: profile.relics >= relicCost(def, relics[def.key]),
+      nameEn: def.nameEn,
+      nameFr: def.nameFr,
+      descEn: def.descEn,
+      descFr: def.descFr,
+      icon: def.icon,
+    })),
+
+    /** Seconds left on the Roar, so the button can show a ring rather than a lie. */
+    roarIn: Math.max(
+      0,
+      ROAR_COOLDOWN_SECONDS - (Date.now() - profile.lastRoarAt.getTime()) / 1000,
+    ),
+    roarCooldown: ROAR_COOLDOWN_SECONDS,
+
     upgrades: UPGRADES.map((def) => ({
       key: def.key,
       level: upgrades[def.key as keyof Upgrades],
@@ -638,7 +742,7 @@ function view(
       affixes: parseAffixes(item.affixesJson),
       // What wearing it would multiply the cat by. Above one is an upgrade, and
       // the screen can say so without the player doing the arithmetic.
-      gain: item.equippedSlot ? 1 : scoreWith(items, upgrades, item) / baseline,
+      gain: item.equippedSlot ? 1 : scoreWith(items, upgrades, item, relics) / baseline,
       equipped: Boolean(item.equippedSlot),
     })),
     report,
@@ -804,5 +908,139 @@ export async function sellAllSpares(userId: string) {
     await tx.idleItem.deleteMany({ where: { userId, equippedSlot: null } });
     await tx.idleProfile.update({ where: { userId }, data: { gold: { increment: value } } });
     return { ok: true as const, gold: value, sold: spares.length };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Rebirth, and the two things a player does with their hands
+// ---------------------------------------------------------------------------
+
+/**
+ * Spends a life.
+ *
+ * Level, gold, gold upgrades and every piece of equipment go. Relics, the relics
+ * already spent, and the record depth stay — the record because relics are owed
+ * on it, so wiping it would let the same floor be sold twice.
+ *
+ * Relics are granted for beating the record and for nothing else. Paying per run
+ * would make rebirthing at floor fifteen a farm, and a farm is the opposite of a
+ * reason to go deeper.
+ */
+export async function rebirth(userId: string) {
+  // Settle the clock first: the last seconds before a rebirth might be the ones
+  // that set the record it pays for.
+  await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    const bestFloor = levelInfo(profile.highestLevel).floor;
+
+    if (bestFloor < REBIRTH_MIN_FLOOR) {
+      return { ok: false as const, error: "TOO_SHALLOW" as const };
+    }
+
+    const owed = Math.max(0, relicsForFloor(bestFloor) - profile.relicsEarned);
+
+    await tx.idleItem.deleteMany({ where: { userId } });
+    await tx.idleProfile.update({
+      where: { userId },
+      data: {
+        level: 1,
+        enemyHp: levelInfo(1).enemyHp,
+        hp: 0,
+        recoverFor: 0,
+        gold: 0,
+        upgradesJson: "{}",
+        relics: profile.relics + owed,
+        relicsEarned: profile.relicsEarned + owed,
+        rebirths: profile.rebirths + 1,
+        lastTickAt: new Date(),
+      },
+    });
+
+    await track("idle.rebirth", userId, { floor: bestFloor, relics: owed });
+    return { ok: true as const, relics: owed, floor: bestFloor };
+  });
+}
+
+/** Spends relics on something that outlives every future rebirth. */
+export async function buyRelic(userId: string, key: string) {
+  const def = RELIC_BY_KEY[key];
+  if (!def) return { ok: false as const, error: "UNKNOWN_UPGRADE" as const };
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    const relics = parseRelics(profile.relicsJson);
+    const level = relics[key as RelicKey];
+
+    if (def.maxLevel !== undefined && level >= def.maxLevel) {
+      return { ok: false as const, error: "MAXED" as const };
+    }
+    const cost = relicCost(def, level);
+    if (profile.relics < cost) return { ok: false as const, error: "NOT_ENOUGH_RELICS" as const };
+
+    relics[key as RelicKey] = level + 1;
+    await tx.idleProfile.update({
+      where: { userId },
+      data: { relics: profile.relics - cost, relicsJson: JSON.stringify(relics) },
+    });
+    return { ok: true as const, level: level + 1 };
+  });
+}
+
+/**
+ * Taps. The enemy takes them; the kill itself is left to the next tick.
+ *
+ * Wounding the enemy and letting `simulate` finish it keeps every reward — gold,
+ * the level, the drop, the Guardian's heal — flowing through the one path that
+ * grants them. Resolving the kill here would mean a second copy of that logic,
+ * and two copies of a reward path is how a game ends up paying twice.
+ *
+ * The count is clamped by the time since the last tap, so a script gains nothing
+ * a fast thumb would not.
+ */
+export async function strike(userId: string, count: number) {
+  const state = await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    const now = new Date();
+    const elapsed = Math.max(0, (now.getTime() - profile.lastStrikeAt.getTime()) / 1000);
+    const allowed = Math.floor(Math.min(count, elapsed * MAX_STRIKES_PER_SECOND + 1));
+    if (allowed <= 0) return { ok: true as const, damage: 0, landed: 0 };
+
+    const damage = state.stats.hitDamage * STRIKE_DAMAGE_MULTIPLIER * allowed;
+    await tx.idleProfile.update({
+      where: { userId },
+      data: {
+        enemyHp: Math.max(0.0001, profile.enemyHp - damage),
+        lastStrikeAt: now,
+      },
+    });
+    return { ok: true as const, damage, landed: allowed };
+  });
+}
+
+/** The Roar: one minute of the cat's own damage, at once, every three minutes. */
+export async function roar(userId: string) {
+  const state = await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    const now = new Date();
+    const since = (now.getTime() - profile.lastRoarAt.getTime()) / 1000;
+    if (since < ROAR_COOLDOWN_SECONDS) {
+      return { ok: false as const, error: "COOLING_DOWN" as const };
+    }
+
+    const damage = state.stats.power * ROAR_DAMAGE_SECONDS;
+    await tx.idleProfile.update({
+      where: { userId },
+      data: {
+        enemyHp: Math.max(0.0001, profile.enemyHp - damage),
+        lastRoarAt: now,
+      },
+    });
+    return { ok: true as const, damage };
   });
 }

@@ -192,5 +192,22 @@
   "loot.equipped": "Worn — the slot was empty",
   "loot.keep": "Keep",
   "loot.worse": "weaker",
-  "loot.marginal": "a shade better"
+  "loot.marginal": "a shade better",
+  "idle.tabRebirth": "Rebirth",
+  "idle.roar": "Roar",
+  "idle.roarIn": "Roar in {s}s",
+  "rebirth.relics": "Relics",
+  "rebirth.livesSpent": "{n} lives spent",
+  "rebirth.intro": "Spend the run and start over. Level, gold, upgrades and equipment go; relics stay, and so does the record they are paid on.",
+  "rebirth.record": "Deepest floor",
+  "rebirth.owed": "Relics owed",
+  "rebirth.tooShallow": "The Vault owes nothing above floor {n}. Go deeper first.",
+  "rebirth.noRecord": "Relics are paid on record depth only, and this record is already paid. Beat it to be owed more.",
+  "rebirth.spend": "Spend this life · {n} relics",
+  "rebirth.confirm": "Yes, take the {n}",
+  "rebirth.warning": "The floor, the gold, every upgrade and every piece worn or spare. All of it, now.",
+  "rebirth.shop": "What outlives a life",
+  "rebirth.shopHint": "Bought once, kept through every rebirth after.",
+  "rebirth.cost": "{n} relics",
+  "common.cancel": "Cancel"
 }

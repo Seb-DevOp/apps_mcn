@@ -638,3 +638,142 @@ export function parseAffixes(json: string): Affix[] {
     return [];
   }
 }
+
+// ---------------------------------------------------------------------------
+// Rebirth: the second arc
+// ---------------------------------------------------------------------------
+
+/**
+ * A cat has nine lives, and the Vault takes them one at a time.
+ *
+ * The first arc decelerates by design — each floor costs more than the last —
+ * which is what makes an idle game last, and also what eventually turns a wall
+ * into an ending. Rebirth turns that wall into a decision instead: spend the run,
+ * keep what it taught you, and start again stronger.
+ *
+ * Relics are granted on **record depth only**. Granting them per run would make
+ * rebirthing at the shallowest allowed floor a farm, and a farm is the opposite
+ * of a reason to push.
+ */
+export const REBIRTH_MIN_FLOOR = 15;
+
+/**
+ * Relics owed for a record depth.
+ *
+ * Exponential in the floor, and it has to be. A polynomial reward against an
+ * exponential difficulty is the same mistake the additive upgrades made at the
+ * start: measured over a week it left rebirth worth exactly one floor, because
+ * what a life costs grows 2.84x per floor while what it paid grew like a square.
+ *
+ * 1.55 per floor stays comfortably under that 2.84, so relics shorten the climb
+ * back without ever outrunning the Vault — each life is worth more than the last,
+ * and none of them is worth the whole game.
+ */
+export function relicsForFloor(floor: number): number {
+  if (floor < REBIRTH_MIN_FLOOR) return 0;
+  return Math.floor(Math.pow(1.55, floor - REBIRTH_MIN_FLOOR + 1));
+}
+
+export type RelicKey = "memory" | "tenacity" | "greed" | "luck";
+
+export interface RelicDef {
+  key: RelicKey;
+  nameEn: string;
+  nameFr: string;
+  descEn: string;
+  descFr: string;
+  baseCost: number;
+  costGrowth: number;
+  perLevel: number;
+  maxLevel?: number;
+  icon: string;
+}
+
+/**
+ * What a life is worth once it is over.
+ *
+ * These survive every rebirth, which is the whole point: the gold upgrades reset
+ * so there is something to spend gold on again, and these are what makes the next
+ * run faster than the last.
+ */
+export const RELICS: RelicDef[] = [
+  {
+    key: "memory",
+    nameEn: "Memory",
+    nameFr: "Mémoire",
+    descEn: "+15% damage per relic. Everything the cat learned about hitting.",
+    descFr: "+15 % de dégâts par relique. Tout ce que le chat a appris à frapper.",
+    baseCost: 1,
+    costGrowth: 1.35,
+    perLevel: 0.15,
+    icon: "core",
+  },
+  {
+    key: "tenacity",
+    nameEn: "Tenacity",
+    nameFr: "Ténacité",
+    descEn: "+15% health per relic. Everything it learned about not dying.",
+    descFr: "+15 % de vie par relique. Tout ce qu'il a appris à ne pas mourir.",
+    baseCost: 1,
+    costGrowth: 1.35,
+    perLevel: 0.15,
+    icon: "velvet",
+  },
+  {
+    key: "greed",
+    nameEn: "Greed",
+    nameFr: "Avidité",
+    descEn: "+25% gold per relic. The run pays for its own upgrades sooner.",
+    descFr: "+25 % d'or par relique. La partie finance ses améliorations plus tôt.",
+    baseCost: 2,
+    costGrowth: 1.4,
+    perLevel: 0.25,
+    icon: "gold",
+  },
+  {
+    key: "luck",
+    nameEn: "Fortune",
+    nameFr: "Chance",
+    descEn: "+3% chance a fallen enemy leaves something. Stops at three in four.",
+    descFr: "+3 % de chance qu'un ennemi vaincu laisse quelque chose. S'arrête à trois sur quatre.",
+    baseCost: 3,
+    costGrowth: 1.4,
+    perLevel: 0.03,
+    maxLevel: 21,
+    icon: "key",
+  },
+];
+
+export const RELIC_BY_KEY: Record<string, RelicDef> = Object.fromEntries(
+  RELICS.map((relic) => [relic.key, relic]),
+);
+
+export function relicCost(def: RelicDef, level: number): number {
+  return Math.ceil(def.baseCost * Math.pow(def.costGrowth, level));
+}
+
+// ---------------------------------------------------------------------------
+// The two things a player can do with their hands
+// ---------------------------------------------------------------------------
+
+/**
+ * Tapping the enemy hurts it.
+ *
+ * Worth a great deal in the first minutes, when the cat swings once a second,
+ * and almost nothing by the time it swings twenty times — which is the right
+ * shape. It gives a reason to open the app without ever becoming the reason to
+ * keep it open, and it cannot outrun the idle curve because it is capped by how
+ * fast a thumb moves.
+ */
+export const STRIKE_DAMAGE_MULTIPLIER = 2;
+/** The server clamps to this, so a script gains nothing a fast tapper would not. */
+export const MAX_STRIKES_PER_SECOND = 8;
+
+/**
+ * The Roar: one minute of the cat's own damage, delivered at once.
+ *
+ * A share of current output rather than a fixed number, so it stays meaningful at
+ * every depth without ever being the thing that clears a floor on its own.
+ */
+export const ROAR_COOLDOWN_SECONDS = 180;
+export const ROAR_DAMAGE_SECONDS = 60;

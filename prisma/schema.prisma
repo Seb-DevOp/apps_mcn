@@ -116,8 +116,26 @@ model IdleProfile {
   kills     Int @default(0)
   bossKills Int @default(0)
 
-  /// { claws: 3, fervour: 1, ... } — keys come from UPGRADES in content/idle.
+  /// { attack: 3, health: 1, ... } — keys come from UPGRADES in content/idle.
+  /// Reset by a rebirth: gold has to have something to buy again.
   upgradesJson String @default("{}")
+
+  /// --- Rebirth: what survives a life ---------------------------------
+  /// Unspent relics, and the total ever granted. The total is what stops
+  /// rebirthing at the shallowest allowed floor from being a farm: relics are
+  /// owed on record depth, so only going deeper than ever before pays.
+  /// Floats, like gold: relics are exponential in the record floor and pass a
+  /// 32-bit integer somewhere around floor sixty-four, which is reachable.
+  relics        Float  @default(0)
+  relicsEarned  Float  @default(0)
+  rebirths      Int    @default(0)
+  /// { memory: 4, tenacity: 2, ... } — permanent, never reset.
+  relicsJson    String @default("{}")
+
+  /// --- The two things a player does with their hands ------------------
+  /// Both clamped server-side: taps by elapsed time, the Roar by its cooldown.
+  lastStrikeAt DateTime @default(now())
+  lastRoarAt   DateTime @default(now())
 
   lastTickAt DateTime @default(now())
   createdAt  DateTime @default(now())

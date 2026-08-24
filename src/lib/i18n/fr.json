@@ -192,5 +192,22 @@
   "loot.equipped": "Équipé — l'emplacement était vide",
   "loot.keep": "Garder",
   "loot.worse": "moins bon",
-  "loot.marginal": "à peine mieux"
+  "loot.marginal": "à peine mieux",
+  "idle.tabRebirth": "Renaissance",
+  "idle.roar": "Rugissement",
+  "idle.roarIn": "Rugissement dans {s}s",
+  "rebirth.relics": "Reliques",
+  "rebirth.livesSpent": "{n} vies dépensées",
+  "rebirth.intro": "Dépense la partie et recommence. Niveau, or, améliorations et équipement partent ; les reliques restent, et le record sur lequel elles sont dues aussi.",
+  "rebirth.record": "Étage record",
+  "rebirth.owed": "Reliques dues",
+  "rebirth.tooShallow": "Le Vault ne doit rien avant l'étage {n}. Descends d'abord.",
+  "rebirth.noRecord": "Les reliques sont dues sur le record de profondeur, et ce record est déjà payé. Bats-le pour qu'il en doive d'autres.",
+  "rebirth.spend": "Dépenser cette vie · {n} reliques",
+  "rebirth.confirm": "Oui, prends les {n}",
+  "rebirth.warning": "L'étage, l'or, chaque amélioration et chaque pièce portée ou en réserve. Tout, maintenant.",
+  "rebirth.shop": "Ce qui survit à une vie",
+  "rebirth.shopHint": "Acheté une fois, gardé à travers toutes les renaissances suivantes.",
+  "rebirth.cost": "{n} reliques",
+  "common.cancel": "Annuler"
 }
