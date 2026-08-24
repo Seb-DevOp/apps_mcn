@@ -738,6 +738,37 @@ phase avec le premier chaque fois qu'une pièce d'armure bouge. Et la vignette d
 boutique est **le chat lui-même** — une pastille de couleur ne montrerait pas ce
 qu'une robe fait à la collerette, aux oreilles et aux yeux.
 
+### Cinq classements, parce qu'il y a deux façons d'être profond
+
+Depuis la Renaissance, « profond » veut dire deux choses différentes.
+
+**Profondeur** est l'étage le plus bas qu'une seule vie ait atteint. **Distance**
+est le nombre d'étages parcourus sur *toutes* les vies. Le premier récompense une
+partie unique poussée très loin, le second une douzaine de vies dépensées — et ne
+classer que le record aurait rendu chaque vie après la première invisible.
+
+Mesuré sur des profils volontairement contrastés : un chat à l'étage 41 en une
+seule vie finit **dernier** en Distance, pendant qu'un chat qui n'a jamais dépassé
+l'étage 23 mais a dépensé neuf vies finit **premier**. Les deux tables classent
+réellement des joueurs différents.
+
+S'y ajoutent **Renaissances** (les vies dépensées — chacune était un record battu,
+sinon elle n'aurait rien valu), **Gardiens** et **Fortune**.
+
+Chaque ligne porte l'étage record et le nombre de vies sous son chiffre principal,
+quel que soit le classement : le nombre de tête seul ne dit rien du genre de joueur
+qui l'a produit.
+
+Deux détails de langue que seul l'écran révèle. `étage 700` et `700 étages` sont
+deux affirmations différentes — l'une est un lieu, l'autre une distance — et la
+Distance réutilisait la formule de la Profondeur. Et `1 vies` : les deux compteurs
+ont maintenant leur forme au singulier.
+
+Le cumul vit dans `totalLevels`, incrémenté à chaque salle franchie et **jamais
+remis à zéro par une renaissance**. C'est le seul nombre qui dise combien de Vault
+un chat a réellement parcouru, là où le record ne dit que jusqu'où il est descendu
+une fois.
+
 ### Le sac
 
 Un onglet à part, parce que trier n'est pas se battre — et le combat continue côté

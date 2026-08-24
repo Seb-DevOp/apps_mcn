@@ -8,14 +8,17 @@ import { formatNumber } from "./format";
 import { TrophyIcon } from "./ui/Icons";
 
 /**
- * Three boards, deliberately.
+ * Five boards, deliberately.
  *
- * Depth rewards whoever pushed furthest, Guardians reward whoever kept beating
- * the thing at the end of each floor, and fortune rewards whoever kept going
- * longest. No single number decides who counts.
+ * Since rebirth there are two different ways to be deep: Depth is the furthest
+ * one life ever got, Distance is how much Vault has been walked across all of
+ * them. One rewards a single enormous run, the other a dozen spent lives, and
+ * ranking only the record would have made every life after the first invisible.
  */
 const BOARDS: { key: BoardKey; labelKey: string }[] = [
   { key: "depth", labelKey: "leaderboard.depth" },
+  { key: "distance", labelKey: "leaderboard.distance" },
+  { key: "lives", labelKey: "leaderboard.lives" },
   { key: "guardians", labelKey: "leaderboard.guardians" },
   { key: "fortune", labelKey: "leaderboard.fortune" },
 ];
@@ -47,13 +50,15 @@ export function Leaderboards() {
         <h1 className="display gold-text mt-0.5 text-2xl">{t("leaderboard.title")}</h1>
       </header>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      {/* A scrolling row rather than a grid: five labels wrapped onto two lines
+          made the tabs look like content. */}
+      <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
         {BOARDS.map((entry) => (
           <button
             key={entry.key}
             type="button"
             onClick={() => setBoard(entry.key)}
-            className="panel py-2 text-[0.7rem] uppercase tracking-widest transition"
+            className="panel shrink-0 whitespace-nowrap px-3 py-2 text-[0.7rem] uppercase tracking-widest transition"
             style={{
               borderColor: board === entry.key ? "rgba(201,162,77,0.6)" : undefined,
               color: board === entry.key ? "var(--gold-bright)" : "var(--text-dim)",
@@ -133,15 +138,26 @@ function Row({ row, board, index }: { row: BoardRow; board: BoardKey; index: num
 
       <span className="text-right">
         <span className="tabular gold-text block text-[0.85rem]">
+          {/* "floor 700" and "700 floors" are different claims: one is a place,
+              the other a distance. */}
           {board === "depth"
-            ? t("leaderboard.floorValue", { n: row.value })
-            : formatNumber(row.value)}
+            ? t("leaderboard.floorValue", { n: formatNumber(row.value) })
+            : board === "distance"
+              ? t("leaderboard.distanceValue", { n: formatNumber(row.value) })
+              : board === "lives"
+                ? t(row.value === 1 ? "leaderboard.lifeValue" : "leaderboard.livesValue", {
+                    n: row.value,
+                  })
+                : formatNumber(row.value)}
         </span>
-        {board !== "depth" && (
-          <span className="dim tabular block text-[0.62rem]">
-            {t("leaderboard.floorValue", { n: row.floor })}
-          </span>
-        )}
+        {/* Depth and lives under every board: the headline number alone says
+            nothing about what kind of player produced it. */}
+        <span className="dim tabular block text-[0.6rem]">
+          {t(row.lives === 1 ? "leaderboard.contextOne" : "leaderboard.context", {
+            floor: row.floor,
+            lives: row.lives,
+          })}
+        </span>
       </span>
     </motion.div>
   );

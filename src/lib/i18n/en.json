@@ -237,5 +237,14 @@
   "shop.coats": "Coats",
   "shop.coatsHint": "Colour only, and kept through every rebirth. Each is about ten times the last.",
   "shop.worn": "worn",
-  "shop.wear": "wear"
+  "shop.wear": "wear",
+  "leaderboard.distance": "Distance",
+  "leaderboard.lives": "Lives",
+  "leaderboard.distance.hint": "Floors walked across every life. Rewards persistence, not one lucky run.",
+  "leaderboard.lives.hint": "Lives spent. Every one of them was a record beaten to be worth spending.",
+  "leaderboard.livesValue": "{n} lives",
+  "leaderboard.context": "floor {floor} · {lives} lives",
+  "leaderboard.distanceValue": "{n} floors",
+  "leaderboard.lifeValue": "1 life",
+  "leaderboard.contextOne": "floor {floor} · 1 life"
 }

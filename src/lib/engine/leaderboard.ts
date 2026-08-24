@@ -1,30 +1,32 @@
 import { prisma } from "@/lib/db";
-import { levelInfo } from "@/lib/content/idle";
+import { levelInfo, LEVELS_PER_FLOOR } from "@/lib/content/idle";
 
 /**
- * Three boards, on purpose.
+ * Five boards, on purpose.
  *
- * No single ranking should decide who matters. The deepest board belongs to
- * whoever pushed furthest, the Guardians board to whoever kept beating the thing
- * at the end of each floor, and the fortune board to whoever kept going longest.
- * Everyone has a table they can be good at.
+ * No single ranking should decide who matters, and since rebirth arrived there
+ * are two genuinely different ways to be deep. **Depth** is the furthest a cat
+ * ever got in one life; **Distance** is how much Vault it has walked across all
+ * of them. A player who pushes one enormous run tops the first; one who has spent
+ * a dozen lives tops the second. Reporting only the record would have made every
+ * life after the first invisible.
  *
- * All three read the idle profile and nothing else: the old ladders ranked XP and
- * streaks, which no longer exist to be ranked.
+ * All five read the idle profile and nothing else.
  */
 
-export type BoardKey = "depth" | "guardians" | "fortune";
+export type BoardKey = "depth" | "distance" | "lives" | "guardians" | "fortune";
 
-export const BOARDS: BoardKey[] = ["depth", "guardians", "fortune"];
+export const BOARDS: BoardKey[] = ["depth", "distance", "lives", "guardians", "fortune"];
 
 export interface BoardRow {
   position: number;
   userId: string;
   handle: string;
-  /** The headline number for this board. */
+  /** The headline number for this board, already in the unit it is displayed in. */
   value: number;
-  /** Deepest floor, shown on every board as the common yardstick. */
+  /** Deepest floor and lives spent, shown on every board as common context. */
   floor: number;
+  lives: number;
   isViewer: boolean;
 }
 
@@ -38,20 +40,63 @@ export interface BoardResult {
 
 const LIMIT = 25;
 
-const ORDER: Record<BoardKey, "highestLevel" | "bossKills" | "totalGold"> = {
+type Field = "highestLevel" | "totalLevels" | "rebirths" | "bossKills" | "totalGold";
+
+const ORDER: Record<BoardKey, Field> = {
   depth: "highestLevel",
+  distance: "totalLevels",
+  lives: "rebirths",
   guardians: "bossKills",
   fortune: "totalGold",
 };
 
+/** The smallest value worth ranking. Below it a player has not started. */
+const FLOOR: Record<BoardKey, number> = {
+  depth: 1,
+  distance: 0,
+  lives: 0,
+  guardians: 0,
+  fortune: 0,
+};
+
+interface ProfileShape {
+  userId: string;
+  highestLevel: number;
+  totalLevels: number;
+  rebirths: number;
+  bossKills: number;
+  totalGold: number;
+  user: { handle: string };
+}
+
+const SELECT = {
+  userId: true,
+  highestLevel: true,
+  totalLevels: true,
+  rebirths: true,
+  bossKills: true,
+  totalGold: true,
+  user: { select: { handle: true } },
+} as const;
+
+function valueFor(profile: ProfileShape, board: BoardKey): number {
+  switch (board) {
+    case "depth":
+      return levelInfo(profile.highestLevel).floor;
+    // Chambers are what the engine counts; floors are what a player reads.
+    case "distance":
+      return Math.floor(profile.totalLevels / LEVELS_PER_FLOOR);
+    case "lives":
+      return profile.rebirths;
+    case "guardians":
+      return profile.bossKills;
+    case "fortune":
+      return Math.floor(profile.totalGold);
+  }
+}
+
 function toRow(
-  profile: {
-    userId: string;
-    highestLevel: number;
-    bossKills: number;
-    totalGold: number;
-    user: { handle: string };
-  },
+  profile: ProfileShape,
   board: BoardKey,
   position: number,
   viewerId: string | null,
@@ -60,20 +105,16 @@ function toRow(
     position,
     userId: profile.userId,
     handle: profile.user.handle,
-    value:
-      board === "depth"
-        ? levelInfo(profile.highestLevel).floor
-        : board === "guardians"
-          ? profile.bossKills
-          : Math.floor(profile.totalGold),
+    value: valueFor(profile, board),
     floor: levelInfo(profile.highestLevel).floor,
+    lives: profile.rebirths,
     isViewer: profile.userId === viewerId,
   };
 }
 
 export async function getBoard(board: BoardKey, viewerId: string | null): Promise<BoardResult> {
   const field = ORDER[board];
-  const where = { [field]: { gt: board === "depth" ? 1 : 0 } };
+  const where = { [field]: { gt: FLOOR[board] } };
 
   const [profiles, total] = await Promise.all([
     prisma.idleProfile.findMany({
@@ -81,13 +122,7 @@ export async function getBoard(board: BoardKey, viewerId: string | null): Promis
       // createdAt breaks ties: whoever got there first keeps the higher place.
       orderBy: [{ [field]: "desc" }, { createdAt: "asc" }],
       take: LIMIT,
-      select: {
-        userId: true,
-        highestLevel: true,
-        bossKills: true,
-        totalGold: true,
-        user: { select: { handle: true } },
-      },
+      select: SELECT,
     }),
     prisma.idleProfile.count({ where }),
   ]);
@@ -113,19 +148,13 @@ async function viewerRow(
 
   const profile = await prisma.idleProfile.findUnique({
     where: { userId: viewerId },
-    select: {
-      userId: true,
-      highestLevel: true,
-      bossKills: true,
-      totalGold: true,
-      user: { select: { handle: true } },
-    },
+    select: SELECT,
   });
   if (!profile) return null;
 
   const field = ORDER[board];
   const own = profile[field];
-  if (own <= (board === "depth" ? 1 : 0)) return null;
+  if (own <= FLOOR[board]) return null;
 
   const ahead = await prisma.idleProfile.count({ where: { [field]: { gt: own } } });
   return toRow(profile, board, ahead + 1, viewerId);

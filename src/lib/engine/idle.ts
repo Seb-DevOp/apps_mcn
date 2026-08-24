@@ -744,6 +744,7 @@ export async function getIdleState(userId: string) {
         totalGold: profile.totalGold + result.goldEarned + autoGold,
         kills: profile.kills + result.kills,
         bossKills: profile.bossKills + result.bossKills,
+        totalLevels: profile.totalLevels + result.levelsCleared,
         lastTickAt: now,
       },
     });

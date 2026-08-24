@@ -117,6 +117,10 @@ model IdleProfile {
 
   kills     Int @default(0)
   bossKills Int @default(0)
+  /// Chambers cleared across every life. Survives a rebirth on purpose: it is the
+  /// only number that says how much Vault a cat has actually walked, where the
+  /// record only says how far down it once got.
+  totalLevels Int @default(0)
 
   /// { attack: 3, health: 1, ... } — keys come from UPGRADES in content/idle.
   /// Reset by a rebirth: gold has to have something to buy again.
