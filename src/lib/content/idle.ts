@@ -1195,3 +1195,75 @@ export const ELITE_GEMS = 1;
  * to be recalculated against anything.
  */
 export const CHEST_GEMS = 6;
+
+// ---------------------------------------------------------------------------
+// What lives on each floor
+// ---------------------------------------------------------------------------
+
+/**
+ * Ten creatures, assigned to the sixteen chambers.
+ *
+ * A single silhouette for every floor made the Vault feel like one room with
+ * different wallpaper. Tying the creature to the chamber it stands in does the
+ * opposite of that for the cost of nine more drawings — a Forge has cinders in
+ * it, an Ossuary has bones, and the player learns where they are from the fight
+ * rather than from the caption.
+ *
+ * They stay deliberately simpler than the cat. The cat is what the player dresses
+ * and watches; an enemy drawn to the same level of detail would compete with it
+ * for the eye, and the eye should be on the thing that is progressing.
+ */
+export type EnemyKind =
+  | "wraith"
+  | "crawler"
+  | "cinder"
+  | "shard"
+  | "tome"
+  | "bloom"
+  | "void"
+  | "sentinel"
+  | "bones"
+  | "storm";
+
+/** One per chamber, in the same order as the backdrops. */
+const ENEMY_BY_CHAMBER: EnemyKind[] = [
+  "wraith", // The Crypt
+  "crawler", // The Hollows
+  "cinder", // The Forge
+  "shard", // The Rime
+  "tome", // The Stacks
+  "bloom", // The Overgrowth
+  "void", // The Abyss
+  "sentinel", // The Gilded Hall
+  "crawler", // The Mire
+  "shard", // The Geode
+  "bones", // The Ossuary
+  "tome", // The Sanctum
+  "sentinel", // The Ruin
+  "storm", // The Tempest
+  "wraith", // The Necropolis
+  "storm", // The Vault Core
+];
+
+export function enemyKindFor(floor: number): EnemyKind {
+  return ENEMY_BY_CHAMBER[(Math.max(1, floor) - 1) % ENEMY_BY_CHAMBER.length];
+}
+
+const ENEMY_NAMES: Record<EnemyKind, { en: string; fr: string }> = {
+  wraith: { en: "Wraith", fr: "Spectre" },
+  crawler: { en: "Crawler", fr: "Rampant" },
+  cinder: { en: "Cinder", fr: "Braise" },
+  shard: { en: "Shard", fr: "Éclat" },
+  tome: { en: "Tome", fr: "Grimoire" },
+  bloom: { en: "Bloom", fr: "Floraison" },
+  void: { en: "Void", fr: "Vide" },
+  sentinel: { en: "Sentinel", fr: "Sentinelle" },
+  bones: { en: "Bones", fr: "Ossements" },
+  storm: { en: "Storm", fr: "Orage" },
+};
+
+/** What the health bar calls the thing. The Guardian and the Elite outrank it. */
+export function enemyName(kind: EnemyKind, locale: string): string {
+  const names = ENEMY_NAMES[kind];
+  return locale === "fr" ? names.fr : names.en;
+}

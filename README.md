@@ -855,6 +855,30 @@ qu'elle a rapporté à côté de l'état.
 la bonne unité pour une amélioration marginale et la mauvaise pour un facteur de
 quatre cent mille. Au-delà d'un facteur dix, l'écran écrit le multiplicateur.
 
+### Une faune, pas un ennemi
+
+Une seule silhouette pour seize chambres donnait un Vault fait d'une pièce unique
+avec un papier peint différent. Il y a maintenant **dix créatures**, chacune
+attachée à la chambre où elle vit : des braises dans la Forge, des ossements dans
+l'Ossuaire, un grimoire dans les Rayonnages, un orage dans la Tempête.
+
+Spectre · Rampant · Braise · Éclat · Grimoire · Floraison · Vide · Sentinelle ·
+Ossements · Orage.
+
+Le joueur apprend donc où il se trouve **par le combat** plutôt que par la légende.
+Et la barre de vie les nomme, ce qui est le seul endroit où le nom tenait sans
+ajouter une quatrième ligne à l'en-tête.
+
+Elles restent délibérément plus simples que le chat. Le chat est ce qu'on habille
+et ce qu'on regarde ; un ennemi dessiné au même niveau de détail lui disputerait
+l'œil, et l'œil doit rester sur ce qui progresse.
+
+**Les trois états sont dessinés une fois, autour des formes, pas dix fois dedans.**
+Ordinaire, Gardien (plus grand, rouge, cornu), Élite (cyan, couronné, auréolé) :
+les cornes et la couronne vivent dans le composant enveloppe, et chaque créature
+n'est qu'un tracé et un visage. Ajouter une onzième bête est une fonction et rien
+d'autre.
+
 ### Le sac
 
 Un onglet à part, parce que trier n'est pas se battre — et le combat continue côté

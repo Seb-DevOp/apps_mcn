@@ -7,11 +7,14 @@ import {
   LEVELS_PER_FLOOR,
   STRIKE_DAMAGE_MULTIPLIER,
   RECOVERY_SECONDS,
+  enemyKindFor,
+  enemyName,
   floorStart,
   levelInfo,
 } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
+import { EnemyCanvas } from "./EnemyCanvas";
 import { FloorBackdrop, themeFor } from "./FloorBackdrop";
 import { IdleBag } from "./IdleBag";
 import { LootPrompt, type LootEntry } from "./LootPrompt";
@@ -73,7 +76,7 @@ interface World {
 }
 
 export function IdleGame({ initial }: { initial: IdleState }) {
-  const { t, L } = useI18n();
+  const { t, L, locale } = useI18n();
 
   const [state, setState] = useState(initial);
   const [tab, setTab] = useState<"FIGHT" | "BAG">("FIGHT");
@@ -483,7 +486,12 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                     exit={{ opacity: 0, scale: 0.4, rotate: 18, y: 20 }}
                     transition={{ duration: 0.28 }}
                   >
-                    <Enemy isBoss={here.isBoss} elite={state.elite} recoil={catSwings} />
+                    <EnemyCanvas
+                      kind={enemyKindFor(here.floor)}
+                      isBoss={here.isBoss}
+                      elite={state.elite}
+                      recoil={catSwings}
+                    />
                   </motion.div>
                 </AnimatePresence>
                 <HitStream hits={hits} target="ENEMY" tone="#f0d089" />
@@ -505,7 +513,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                     ? t("idle.eliteHp")
                     : here.isBoss
                       ? t("idle.guardianHp")
-                      : t("idle.enemyHp")
+                      : enemyName(enemyKindFor(here.floor), locale)
                 }
                 value={shown.enemyHp}
                 max={here.enemyHp}
@@ -943,85 +951,6 @@ function FloorPips({ position }: { position: number }) {
         );
       })}
     </div>
-  );
-}
-
-/**
- * The thing in front of the cat. Deliberately less detailed than the cat, so the
- * eye stays where the progress is — but it lunges, because a static enemy is what
- * made this screen read as a progress bar with a picture next to it.
- */
-function Enemy({
-  isBoss,
-  elite,
-  recoil,
-}: {
-  isBoss: boolean;
-  elite: boolean;
-  recoil: number;
-}) {
-  const tint = elite ? "#37d5ff" : isBoss ? "#e0603f" : "#5a4f7a";
-  return (
-    <motion.svg
-      viewBox="0 0 120 150"
-      width="100%"
-      style={{ maxWidth: isBoss ? 132 : 104, marginLeft: "auto", display: "block" }}
-      animate={{ y: [0, -5, 0] }}
-      transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}
-      aria-hidden
-    >
-      <motion.g
-        animate={{ x: recoil % 2 === 0 ? 0 : 9, scale: recoil % 2 === 0 ? 1 : 0.97 }}
-        transition={{ type: "spring", stiffness: 700, damping: 15 }}
-        style={{
-          originX: "60px",
-          originY: "90px",
-          filter: elite ? "drop-shadow(0 0 10px rgba(55,213,255,0.8))" : undefined,
-        }}
-      >
-        {/* A crown of shards, so an Elite is recognised before its health bar is
-            read. Six times the health arriving unannounced reads as a bug. */}
-        {elite && (
-          <path
-            d="M30 26 L24 2 L44 16 L60 -4 L76 16 L96 2 L90 26 Z"
-            fill={tint}
-            opacity="0.9"
-          />
-        )}
-        <ellipse cx="60" cy="142" rx="34" ry="7" fill="#000" opacity="0.42" />
-        <path
-          d="M60 30 C88 30 100 56 96 88 C93 116 78 132 60 132 C42 132 27 116 24 88 C20 56 32 30 60 30 Z"
-          fill={tint}
-          opacity="0.9"
-        />
-        {isBoss && (
-          <>
-            {/* Thick and curling, because a thin triangle above a head is an ear. */}
-            <path d="M38 42 C22 36 14 24 18 10" stroke={tint} strokeWidth="11" strokeLinecap="round" fill="none" />
-            <path d="M82 42 C98 36 106 24 102 10" stroke={tint} strokeWidth="11" strokeLinecap="round" fill="none" />
-            <path d="M18 14 L14 4 L26 10 Z" fill={tint} />
-            <path d="M102 14 L106 4 L94 10 Z" fill={tint} />
-          </>
-        )}
-        <path d="M38 60 l16 6 M82 60 l-16 6" stroke="#0a0710" strokeWidth="3.5" strokeLinecap="round" />
-        <motion.g
-          animate={{ scaleY: [1, 0.15, 1] }}
-          transition={{ duration: 0.22, repeat: Infinity, repeatDelay: 3.4 }}
-          style={{ originY: "72px" }}
-        >
-          <ellipse cx="46" cy="72" rx="7" ry="8.5" fill={isBoss ? "#ffd76a" : "#ff8e5e"} />
-          <ellipse cx="74" cy="72" rx="7" ry="8.5" fill={isBoss ? "#ffd76a" : "#ff8e5e"} />
-        </motion.g>
-        <path
-          d="M42 102 l7 -7 l7 7 l7 -7 l7 7 l7 -7"
-          stroke="#0a0710"
-          strokeWidth="3"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </motion.g>
-    </motion.svg>
   );
 }
 
