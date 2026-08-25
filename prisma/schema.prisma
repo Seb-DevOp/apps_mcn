@@ -147,6 +147,12 @@ model IdleProfile {
   shieldFor    Float    @default(0)
 
   /// --- The shop ------------------------------------------------------
+  /// Gems. Earned from Guardians, one floor at a time, so they accumulate
+  /// linearly where gold is exponential — which is what lets a shop price mean
+  /// the same thing at every depth. They survive a rebirth.
+  gems      Int @default(0)
+  gemsEarned Int @default(0)
+
   /// Chests bought. Only its remainder matters: every tenth one is guaranteed.
   chestsOpened Int    @default(0)
   /// The coat currently worn, and every coat ever bought. Cosmetics survive a

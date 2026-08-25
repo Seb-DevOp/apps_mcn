@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "IdleProfile" ADD COLUMN     "gems" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "gemsEarned" INTEGER NOT NULL DEFAULT 0;

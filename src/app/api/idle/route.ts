@@ -67,7 +67,12 @@ export async function POST(request: Request) {
     const result = await run(user.id, input);
 
     if (!result.ok) return fail(result.error, 409);
-    return ok({ state: await getIdleState(user.id) });
+
+    // Forward whatever the action itself reported alongside the fresh state.
+    // Returning only the state threw away the id of the piece a chest had just
+    // created, which is the one thing the screen needed to show it.
+    const { ok: _ok, ...reported } = result;
+    return ok({ ...reported, state: await getIdleState(user.id) });
   });
 }
 

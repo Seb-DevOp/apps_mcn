@@ -348,3 +348,18 @@ export function RebirthIcon({ size = 22, className }: IconProps) {
     </svg>
   );
 }
+
+/** A cut stone: the currency that does not inflate. */
+export function GemIcon({ size = 22, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M7 3h10l4 6-9 12L3 9Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M3 9h18M9.5 3 12 21M14.5 3 12 21" stroke="currentColor" strokeWidth="1.1" opacity="0.6" />
+    </svg>
+  );
+}

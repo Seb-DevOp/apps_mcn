@@ -814,6 +814,47 @@ une en laisse deux, et de nouveaux butins arrivent entre le clic et la vérifica
 Instrumenter la réponse de l'API a montré `equipped=true` et la disparition de la
 bonne carte.
 
+### Les gemmes, ou le correctif au lieu de la rustine
+
+L'or est multiplié par mille tous les huit étages. Un prix en or ne veut donc rien
+dire en soi : il est inatteignable à l'étage cinq et offert à l'étage vingt-cinq.
+Ce symptôme a été rustiné deux fois — le coffre refacturé sur l'étage courant, les
+pelages relevés d'un facteur mille — avant que la monnaie elle-même soit reconnue
+comme le problème.
+
+**Les gemmes viennent des Gardiens**, un étage à la fois, donc elles s'accumulent
+**linéairement** là où l'or est exponentiel. Un prix en gemmes veut dire la même
+chose à n'importe quelle profondeur, ce qui est la seule façon pour une échelle de
+boutique de rester une échelle. Elles survivent à une renaissance : une monnaie
+effacée à chaque vie est une monnaie que personne ne dépense.
+
+Chaque Gardien en laisse `1 + étage / 8`. Les Gardiens profonds sont plus rares — la
+descente décélère par construction — donc chacun vaut davantage ; sans ça le débit
+s'effondrerait exactement au moment où la boutique commence à valoir la peine d'être
+regardée. Mesuré : 301 gemmes en 12 h, 781 en 48 h, 1069 en une semaine. L'échelle
+complète des pelages coûte 3580, soit trois à quatre semaines.
+
+Le coffre coûte **six gemmes, pour toujours**. C'est tout l'intérêt de la monnaie :
+son prix n'a rien à recalculer.
+
+L'or garde son travail — les six améliorations — et n'a plus rien à faire dans la
+boutique.
+
+### Trois choses que l'écran a révélées
+
+**Le coffre ne disait pas ce qu'il donnait.** La pièce partait silencieusement dans
+le sac et la seule preuve était un compteur qui montait. C'est exactement la
+décision qu'un butin pose, donc c'est la même carte : Porter · Vendre · Garder.
+
+**La route jetait la réponse de l'action.** Elle ne renvoyait que l'état, ce qui
+effaçait l'identifiant de la pièce que le coffre venait de créer — la seule chose
+dont l'écran avait besoin pour la montrer. Toute action transmet maintenant ce
+qu'elle a rapporté à côté de l'état.
+
+**`+46171596 %`** — le gain d'une première pièce sur un chat nu. Le pourcentage est
+la bonne unité pour une amélioration marginale et la mauvaise pour un facteur de
+quatre cent mille. Au-delà d'un facteur dix, l'écran écrit le multiplicateur.
+
 ### Le sac
 
 Un onglet à part, parce que trier n'est pas se battre — et le combat continue côté

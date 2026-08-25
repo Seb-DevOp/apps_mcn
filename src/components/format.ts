@@ -22,3 +22,16 @@ export function formatNumber(value: number): string {
   if (scaled >= 1000) return n.toExponential(2);
   return `${scaled.toFixed(scaled < 10 ? 2 : scaled < 100 ? 1 : 0)}${SUFFIXES[tier]}`;
 }
+
+/**
+ * What wearing a piece would do, written so a person can read it.
+ *
+ * A percentage is the right unit for an incremental upgrade and the wrong one
+ * for a first piece on a bare cat, where the honest answer is "+46171596%".
+ * Past a factor of ten the multiplier is what the number actually means.
+ */
+export function formatGain(gain: number): string {
+  if (!Number.isFinite(gain) || gain <= 1) return "";
+  if (gain >= 10) return `×${formatNumber(gain)}`;
+  return `+${Math.round((gain - 1) * 100)}%`;
+}

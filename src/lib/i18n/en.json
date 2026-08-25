@@ -230,12 +230,12 @@
   "idle.tabShop": "Shop",
   "shop.chest": "The Chest",
   "shop.chestHint": "One piece from the floor you are standing on, rolled on your own odds — the ones your lives have opened.",
-  "shop.buyChest": "Open · {n}",
+  "shop.buyChest": "Open",
   "shop.untilGuaranteed": "{n} more before a guaranteed {rarity}",
   "shop.nextIsGuaranteed": "The next one is a guaranteed {rarity}",
   "shop.chestsBought": "{n} chests opened",
   "shop.coats": "Coats",
-  "shop.coatsHint": "Colour only, and kept through every rebirth. Each is about ten times the last.",
+  "shop.coatsHint": "Colour only, and kept through every rebirth.",
   "shop.worn": "worn",
   "shop.wear": "wear",
   "leaderboard.distance": "Distance",
@@ -248,5 +248,7 @@
   "leaderboard.lifeValue": "1 life",
   "leaderboard.contextOne": "floor {floor} · 1 life",
   "nav.shop": "Shop",
-  "nav.rebirth": "Lives"
+  "nav.rebirth": "Lives",
+  "shop.gems": "Gems",
+  "shop.gemsHint": "Gems come from Guardians, one floor at a time. They do not inflate, so a price here means the same thing at any depth."
 }

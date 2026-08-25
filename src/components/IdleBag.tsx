@@ -14,7 +14,7 @@ import {
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
 import { useI18n } from "./I18nProvider";
-import { formatNumber } from "./format";
+import { formatGain, formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
 
 /**
@@ -340,8 +340,8 @@ function Row({
         <p className="dim tabular text-[0.64rem]">
           {formatNumber(item.power)} ·{" "}
           <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
-          {better && Math.round((item.gain - 1) * 100) >= 1 && (
-            <span className="text-[#7ed08f]"> · +{Math.round((item.gain - 1) * 100)}%</span>
+          {better && formatGain(item.gain) !== "+0%" && (
+            <span className="text-[#7ed08f]"> · {formatGain(item.gain)}</span>
           )}
         </p>
         {item.affixes.length > 0 && (

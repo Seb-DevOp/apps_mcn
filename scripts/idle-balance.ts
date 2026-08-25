@@ -66,6 +66,7 @@ let recoverFor = 0;
 let shieldFor = 0;
 let elite = false;
 let defeats = 0;
+let gems = 0;
 
 // --- Rebirth ---------------------------------------------------------------
 const relics: Relics = { memory: 0, tenacity: 0, greed: 0, luck: 0 };
@@ -119,6 +120,7 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   highestLevel = result.highestLevel;
   gold += result.goldEarned;
   defeats += result.defeats;
+  gems += result.gemsEarned;
 
   // Nothing equips itself any more, so the simulated player does what the
   // recommendation button does: wear it if the whole cat comes out stronger.
@@ -217,6 +219,7 @@ const totalSpent = Object.values(spent).reduce((sum, value) => sum + value, 0);
 console.log(`après ${HOURS} h de jeu passif`);
 console.log(`  étage atteint      ${levelInfo(highestLevel).floor}`);
 console.log(`  défaites           ${defeats}`);
+console.log(`  gemmes gagnées     ${gems}`);
 console.log(`  renaissances       ${rebirths} · prochaine à l étage ${rebirthFloorFor(rebirths)}`);
 console.log(
   `  reliques           ${RELICS.map((def) => `${def.nameFr} ${relics[def.key]}`).join(" · ")}`,

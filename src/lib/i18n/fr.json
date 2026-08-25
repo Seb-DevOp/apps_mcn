@@ -230,12 +230,12 @@
   "idle.tabShop": "Boutique",
   "shop.chest": "Le Coffre",
   "shop.chestHint": "Une pièce de l'étage où tu te trouves, tirée sur tes propres odds — celles que tes vies ont ouvertes.",
-  "shop.buyChest": "Ouvrir · {n}",
+  "shop.buyChest": "Ouvrir",
   "shop.untilGuaranteed": "Encore {n} avant un {rarity} garanti",
   "shop.nextIsGuaranteed": "Le prochain est un {rarity} garanti",
   "shop.chestsBought": "{n} coffres ouverts",
   "shop.coats": "Pelages",
-  "shop.coatsHint": "Couleur seulement, gardée à travers chaque renaissance. Chacun vaut environ dix fois le précédent.",
+  "shop.coatsHint": "Couleur seulement, gardée à travers chaque renaissance.",
   "shop.worn": "porté",
   "shop.wear": "porter",
   "leaderboard.distance": "Distance",
@@ -248,5 +248,7 @@
   "leaderboard.lifeValue": "1 vie",
   "leaderboard.contextOne": "étage {floor} · 1 vie",
   "nav.shop": "Boutique",
-  "nav.rebirth": "Vies"
+  "nav.rebirth": "Vies",
+  "shop.gems": "Gemmes",
+  "shop.gemsHint": "Les gemmes viennent des Gardiens, un étage à la fois. Elles n'inflatent pas : un prix ici veut dire la même chose à n'importe quelle profondeur."
 }

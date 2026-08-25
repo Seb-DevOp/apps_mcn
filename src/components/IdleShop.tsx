@@ -4,21 +4,21 @@ import { motion } from "framer-motion";
 import { RARITY_STYLE, type Rarity } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas } from "./CatCanvas";
+import { GemIcon } from "./ui/Icons";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 
 /**
  * THE SHOP
  *
- * Two things gold can buy that the upgrade list cannot: another roll of the dice,
- * and a different cat to look at.
+ * Two things the upgrade list cannot sell: another roll of the dice, and a
+ * different cat to look at.
  *
- * A chest is priced against the current floor's own reward rather than as a fixed
- * number, because gold inflates by a factor of a thousand every eight floors —
- * any fixed price is unaffordable at floor five and free at floor twenty-five.
- * Coats are the opposite: fixed prices, each roughly ten times the last, so a coat
- * unlocks by descending rather than by saving, and there is always exactly one
- * that is nearly affordable.
+ * Both are priced in **gems**, not gold. Gold multiplies by a thousand every
+ * eight floors, so a gold price is unaffordable at floor five and free at floor
+ * twenty-five — which was patched twice before the currency itself was the
+ * answer. Gems come from Guardians one floor at a time, so they accumulate
+ * linearly and a price here means the same thing at any depth.
  */
 export function IdleShop({
   state,
@@ -32,7 +32,7 @@ export function IdleShop({
   const { t, L } = useI18n();
   const { shop } = state;
 
-  const canBuyChest = state.gold >= shop.chestPrice;
+  const canBuyChest = shop.gems >= shop.chestPrice;
   const guaranteedStyle = RARITY_STYLE[shop.guaranteedRarity as Rarity];
   const opened = shop.chestsOpened % shop.pity;
 
@@ -42,6 +42,7 @@ export function IdleShop({
       <section className="panel panel-gilded mt-4 p-4 text-center">
         <p className="eyebrow">{t("shop.chest")}</p>
         <p className="dim mt-2 text-[0.74rem] leading-snug">{t("shop.chestHint")}</p>
+        <p className="dim mt-2 text-[0.66rem] italic leading-snug">{t("shop.gemsHint")}</p>
 
         {/* The guarantee as ten pips: a promise you can watch arriving beats a
             promise written in a description. */}
@@ -78,7 +79,10 @@ export function IdleShop({
           disabled={!canBuyChest || busy !== null}
           onClick={() => act({ action: "chest" }, "chest")}
         >
-          {t("shop.buyChest", { n: formatNumber(shop.chestPrice) })}
+          <span className="inline-flex items-center gap-1.5">
+            {t("shop.buyChest")} · {shop.chestPrice}
+            <GemIcon size={14} />
+          </span>
         </button>
 
         <p className="dim mt-2 text-[0.66rem]">
@@ -92,7 +96,7 @@ export function IdleShop({
 
       <div className="mt-2 grid grid-cols-2 gap-2">
         {shop.skins.map((skin, index) => {
-          const affordable = skin.owned || state.gold >= skin.price;
+          const affordable = skin.owned || shop.gems >= skin.price;
           return (
             <motion.button
               key={skin.key}
@@ -116,14 +120,25 @@ export function IdleShop({
                 {L(skin.nameEn, skin.nameFr)}
               </p>
               <p
-                className="tabular text-[0.68rem]"
-                style={{ color: skin.worn ? "var(--gold-bright)" : "var(--text-faint)" }}
+                className="tabular flex items-center gap-1 text-[0.68rem]"
+                style={{
+                  color: skin.worn
+                    ? "var(--gold-bright)"
+                    : skin.owned
+                      ? "var(--text-dim)"
+                      : "#8ef0ff",
+                }}
               >
-                {skin.worn
-                  ? t("shop.worn")
-                  : skin.owned
-                    ? t("shop.wear")
-                    : formatNumber(skin.price)}
+                {skin.worn ? (
+                  t("shop.worn")
+                ) : skin.owned ? (
+                  t("shop.wear")
+                ) : (
+                  <>
+                    {skin.price}
+                    <GemIcon size={12} />
+                  </>
+                )}
               </p>
             </motion.button>
           );

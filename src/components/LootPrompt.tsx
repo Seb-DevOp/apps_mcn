@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { RARITY_STYLE, affixLabel, itemName, type Rarity, type Slot } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { useI18n } from "./I18nProvider";
-import { formatNumber } from "./format";
+import { formatGain, formatNumber } from "./format";
 
 /**
  * WHAT JUST DROPPED
@@ -159,11 +159,9 @@ function Card({
         >
           {worn
             ? "—"
-            : better && Math.round((gain - 1) * 100) >= 1
-              ? `+${Math.round((gain - 1) * 100)}%`
-              : better
-                ? t("loot.marginal")
-                : t("loot.worse")}
+            : !better
+              ? t("loot.worse")
+              : (formatGain(gain) === "+0%" ? t("loot.marginal") : formatGain(gain))}
         </span>
       </div>
 

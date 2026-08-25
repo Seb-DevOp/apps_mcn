@@ -46,7 +46,9 @@ import {
   rebirthFloorFor,
   eliteLevel,
   ELITE_CHANCE,
-  chestPrice,
+  gemsForGuardian,
+  ELITE_GEMS,
+  CHEST_GEMS,
   chestFloorRarity,
   CHEST_PITY,
   SKINS,
@@ -375,6 +377,8 @@ export interface TickReport {
   defeats: number;
   /** Guardians felled, each one healing the cat outright. */
   heals: number;
+  /** Gems the Guardians and Elites left. */
+  gemsEarned: number;
   /** Finds the Nose turned into gold before they reached the bag. */
   autoSold: number;
   autoGold: number;
@@ -448,6 +452,7 @@ export function simulate(
   let levelsCleared = 0;
   let defeats = 0;
   let heals = 0;
+  let gemsEarned = 0;
   // Starts at one, not zero: a tick that opens on a defeat should not be read as
   // a fruitless loop, or a player checking in on a hard Guardian would be dropped
   // a floor for looking.
@@ -554,7 +559,9 @@ export function simulate(
       bossKills += 1;
       hp = stats.maxHp;
       heals += 1;
+      gemsEarned += gemsForGuardian(info.floor);
     }
+    if (elite) gemsEarned += ELITE_GEMS;
 
     const guaranteed = info.isBoss || elite;
     if (drops.length < MAX_DROPS_PER_TICK && (guaranteed || Math.random() < stats.dropChance)) {
@@ -598,6 +605,7 @@ export function simulate(
     levelsCleared,
     defeats,
     heals,
+    gemsEarned,
     autoSold: 0,
     autoGold: 0,
     drops,
@@ -653,6 +661,7 @@ export async function getIdleState(userId: string) {
           levelsCleared: 0,
           defeats: 0,
           heals: 0,
+          gemsEarned: 0,
           autoSold: 0,
           autoGold: 0,
           drops: [],
@@ -745,6 +754,8 @@ export async function getIdleState(userId: string) {
         kills: profile.kills + result.kills,
         bossKills: profile.bossKills + result.bossKills,
         totalLevels: profile.totalLevels + result.levelsCleared,
+        gems: profile.gems + result.gemsEarned,
+        gemsEarned: profile.gemsEarned + result.gemsEarned,
         lastTickAt: now,
       },
     });
@@ -782,6 +793,8 @@ function view(
     lastBreathAt: Date;
     shieldFor: number;
     autoSellBelow: string;
+    gems: number;
+    gemsEarned: number;
     chestsOpened: number;
     skinKey: string;
     skinsJson: string;
@@ -873,7 +886,9 @@ function view(
     })),
 
     shop: {
-      chestPrice: chestPrice(profile.level),
+      gems: profile.gems,
+      gemsEarned: profile.gemsEarned,
+      chestPrice: CHEST_GEMS,
       chestsOpened: profile.chestsOpened,
       /** How many more before the guaranteed one. Shown, not implied. */
       untilGuaranteed: CHEST_PITY - (profile.chestsOpened % CHEST_PITY),
@@ -946,6 +961,7 @@ export type IdleState = Awaited<ReturnType<typeof getIdleState>>;
 // ---------------------------------------------------------------------------
 
 export type IdleError =
+  | "NOT_ENOUGH_GEMS"
   | "UNKNOWN_UPGRADE"
   | "NOT_ENOUGH_GOLD"
   | "MAXED"
@@ -1332,8 +1348,9 @@ export async function buyChest(userId: string) {
 
   return prisma.$transaction(async (tx) => {
     const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
-    const price = chestPrice(profile.level);
-    if (profile.gold < price) return { ok: false as const, error: "NOT_ENOUGH_GOLD" as const };
+    if (profile.gems < CHEST_GEMS) {
+      return { ok: false as const, error: "NOT_ENOUGH_GEMS" as const };
+    }
 
     const guaranteed = (profile.chestsOpened + 1) % CHEST_PITY === 0;
     // The floor you are on, for the same reason as the price: buying a record
@@ -1370,7 +1387,7 @@ export async function buyChest(userId: string) {
 
     await tx.idleProfile.update({
       where: { userId },
-      data: { gold: profile.gold - price, chestsOpened: profile.chestsOpened + 1 },
+      data: { gems: profile.gems - CHEST_GEMS, chestsOpened: profile.chestsOpened + 1 },
     });
 
     await track("idle.chest", userId, { rarity, guaranteed });
@@ -1392,12 +1409,14 @@ export async function buySkin(userId: string, key: string) {
       return { ok: true as const, worn: true };
     }
 
-    if (profile.gold < def.price) return { ok: false as const, error: "NOT_ENOUGH_GOLD" as const };
+    if (profile.gems < def.price) {
+      return { ok: false as const, error: "NOT_ENOUGH_GEMS" as const };
+    }
 
     await tx.idleProfile.update({
       where: { userId },
       data: {
-        gold: profile.gold - def.price,
+        gems: profile.gems - def.price,
         skinKey: key,
         skinsJson: JSON.stringify([...owned, key]),
       },

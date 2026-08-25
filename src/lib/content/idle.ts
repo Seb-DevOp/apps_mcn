@@ -1022,21 +1022,6 @@ export function isPackSlot(worn: string | null): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * A chest costs about three minutes of the floor you are on.
- *
- * Priced against the floor you are standing on — not the record. Pricing on the
- * record while the chest gives a piece from the current floor would make a fresh
- * rebirth an unaffordable shop and a deep one a free one, in the same run.
- *
- * Against the floor's own reward rather than a fixed number,
- * because gold inflates by a factor of a thousand every eight floors: any fixed
- * price is either unaffordable at floor five or free at floor twenty-five.
- */
-export function chestPrice(level: number): number {
-  return Math.ceil(levelInfo(level).goldReward * 40);
-}
-
-/**
  * Every tenth chest is guaranteed.
  *
  * Randomness that can be unlucky forty times in a row is not a shop, it is a
@@ -1068,14 +1053,11 @@ export interface SkinDef {
 /**
  * Coats, priced along the curve rather than on a flat list.
  *
- * Each is roughly ten times the last, and gold grows by a thousand every eight
- * floors — so a coat unlocks by descending rather than by saving, and the shop
- * always has exactly one thing that is nearly affordable.
- *
- * The whole ladder was raised a thousandfold after play showed the top of it
- * being bought in an afternoon. Where the ladder starts is the only thing that
- * decides which floor each coat belongs to; the spacing between rungs is what
- * makes it a ladder at all, so that stayed.
+ * Priced in gems, which do not inflate — so the rungs can be close together and
+ * still mean something. In gold this ladder had to climb by a factor of ten a
+ * rung just to stay ahead of the currency, and even then the top of it was
+ * bought in an afternoon. Here the numbers are small, the spacing is gentle, and
+ * a coat is a fortnight of Guardians rather than an accident of depth.
  */
 export const SKINS: SkinDef[] = [
   {
@@ -1094,7 +1076,7 @@ export const SKINS: SkinDef[] = [
     key: "ember",
     nameEn: "Ember",
     nameFr: "Braise",
-    price: 5_000_000,
+    price: 40,
     fur: "#c2703a",
     furDark: "#94502a",
     furDeep: "#6b3a1e",
@@ -1106,7 +1088,7 @@ export const SKINS: SkinDef[] = [
     key: "shadow",
     nameEn: "Shadow",
     nameFr: "Ombre",
-    price: 60_000_000,
+    price: 90,
     fur: "#3a3a42",
     furDark: "#26262c",
     furDeep: "#17171b",
@@ -1118,7 +1100,7 @@ export const SKINS: SkinDef[] = [
     key: "snow",
     nameEn: "Snow",
     nameFr: "Neige",
-    price: 700_000_000,
+    price: 180,
     fur: "#e2e0da",
     furDark: "#c2bfb6",
     furDeep: "#9d9a91",
@@ -1130,7 +1112,7 @@ export const SKINS: SkinDef[] = [
     key: "siamese",
     nameEn: "Siamese",
     nameFr: "Siamois",
-    price: 8_000_000_000,
+    price: 320,
     fur: "#ddd0b8",
     furDark: "#6b5a4a",
     furDeep: "#453a30",
@@ -1142,7 +1124,7 @@ export const SKINS: SkinDef[] = [
     key: "spectre",
     nameEn: "Spectre",
     nameFr: "Fantôme",
-    price: 90_000_000_000,
+    price: 550,
     fur: "#6f86a8",
     furDark: "#4a5c78",
     furDeep: "#2f3c52",
@@ -1154,7 +1136,7 @@ export const SKINS: SkinDef[] = [
     key: "gilded",
     nameEn: "Gilded",
     nameFr: "Doré",
-    price: 1_000_000_000_000,
+    price: 900,
     fur: "#d4a94e",
     furDark: "#a67f30",
     furDeep: "#75581e",
@@ -1166,7 +1148,7 @@ export const SKINS: SkinDef[] = [
     key: "vault",
     nameEn: "Vault Heart",
     nameFr: "Cœur du Vault",
-    price: 12_000_000_000_000,
+    price: 1500,
     fur: "#5a4b9c",
     furDark: "#3d3270",
     furDeep: "#26204a",
@@ -1179,3 +1161,37 @@ export const SKINS: SkinDef[] = [
 export const SKIN_BY_KEY: Record<string, SkinDef> = Object.fromEntries(
   SKINS.map((skin) => [skin.key, skin]),
 );
+
+// ---------------------------------------------------------------------------
+// Gems: a currency that does not inflate
+// ---------------------------------------------------------------------------
+
+/**
+ * Gold multiplies by a thousand every eight floors, which makes any gold price
+ * either unaffordable or free depending only on when it is read. That was
+ * patched twice — the chest billed against the current floor, the coats raised
+ * a thousandfold — and both were the same symptom.
+ *
+ * Gems are the fix rather than the patch. They come from Guardians, one floor at
+ * a time, so they accumulate **linearly** with progress. A price in gems means
+ * the same thing on floor five and on floor five hundred, which is the only way
+ * a shop ladder stays a ladder.
+ *
+ * They survive a rebirth: cosmetics bought once should stay bought, and a
+ * currency wiped every life would be a currency nobody spends.
+ */
+export function gemsForGuardian(floor: number): number {
+  // Deeper Guardians are rarer — the descent decelerates by design — so each one
+  // is worth more. Without this the gem rate would fall away exactly when the
+  // shop starts having something worth saving for.
+  return 1 + Math.floor(floor / 8);
+}
+
+/** An Elite is not a Guardian, but it is not nothing either. */
+export const ELITE_GEMS = 1;
+
+/**
+ * One price, forever. This is the whole point of the currency: it does not need
+ * to be recalculated against anything.
+ */
+export const CHEST_GEMS = 6;
