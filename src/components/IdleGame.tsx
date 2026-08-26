@@ -768,6 +768,17 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                   drops: initial.report.drops.length,
                 })}
               </p>
+              {/* The Nose works silently by design — nothing reaches the bag,
+                  so nothing announces itself. Which also means a player has no
+                  evidence it is on at all. Here is the evidence. */}
+              {initial.report.autoSold > 0 && (
+                <p className="mt-2 text-[0.72rem]" style={{ color: "#7ed08f" }}>
+                  {t("idle.awaySold", {
+                    n: initial.report.autoSold,
+                    gold: formatNumber(initial.report.autoGold),
+                  })}
+                </p>
+              )}
               {initial.report.defeats > 0 && (
                 <p className="mt-2 text-[0.72rem] text-[#ff8e8e]">
                   {t("idle.awayDefeats", { n: initial.report.defeats })}

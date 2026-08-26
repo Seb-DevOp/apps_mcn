@@ -8,6 +8,7 @@ import {
   SLOTS,
   affixLabel,
   itemName,
+  rarityWeights,
   weaponFor,
   type Rarity,
   type Slot,
@@ -55,6 +56,7 @@ export const IdleBag = memo(function IdleBag({
   const [selected, setSelected] = useState<string | null>(null);
   const [slotFilter, setSlotFilter] = useState<Slot | null>(null);
   const [rarityFilter, setRarityFilter] = useState<Rarity | null>(null);
+  const [sellingAll, setSellingAll] = useState(false);
   const onPack = packOpen && dressing === "PACK";
 
   const worn = useMemo<WornPiece[]>(
@@ -134,6 +136,36 @@ export const IdleBag = memo(function IdleBag({
         .sort((a, b) => b.gain - a.gain),
     [spares, slotFilter, rarityFilter],
   );
+
+  /**
+   * What each Nose threshold would actually catch, at this depth.
+   *
+   * The odds move with the floor and with every life spent: "sell below
+   * Uncommon" catches a third of finds on floor ten and one in twenty-five on
+   * floor thirty, because depth thins the commons out of the table. A setting
+   * that quietly stops doing anything is indistinguishable from one that is
+   * broken, so the chip says what it is worth here rather than leaving the
+   * player to conclude the feature is dead.
+   */
+  const flair = useMemo(() => {
+    const weights = rarityWeights(state.level.floor, state.rebirth.rebirths);
+    const total = weights.reduce((sum, entry) => sum + entry.weight, 0);
+    const share = new Map<Rarity, number>();
+    let below = 0;
+    for (const entry of weights) {
+      share.set(entry.rarity, total > 0 ? below / total : 0);
+      below += entry.weight;
+    }
+    return {
+      share,
+      // Only rarities that can actually fall here. Offering a threshold for
+      // something the table cannot produce is offering a setting that does
+      // nothing, which is the problem this is fixing.
+      offered: weights
+        .filter((entry) => entry.weight > 0 && entry.rarity !== "COMMON")
+        .map((entry) => entry.rarity),
+    };
+  }, [state.level.floor, state.rebirth.rebirths]);
 
   /** Rarities worn at least twice: below that there is no set to speak of. */
   const sealTiers = useMemo(
@@ -341,16 +373,17 @@ export const IdleBag = memo(function IdleBag({
           <h2 className="eyebrow">{t("flair.title")}</h2>
           <p className="dim mt-1 text-[0.68rem] italic">{t("flair.hint")}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {["", ...RARITIES.slice(1, 5)].map((rarity) => {
+            {["", ...flair.offered].map((rarity) => {
               const active = state.autoSellBelow === rarity;
               const style = rarity ? RARITY_STYLE[rarity as Rarity] : null;
+              const caught = rarity ? (flair.share.get(rarity as Rarity) ?? 0) : 0;
               return (
                 <button
                   key={rarity || "off"}
                   type="button"
                   disabled={busy !== null}
                   onClick={() => act({ action: "autoSell", rarity }, `flair-${rarity}`)}
-                  className="panel flex items-center gap-1.5 px-2 py-1.5 text-[0.66rem] transition"
+                  className="panel flex items-center gap-1.5 px-2 py-1.5 text-left text-[0.66rem] transition"
                   style={{
                     borderColor: active ? "rgba(201,162,77,0.6)" : undefined,
                     color: active ? "var(--gold-bright)" : "var(--text-dim)",
@@ -358,11 +391,18 @@ export const IdleBag = memo(function IdleBag({
                 >
                   {style && (
                     <span
-                      className="h-2 w-2 rounded-full"
+                      className="h-2 w-2 shrink-0 rounded-full"
                       style={{ background: style.color }}
                     />
                   )}
-                  {rarity ? t(`idle.rarity.${rarity}`) : t("flair.off")}
+                  <span>
+                    {rarity ? t(`idle.rarity.${rarity}`) : t("flair.off")}
+                    {rarity !== "" && (
+                      <span className="dim tabular block text-[0.56rem] leading-tight">
+                        {t("flair.share", { pct: Math.round(caught * 100) })}
+                      </span>
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -373,17 +413,59 @@ export const IdleBag = memo(function IdleBag({
       {/* --- Everything else it owns ------------------------------------ */}
       <div className="mt-6 flex items-center justify-between">
         <h2 className="eyebrow">{t("idle.spares", { n: spares.length })}</h2>
-        {spares.length > 0 && (
+        {spares.length > 0 && !sellingAll && (
           <button
             type="button"
             className="btn btn-ghost px-3 py-1 text-[0.68rem]"
             disabled={busy !== null}
-            onClick={() => act({ action: "sellAll" }, "sellAll")}
+            onClick={() => setSellingAll(true)}
           >
             {t("idle.sellAll")}
           </button>
         )}
       </div>
+
+      {/*
+        One tap used to empty the bag.
+
+        It is the only irreversible button on the screen — a hundred pieces gone,
+        and the gold it pays is worth nothing next to a Sovereign helm sold by a
+        thumb that meant to tap the tile beside it. So it asks, and it says what
+        it is about to take.
+      */}
+      {sellingAll && spares.length > 0 && (
+        <div className="panel mt-2 p-3" style={{ borderColor: "rgba(224,96,63,0.5)" }}>
+          <p className="text-[0.74rem] leading-snug text-[#ffb0a0]">
+            {t("idle.sellAllAsk", {
+              n: spares.length,
+              gold: formatNumber(
+                spares.reduce((sum, item) => sum + Math.max(1, Math.round(item.power * 4)), 0),
+              ),
+            })}
+          </p>
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="btn btn-ghost py-1.5 text-[0.72rem]"
+              onClick={() => setSellingAll(false)}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-gold py-1.5 text-[0.72rem]"
+              disabled={busy !== null}
+              onClick={() => {
+                setSellingAll(false);
+                setSelected(null);
+                act({ action: "sellAll" }, "sellAll");
+              }}
+            >
+              {t("idle.sellAll")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {spares.length === 0 ? (
         <p className="dim mt-2 text-center text-[0.72rem] italic">{t("idle.bagEmpty")}</p>

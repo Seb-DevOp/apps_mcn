@@ -262,5 +262,8 @@
   "bag.all": "Tout",
   "bag.noMatch": "Rien de tel dans le sac.",
   "rebirth.held": "Ce que tes reliques donnent",
-  "rebirth.owedOf": "sur {total} à l'étage {floor}"
+  "rebirth.owedOf": "sur {total} à l'étage {floor}",
+  "flair.share": "{pct} % des trouvailles",
+  "idle.sellAllAsk": "Vendre les {n} rechanges pour {gold} or ? Rien ne revient.",
+  "idle.awaySold": "{n} vendues sur place · +{gold}"
 }

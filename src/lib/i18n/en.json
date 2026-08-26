@@ -262,5 +262,8 @@
   "bag.all": "All",
   "bag.noMatch": "Nothing like that in the bag.",
   "rebirth.held": "What your relics give",
-  "rebirth.owedOf": "of {total} at floor {floor}"
+  "rebirth.owedOf": "of {total} at floor {floor}",
+  "flair.share": "{pct}% of finds",
+  "idle.sellAllAsk": "Sell all {n} spares for {gold} gold? Nothing comes back.",
+  "idle.awaySold": "{n} sold where they fell · +{gold}"
 }
