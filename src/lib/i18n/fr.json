@@ -267,5 +267,8 @@
   "idle.sellAllAsk": "Vendre les {n} rechanges pour {gold} or ? Rien ne revient.",
   "idle.awaySold": "{n} vendues sur place · +{gold}",
   "flair.quiet": "Tant qu'il est actif, seules les trouvailles meilleures que ton équipement s'annoncent. Le reste attend dans le sac.",
-  "flair.keep": "Garder {rarity}+"
+  "flair.keep": "Garder {rarity}+",
+  "leaderboard.chests": "Coffres",
+  "leaderboard.chests.hint": "Coffres ouverts. Les gemmes viennent des Gardiens : c'est un record de profondeur dépensée en chance.",
+  "leaderboard.chestValue": "{n} coffres"
 }

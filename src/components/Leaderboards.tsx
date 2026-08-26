@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { BoardKey, BoardResult, BoardRow } from "@/lib/engine/leaderboard";
+import { CatCanvas } from "./CatCanvas";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 import { TrophyIcon } from "./ui/Icons";
@@ -21,7 +22,11 @@ const BOARDS: { key: BoardKey; labelKey: string }[] = [
   { key: "lives", labelKey: "leaderboard.lives" },
   { key: "guardians", labelKey: "leaderboard.guardians" },
   { key: "fortune", labelKey: "leaderboard.fortune" },
+  { key: "chests", labelKey: "leaderboard.chests" },
 ];
+
+/** Gold, silver, bronze. The only three places that get a colour of their own. */
+const MEDALS = ["#f3d68f", "#cfd8e3", "#d09a63"];
 
 export function Leaderboards() {
   const { t } = useI18n();
@@ -78,8 +83,10 @@ export function Leaderboards() {
         <p className="dim mt-8 text-center text-sm">{t("leaderboard.empty")}</p>
       ) : (
         <>
+          <Podium rows={data.rows.slice(0, 3)} board={board} />
+
           <div className="mt-4 space-y-1.5">
-            {data.rows.map((row, index) => (
+            {data.rows.slice(3).map((row, index) => (
               <Row key={row.userId} row={row} board={board} index={index} />
             ))}
           </div>
@@ -102,6 +109,97 @@ export function Leaderboards() {
       )}
     </main>
   );
+}
+
+/**
+ * THE PODIUM
+ *
+ * Three cats, wearing what they were actually wearing when the board was read.
+ *
+ * A leaderboard of handles and numbers says who won and nothing about what
+ * winning looks like. The cat is the whole game — the coat is bought, the six
+ * pieces are found and chosen — so the top three are drawn rather than listed,
+ * and a player scrolling past can see what a Sovereign set on a Void coat looks
+ * like before they have one.
+ *
+ * Second, first, third, left to right: the middle is the tallest place on a
+ * podium, and reading order is not rank order once there is a shape to read.
+ */
+function Podium({ rows, board }: { rows: BoardRow[]; board: BoardKey }) {
+  const { t } = useI18n();
+  const [first, second, third] = rows;
+  const places = [second, first, third].filter(Boolean) as BoardRow[];
+  if (places.length === 0) return null;
+
+  return (
+    <div className="mt-4 flex items-end justify-center gap-2">
+      {places.map((row) => {
+        const rank = row.position;
+        const medal = MEDALS[rank - 1] ?? "var(--text-faint)";
+        const top = rank === 1;
+        return (
+          <motion.div
+            key={row.userId}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: (rank === 1 ? 0 : rank) * 0.06 }}
+            className="flex min-w-0 flex-1 flex-col items-center"
+          >
+            {/* The winner is drawn larger and is the only one still breathing:
+                a podium where all three are the same size is a list in a row. */}
+            <CatCanvas
+              worn={row.cat?.worn ?? []}
+              size={top ? 96 : 74}
+              breathing={top}
+              skin={row.cat?.skin ?? "classic"}
+            />
+            <div
+              className="panel w-full px-1.5 pb-2 text-center"
+              style={{
+                borderColor: `${medal}66`,
+                background: row.isViewer ? "rgba(201,162,77,0.1)" : `${medal}0f`,
+                paddingTop: top ? "0.6rem" : "0.35rem",
+              }}
+            >
+              <p
+                className="tabular text-[0.9rem] leading-none"
+                style={{ color: medal, textShadow: `0 0 10px ${medal}55` }}
+              >
+                {rank}
+              </p>
+              <p className="mt-1 truncate text-[0.68rem] text-[var(--parchment)]">{row.handle}</p>
+              <p className="gold-text tabular mt-0.5 text-[0.7rem] leading-tight">
+                {valueLabel(row, board, t)}
+              </p>
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The headline number, in the unit its board counts in.
+ *
+ * "floor 700" and "700 floors" are different claims: one is a place, the other
+ * a distance. Shared by the podium and the list so the two can never disagree.
+ */
+function valueLabel(row: BoardRow, board: BoardKey, t: (key: string, vars?: Record<string, string | number>) => string) {
+  switch (board) {
+    case "depth":
+      return t("leaderboard.floorValue", { n: formatNumber(row.value) });
+    case "distance":
+      return t("leaderboard.distanceValue", { n: formatNumber(row.value) });
+    case "lives":
+      return t(row.value === 1 ? "leaderboard.lifeValue" : "leaderboard.livesValue", {
+        n: row.value,
+      });
+    case "chests":
+      return t("leaderboard.chestValue", { n: formatNumber(row.value) });
+    default:
+      return formatNumber(row.value);
+  }
 }
 
 function Row({ row, board, index }: { row: BoardRow; board: BoardKey; index: number }) {
@@ -138,17 +236,7 @@ function Row({ row, board, index }: { row: BoardRow; board: BoardKey; index: num
 
       <span className="text-right">
         <span className="tabular gold-text block text-[0.85rem]">
-          {/* "floor 700" and "700 floors" are different claims: one is a place,
-              the other a distance. */}
-          {board === "depth"
-            ? t("leaderboard.floorValue", { n: formatNumber(row.value) })
-            : board === "distance"
-              ? t("leaderboard.distanceValue", { n: formatNumber(row.value) })
-              : board === "lives"
-                ? t(row.value === 1 ? "leaderboard.lifeValue" : "leaderboard.livesValue", {
-                    n: row.value,
-                  })
-                : formatNumber(row.value)}
+          {valueLabel(row, board, t)}
         </span>
         {/* Depth and lives under every board: the headline number alone says
             nothing about what kind of player produced it. */}

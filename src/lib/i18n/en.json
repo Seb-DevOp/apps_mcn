@@ -267,5 +267,8 @@
   "idle.sellAllAsk": "Sell all {n} spares for {gold} gold? Nothing comes back.",
   "idle.awaySold": "{n} sold where they fell · +{gold}",
   "flair.quiet": "While it is on, only finds better than what the cat wears announce themselves. The rest waits in the bag.",
-  "flair.keep": "Keep {rarity}+"
+  "flair.keep": "Keep {rarity}+",
+  "leaderboard.chests": "Chests",
+  "leaderboard.chests.hint": "Chests opened. Gems come from Guardians, so this is a record of depth spent on luck.",
+  "leaderboard.chestValue": "{n} chests"
 }

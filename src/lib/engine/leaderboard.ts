@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/db";
-import { levelInfo, LEVELS_PER_FLOOR } from "@/lib/content/idle";
+import {
+  levelInfo,
+  weaponFor,
+  LEVELS_PER_FLOOR,
+  type Rarity,
+  type Slot,
+  type WeaponKind,
+} from "@/lib/content/idle";
 
 /**
  * Five boards, on purpose.
@@ -14,9 +21,28 @@ import { levelInfo, LEVELS_PER_FLOOR } from "@/lib/content/idle";
  * All five read the idle profile and nothing else.
  */
 
-export type BoardKey = "depth" | "distance" | "lives" | "guardians" | "fortune";
+export type BoardKey =
+  | "depth"
+  | "distance"
+  | "lives"
+  | "guardians"
+  | "fortune"
+  | "chests";
 
-export const BOARDS: BoardKey[] = ["depth", "distance", "lives", "guardians", "fortune"];
+export const BOARDS: BoardKey[] = [
+  "depth",
+  "distance",
+  "lives",
+  "guardians",
+  "fortune",
+  "chests",
+];
+
+/** Enough of a player to draw their cat: the coat, and what it is wearing. */
+export interface BoardCat {
+  skin: string;
+  worn: { slot: Slot; shape: string; rarity: Rarity; weapon: WeaponKind }[];
+}
 
 export interface BoardRow {
   position: number;
@@ -28,6 +54,8 @@ export interface BoardRow {
   floor: number;
   lives: number;
   isViewer: boolean;
+  /** Only the top three carry one: the podium draws them, the list does not. */
+  cat?: BoardCat;
 }
 
 export interface BoardResult {
@@ -40,7 +68,13 @@ export interface BoardResult {
 
 const LIMIT = 25;
 
-type Field = "highestLevel" | "totalLevels" | "rebirths" | "bossKills" | "totalGold";
+type Field =
+  | "highestLevel"
+  | "totalLevels"
+  | "rebirths"
+  | "bossKills"
+  | "totalGold"
+  | "chestsOpened";
 
 const ORDER: Record<BoardKey, Field> = {
   depth: "highestLevel",
@@ -48,6 +82,7 @@ const ORDER: Record<BoardKey, Field> = {
   lives: "rebirths",
   guardians: "bossKills",
   fortune: "totalGold",
+  chests: "chestsOpened",
 };
 
 /** The smallest value worth ranking. Below it a player has not started. */
@@ -57,6 +92,7 @@ const FLOOR: Record<BoardKey, number> = {
   lives: 0,
   guardians: 0,
   fortune: 0,
+  chests: 0,
 };
 
 interface ProfileShape {
@@ -66,6 +102,8 @@ interface ProfileShape {
   rebirths: number;
   bossKills: number;
   totalGold: number;
+  chestsOpened: number;
+  skinKey: string;
   user: { handle: string };
 }
 
@@ -76,6 +114,8 @@ const SELECT = {
   rebirths: true,
   bossKills: true,
   totalGold: true,
+  chestsOpened: true,
+  skinKey: true,
   user: { select: { handle: true } },
 } as const;
 
@@ -92,6 +132,8 @@ function valueFor(profile: ProfileShape, board: BoardKey): number {
       return profile.bossKills;
     case "fortune":
       return Math.floor(profile.totalGold);
+    case "chests":
+      return profile.chestsOpened;
   }
 }
 
@@ -128,8 +170,44 @@ export async function getBoard(board: BoardKey, viewerId: string | null): Promis
   ]);
 
   const rows = profiles.map((profile, index) => toRow(profile, board, index + 1, viewerId));
+  await dressPodium(rows, profiles);
 
   return { board, rows, viewer: await viewerRow(board, viewerId, rows), total };
+}
+
+/**
+ * What the top three are wearing.
+ *
+ * One query for at most three players, and only the pieces actually on them —
+ * a podium is three cats, not thirty. The second cat of a Pack is left out on
+ * purpose: the podium shows the player, and a player is their first cat.
+ */
+async function dressPodium(rows: BoardRow[], profiles: ProfileShape[]): Promise<void> {
+  const top = rows.slice(0, 3);
+  if (top.length === 0) return;
+
+  const items = await prisma.idleItem.findMany({
+    where: { userId: { in: top.map((row) => row.userId) }, equippedSlot: { not: null } },
+    select: { id: true, userId: true, slot: true, shape: true, rarity: true, equippedSlot: true },
+  });
+
+  const skins = new Map(profiles.map((profile) => [profile.userId, profile.skinKey]));
+
+  for (const row of top) {
+    row.cat = {
+      skin: skins.get(row.userId) ?? "classic",
+      worn: items
+        .filter(
+          (item) => item.userId === row.userId && !item.equippedSlot?.startsWith("PACK:"),
+        )
+        .map((item) => ({
+          slot: item.slot as Slot,
+          shape: item.shape,
+          rarity: item.rarity as Rarity,
+          weapon: weaponFor(item.id),
+        })),
+    };
+  }
 }
 
 /**
