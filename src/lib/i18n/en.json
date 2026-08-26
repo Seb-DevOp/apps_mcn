@@ -260,5 +260,7 @@
   "bag.sealNone": "No set yet — three pieces of one rarity start one.",
   "bag.sealNext": "+1 → +{pct}%",
   "bag.all": "All",
-  "bag.noMatch": "Nothing like that in the bag."
+  "bag.noMatch": "Nothing like that in the bag.",
+  "rebirth.held": "What your relics give",
+  "rebirth.owedOf": "of {total} at floor {floor}"
 }

@@ -732,6 +732,9 @@ export interface RelicDef {
   key: RelicKey;
   nameEn: string;
   nameFr: string;
+  /** What it acts on, so a screen can say "×2.65 damage" and not just "+15%". */
+  unitEn: string;
+  unitFr: string;
   descEn: string;
   descFr: string;
   baseCost: number;
@@ -753,6 +756,8 @@ export const RELICS: RelicDef[] = [
     key: "memory",
     nameEn: "Memory",
     nameFr: "Mémoire",
+    unitEn: "damage",
+    unitFr: "dégâts",
     descEn: "+15% damage",
     descFr: "+15 % dégâts",
     baseCost: 1,
@@ -764,6 +769,8 @@ export const RELICS: RelicDef[] = [
     key: "tenacity",
     nameEn: "Tenacity",
     nameFr: "Ténacité",
+    unitEn: "health",
+    unitFr: "vie",
     descEn: "+15% health",
     descFr: "+15 % vie",
     baseCost: 1,
@@ -775,6 +782,8 @@ export const RELICS: RelicDef[] = [
     key: "greed",
     nameEn: "Greed",
     nameFr: "Avidité",
+    unitEn: "gold",
+    unitFr: "or",
     descEn: "+25% gold",
     descFr: "+25 % or",
     baseCost: 2,
@@ -786,6 +795,8 @@ export const RELICS: RelicDef[] = [
     key: "luck",
     nameEn: "Fortune",
     nameFr: "Chance",
+    unitEn: "drop chance",
+    unitFr: "de butin",
     descEn: "+3% drop chance",
     descFr: "+3 % de butin",
     baseCost: 3,

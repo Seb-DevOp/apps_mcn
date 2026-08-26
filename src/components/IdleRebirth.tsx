@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import type { IdleState } from "@/lib/engine/idle";
 import { useI18n } from "./I18nProvider";
-import { formatNumber } from "./format";
+import { formatFactor, formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
 
 /**
@@ -29,8 +29,28 @@ export function IdleRebirth({
   busy: string | null;
   act: (body: Record<string, unknown>, key: string) => void;
 }) {
-  const { t, L } = useI18n();
+  const { t, L, locale } = useI18n();
   const [confirming, setConfirming] = useState(false);
+
+  /**
+   * A relic's effect, in the form it actually takes.
+   *
+   * Three of the four multiply — damage, health, gold — and Fortune does not:
+   * it adds percentage points to a probability. Writing "×1.21 drop chance"
+   * would be a lie in the shape of a number.
+   */
+  const effect = (
+    relic: IdleState["relicShop"][number],
+    value: number = relic.held,
+    withUnit = true,
+  ) => {
+    // The unit is dropped on the right-hand side of an arrow: "×2.65 damage →
+    // ×2.80" says the same thing as repeating it and fits on one line.
+    const unit = withUnit ? ` ${locale === "fr" ? relic.unitFr : relic.unitEn}` : "";
+    return relic.factor
+      ? `×${formatFactor(value)}${unit}`
+      : `+${Math.round(value * 100)} %${unit}`;
+  };
 
   const { rebirth } = state;
   const worthIt = rebirth.owed > 0;
@@ -57,7 +77,16 @@ export function IdleRebirth({
               className="tabular mt-1 text-[0.95rem]"
               style={{ color: worthIt ? "var(--gold-bright)" : "var(--text-faint)" }}
             >
-              {rebirth.owed}
+              {formatNumber(rebirth.owed)}
+            </p>
+            {/* What is owed is a difference — this record's worth, less what has
+                already been paid for it. On its own it reads as a total, and a
+                total is what makes a number look either enormous or insulting. */}
+            <p className="dim text-[0.55rem] leading-tight">
+              {t("rebirth.owedOf", {
+                total: formatNumber(rebirth.total),
+                floor: rebirth.bestFloor,
+              })}
             </p>
           </div>
         </div>
@@ -105,6 +134,38 @@ export function IdleRebirth({
           </button>
         )}
       </section>
+
+      {/*
+        What the relics already bought are doing, at a glance.
+
+        The shop is three sections down and its cards used to say only what one
+        more level costs, so a player who had spent four lives' worth had no way
+        to see what any of it was worth. This is the same number the fight is
+        resolved with.
+      */}
+      {state.relicShop.some((relic) => relic.level > 0) && (
+        <section className="panel mt-3 p-3">
+          <p className="dim text-[0.58rem] uppercase tracking-widest">{t("rebirth.held")}</p>
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
+            {state.relicShop
+              .filter((relic) => relic.level > 0)
+              .map((relic) => (
+                <div key={relic.key} className="flex items-center gap-2">
+                  <span className="shrink-0 text-[var(--gold)]">
+                    <ItemIcon icon={relic.icon} size={15} />
+                  </span>
+                  <span className="dim min-w-0 flex-1 truncate text-[0.64rem]">
+                    {L(relic.nameEn, relic.nameFr)}
+                    <span className="tabular"> {relic.level}</span>
+                  </span>
+                  <span className="tabular shrink-0 text-[0.7rem] text-[var(--gold-bright)]">
+                    {effect(relic)}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
 
       <h2 className="eyebrow mt-6">{t("rebirth.ladder")}</h2>
       <p className="dim mt-1 text-[0.68rem] italic">{t("rebirth.ladderHint")}</p>
@@ -165,11 +226,19 @@ export function IdleRebirth({
                 </span>
                 <span className="tabular dim text-[0.7rem]">{relic.level}</span>
               </div>
-              <p className="dim mt-1 text-[0.65rem] leading-snug">
+              {relic.level > 0 && (
+                <p className="tabular mt-1 text-[0.72rem] text-[var(--gold-bright)]">
+                  {effect(relic)}
+                  {!relic.maxed && (
+                    <span className="dim"> → {effect(relic, relic.next, false)}</span>
+                  )}
+                </p>
+              )}
+              <p className="dim mt-1 text-[0.62rem] leading-snug">
                 {L(relic.descEn, relic.descFr)}
               </p>
               <p className="gold-text tabular mt-2 text-[0.72rem]">
-                {relic.maxed ? t("idle.maxed") : t("rebirth.cost", { n: relic.cost })}
+                {relic.maxed ? t("idle.maxed") : t("rebirth.cost", { n: formatNumber(relic.cost) })}
               </p>
             </motion.button>
           );

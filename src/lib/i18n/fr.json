@@ -260,5 +260,7 @@
   "bag.sealNone": "Aucun set — trois pièces de même rareté en ouvrent un.",
   "bag.sealNext": "+1 → +{pct} %",
   "bag.all": "Tout",
-  "bag.noMatch": "Rien de tel dans le sac."
+  "bag.noMatch": "Rien de tel dans le sac.",
+  "rebirth.held": "Ce que tes reliques donnent",
+  "rebirth.owedOf": "sur {total} à l'étage {floor}"
 }

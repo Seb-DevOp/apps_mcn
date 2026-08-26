@@ -894,22 +894,50 @@ function view(
         minFloor: rebirthFloorFor(profile.rebirths),
         /** Granted the moment a life is spent — zero until a record is beaten. */
         owed,
+        /**
+         * Everything this record is worth, paid and unpaid.
+         *
+         * Shown next to `owed` because on its own `owed` is a difference, and a
+         * difference read as a total is what makes a hundred relics look either
+         * enormous or insulting depending on the player's guess.
+         */
+        total: relicsForFloor(bestFloor),
         ready: bestFloor >= rebirthFloorFor(profile.rebirths),
       };
     })(),
 
-    relicShop: RELICS.map((def) => ({
-      key: def.key,
-      level: relics[def.key],
-      cost: relicCost(def, relics[def.key]),
-      maxed: def.maxLevel !== undefined && relics[def.key] >= def.maxLevel,
-      affordable: profile.relics >= relicCost(def, relics[def.key]),
-      nameEn: def.nameEn,
-      nameFr: def.nameFr,
-      descEn: def.descEn,
-      descFr: def.descFr,
-      icon: def.icon,
-    })),
+    /**
+     * The relic shop, and what the levels already bought are actually worth.
+     *
+     * A card that only says "+15% damage per level" leaves the player to
+     * multiply in their head, which nobody does — so relics were bought blind
+     * and their effect never seen. `held` is the number the fight uses.
+     *
+     * Three of them multiply and Fortune does not: it adds percentage points to
+     * a probability, so it is reported as points and flagged.
+     */
+    relicShop: RELICS.map((def) => {
+      const level = relics[def.key];
+      const value = (at: number) => (def.key === "luck" ? at * def.perLevel : 1 + at * def.perLevel);
+      return {
+        key: def.key,
+        level,
+        cost: relicCost(def, level),
+        maxed: def.maxLevel !== undefined && level >= def.maxLevel,
+        affordable: profile.relics >= relicCost(def, level),
+        held: value(level),
+        next: value(level + 1),
+        /** True when `held` reads as a multiplier rather than as points. */
+        factor: def.key !== "luck",
+        nameEn: def.nameEn,
+        nameFr: def.nameFr,
+        unitEn: def.unitEn,
+        unitFr: def.unitFr,
+        descEn: def.descEn,
+        descFr: def.descFr,
+        icon: def.icon,
+      };
+    }),
 
     /** The five rungs, and which of them this cat has climbed. */
     unlocks: UNLOCKS.map((def) => ({

@@ -24,6 +24,19 @@ export function formatNumber(value: number): string {
 }
 
 /**
+ * A multiplier, with the decimals that carry its meaning.
+ *
+ * `formatNumber` floors, which is right for damage and wrong for a factor:
+ * ×2.65 became "×2" and the two levels between them disappeared.
+ */
+export function formatFactor(value: number): string {
+  if (!Number.isFinite(value)) return "∞";
+  if (value < 10) return value.toFixed(2);
+  if (value < 1000) return value.toFixed(1);
+  return formatNumber(value);
+}
+
+/**
  * What wearing a piece would do, written so a person can read it.
  *
  * A percentage is the right unit for an incremental upgrade and the wrong one
