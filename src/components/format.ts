@@ -31,7 +31,13 @@ export function formatNumber(value: number): string {
  * Past a factor of ten the multiplier is what the number actually means.
  */
 export function formatGain(gain: number): string {
-  if (!Number.isFinite(gain) || gain <= 1) return "";
+  if (!Number.isFinite(gain) || gain <= 0) return "";
   if (gain >= 10) return `×${formatNumber(gain)}`;
-  return `+${Math.round((gain - 1) * 100)}%`;
+  // Losses are the other half of the question. A bag that only ever says how
+  // much better something is leaves "would this cost me power?" unanswered, and
+  // that is the one the player is actually asking while holding forty pieces.
+  if (gain <= 0.1) return `÷${formatNumber(1 / gain)}`;
+  const percent = Math.round((gain - 1) * 100);
+  if (percent === 0) return gain >= 1 ? "+0%" : "−0%";
+  return `${percent > 0 ? "+" : "−"}${Math.abs(percent)}%`;
 }

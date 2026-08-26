@@ -43,6 +43,7 @@ import {
   UNLOCKS,
   unlocked,
   sealBonus,
+  sealBonusFor,
   rebirthFloorFor,
   eliteLevel,
   ELITE_CHANCE,
@@ -830,6 +831,43 @@ function view(
     defeats: profile.defeats,
     recoverFor: profile.recoverFor,
     stats,
+
+    /**
+     * One number for how strong the cat is, so every other number can be read
+     * against it.
+     *
+     * It is `combatScore` — the same product the recommendation button optimises
+     * and the same one each spare's `gain` is a ratio of. Showing it turns "+18 %"
+     * into a quantity: the player can see what a piece is worth without owning the
+     * arithmetic, and can see a piece that would cost them power just as plainly.
+     */
+    score: baseline,
+
+    /**
+     * The matching set, and the rung above it.
+     *
+     * `sealBonus` only ever returns the best one, which is the right answer for
+     * the fight and a useless one for the bag: it cannot say "one more Epic and
+     * this doubles". Every rarity actually worn is listed with what it pays now
+     * and what one more piece would pay.
+     */
+    seals: {
+      open: unlocked("seals", profile.rebirths),
+      active: stats.seal,
+      worn: RARITIES.map((rarity) => {
+        const count = items.filter(
+          (item) => item.equippedSlot && !isPackSlot(item.equippedSlot) && item.rarity === rarity,
+        ).length;
+        return {
+          rarity,
+          count,
+          bonus: sealBonusFor(rarity, count),
+          /** What the next matching piece would be worth. Six is the last rung. */
+          next: count < 6 ? sealBonusFor(rarity, count + 1) : null,
+        };
+      }).filter((tier) => tier.count > 0),
+    },
+
     /** Seconds to kill the current enemy at the current power — the wall, made visible. */
     secondsToKill,
     /**

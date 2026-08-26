@@ -585,6 +585,15 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
           <Verdict outcome={state.outcome} isBoss={here.isBoss} />
 
+          {/* One number the other six can be read against, and the one every
+              "+18 %" in the bag is a percentage of. */}
+          <div className="panel mt-3 flex items-center justify-between px-3 py-2">
+            <span className="dim text-[0.6rem] uppercase tracking-widest">{t("idle.score")}</span>
+            <span className="tabular text-[1.05rem] text-[var(--gold-bright)]">
+              {formatNumber(state.score)}
+            </span>
+          </div>
+
           {/* --- The six statistics ----------------------------------- */}
           <section className="mt-3 grid grid-cols-3 gap-2">
             <Stat label={t("idle.dps")} value={`${formatNumber(stats.power)}/s`} tone="gold" />

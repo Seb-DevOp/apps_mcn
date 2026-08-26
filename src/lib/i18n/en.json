@@ -254,5 +254,11 @@
   "weapon.sword": "Sword",
   "weapon.staff": "Staff",
   "weapon.bow": "Bow",
-  "weapon.shield": "Shield"
+  "weapon.shield": "Shield",
+  "idle.score": "Power",
+  "bag.seal": "Set seal",
+  "bag.sealNone": "No set yet — three pieces of one rarity start one.",
+  "bag.sealNext": "+1 → +{pct}%",
+  "bag.all": "All",
+  "bag.noMatch": "Nothing like that in the bag."
 }

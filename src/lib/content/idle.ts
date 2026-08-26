@@ -945,14 +945,25 @@ export interface SealBonus {
   bonus: number;
 }
 
+/**
+ * What a given number of matching pieces of a given rarity is worth.
+ *
+ * Exported so the bag can show the rung above the one you are on. A set bonus
+ * you cannot see the next step of is a set bonus nobody sets out to complete.
+ */
+export function sealBonusFor(rarity: Rarity, count: number): number {
+  if (count < 3) return 0;
+  // Rarer sets are worth more, so a full common set never beats four legendaries.
+  return SEAL_STEPS[Math.min(count, 6)] * (1 + RARITIES.indexOf(rarity) * 0.16);
+}
+
+/** The highest rung any worn rarity reaches. */
 export function sealBonus(worn: Rarity[]): SealBonus {
   let best: SealBonus = { count: 0, rarity: null, bonus: 0 };
 
   for (const rarity of RARITIES) {
     const count = worn.filter((entry) => entry === rarity).length;
-    if (count < 3) continue;
-    // Rarer sets are worth more, so a full common set never beats four legendaries.
-    const bonus = SEAL_STEPS[Math.min(count, 6)] * (1 + RARITIES.indexOf(rarity) * 0.16);
+    const bonus = sealBonusFor(rarity, count);
     if (bonus > best.bonus) best = { count, rarity, bonus };
   }
 

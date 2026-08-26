@@ -46,6 +46,8 @@ export function IdleBag({
   const packOpen = state.unlocks.some((entry) => entry.key === "pack" && entry.open);
   const [dressing, setDressing] = useState<"CAT" | "PACK">("CAT");
   const [selected, setSelected] = useState<string | null>(null);
+  const [slotFilter, setSlotFilter] = useState<Slot | null>(null);
+  const [rarityFilter, setRarityFilter] = useState<Rarity | null>(null);
   const onPack = packOpen && dressing === "PACK";
 
   const worn = useMemo<WornPiece[]>(
@@ -110,6 +112,28 @@ export function IdleBag({
     [spares],
   );
 
+  /**
+   * What the grid shows: the filters applied, best first.
+   *
+   * Sorted by what wearing the piece would do rather than by when it was found,
+   * because that is the order the player reads them in — the tile worth tapping
+   * should be the first one.
+   */
+  const shown = useMemo(
+    () =>
+      spares
+        .filter((item) => (slotFilter ? item.slot === slotFilter : true))
+        .filter((item) => (rarityFilter ? item.rarity === rarityFilter : true))
+        .sort((a, b) => b.gain - a.gain),
+    [spares, slotFilter, rarityFilter],
+  );
+
+  /** Rarities worn at least twice: below that there is no set to speak of. */
+  const sealTiers = useMemo(
+    () => state.seals.worn.filter((tier) => tier.count >= 2).sort((a, b) => b.count - a.count),
+    [state.seals.worn],
+  );
+
   // The tile that is open, if it still exists — selling one leaves an id behind.
   const chosen = spares.find((item) => item.id === selected) ?? null;
 
@@ -138,6 +162,77 @@ export function IdleBag({
       <div className="panel panel-sapphire mt-4 flex justify-center py-3">
         <CatCanvas worn={worn} size={190} skin={state.shop.skinKey} />
       </div>
+
+      {/* --- What it all comes to ---------------------------------- */}
+      <div className="panel mt-3 flex items-center justify-between px-3 py-2">
+        <span className="dim text-[0.6rem] uppercase tracking-widest">{t("idle.score")}</span>
+        <span className="tabular text-[1.05rem] text-[var(--gold-bright)]">
+          {formatNumber(state.score)}
+        </span>
+      </div>
+
+      {/*
+        The set bonus, with the rung above it.
+
+        The fight only ever needs the best matching set, so that is all the stats
+        line ever said — which made the Seals a bonus that arrived by accident and
+        was never aimed at. Listing every rarity the cat is actually wearing, and
+        what one more piece of it would pay, is what turns them into a decision.
+      */}
+      {/* The Seals only ever count the first cat, so the frame steps aside
+          while the second one is being dressed rather than reporting the wrong
+          cat's set. */}
+      {state.seals.open && !onPack && (
+        <section className="panel mt-2 p-2.5">
+          <div className="flex items-baseline justify-between">
+            <span className="dim text-[0.6rem] uppercase tracking-widest">{t("bag.seal")}</span>
+            <span
+              className="tabular text-[0.82rem]"
+              style={{
+                color: state.seals.active.rarity
+                  ? RARITY_STYLE[state.seals.active.rarity].color
+                  : "var(--text-faint)",
+              }}
+            >
+              {state.seals.active.rarity
+                ? `+${Math.round(state.seals.active.bonus * 100)} %`
+                : "—"}
+            </span>
+          </div>
+
+          {sealTiers.length === 0 ? (
+            <p className="dim mt-1 text-[0.66rem] italic">{t("bag.sealNone")}</p>
+          ) : (
+            <div className="mt-1.5 space-y-1">
+              {sealTiers.map((tier) => {
+                const style = RARITY_STYLE[tier.rarity];
+                const live = tier.bonus > 0;
+                return (
+                  <div key={tier.rarity} className="flex items-center gap-2 text-[0.66rem]">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: style.color, opacity: live ? 1 : 0.5 }}
+                    />
+                    <span className="min-w-0 flex-1 truncate" style={{ color: style.color }}>
+                      {t(`idle.rarity.${tier.rarity}`)} ×{tier.count}
+                    </span>
+                    {live && (
+                      <span className="tabular text-[#7ed08f]">
+                        +{Math.round(tier.bonus * 100)} %
+                      </span>
+                    )}
+                    {tier.next !== null && tier.next > tier.bonus && (
+                      <span className="dim tabular">
+                        {t("bag.sealNext", { pct: Math.round(tier.next * 100) })}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       <h2 className="eyebrow mt-5">{t("idle.equipped")}</h2>
       <div className="mt-2 grid grid-cols-3 gap-2">
@@ -294,42 +389,102 @@ export function IdleBag({
             border and the green corner carry everything a first pass needs, and
             the numbers wait until a tile is picked.
           */}
-          <div className="mt-2 grid grid-cols-4 gap-2">
-            {spares.map((item, index) => {
-              const style = RARITY_STYLE[item.rarity];
-              const better = item.gain > 1.0001;
-              const picked = selected === item.id;
-              return (
-                <motion.button
-                  key={item.id}
-                  type="button"
-                  initial={{ opacity: 0, scale: 0.94 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: Math.min(index, 12) * 0.015 }}
-                  onClick={() => setSelected(picked ? null : item.id)}
-                  className="panel relative flex aspect-square items-center justify-center p-1"
-                  style={{
-                    borderColor: picked ? "rgba(201,162,77,0.8)" : `${style.color}55`,
-                    background: picked ? "rgba(201,162,77,0.1)" : `${style.color}0f`,
-                  }}
-                >
-                  <ItemArt
-                    slot={item.slot}
-                    shape={item.shape}
-                    rarity={item.rarity}
-                    id={item.id}
-                    size={46}
-                  />
-                  {better && (
-                    <span
-                      className="absolute right-1 top-1 h-2 w-2 rounded-full"
-                      style={{ background: "#7ed08f", boxShadow: "0 0 6px #7ed08f" }}
-                    />
-                  )}
-                </motion.button>
-              );
-            })}
+          {/*
+            Two rows of filters rather than a search box.
+            Forty pieces is small enough that typing is absurd and large enough
+            that hunting for the one Epic helm is a chore. Only the slots and
+            rarities actually in the bag get a chip: an empty filter is a button
+            that can only disappoint.
+          */}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Chip active={slotFilter === null} onPick={() => setSlotFilter(null)}>
+              {t("bag.all")}
+            </Chip>
+            {SLOTS.filter((slot) => spares.some((item) => item.slot === slot)).map((slot) => (
+              <Chip
+                key={slot}
+                active={slotFilter === slot}
+                onPick={() => setSlotFilter(slotFilter === slot ? null : slot)}
+              >
+                {t(`idle.slot.${slot}`)}
+              </Chip>
+            ))}
           </div>
+
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <Chip active={rarityFilter === null} onPick={() => setRarityFilter(null)}>
+              {t("bag.all")}
+            </Chip>
+            {RARITIES.filter((rarity) => spares.some((item) => item.rarity === rarity)).map(
+              (rarity) => (
+                <Chip
+                  key={rarity}
+                  active={rarityFilter === rarity}
+                  colour={RARITY_STYLE[rarity].color}
+                  onPick={() => setRarityFilter(rarityFilter === rarity ? null : rarity)}
+                >
+                  {t(`idle.rarity.${rarity}`)}
+                </Chip>
+              ),
+            )}
+          </div>
+
+          {shown.length === 0 ? (
+            <p className="dim mt-3 text-center text-[0.72rem] italic">{t("bag.noMatch")}</p>
+          ) : (
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {shown.map((item, index) => {
+                const style = RARITY_STYLE[item.rarity];
+                const better = item.gain > 1.0001;
+                const picked = selected === item.id;
+                return (
+                  <motion.button
+                    key={item.id}
+                    type="button"
+                    initial={{ opacity: 0, scale: 0.94 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: Math.min(index, 12) * 0.015 }}
+                    onClick={() => setSelected(picked ? null : item.id)}
+                    className="panel relative flex aspect-square flex-col items-center justify-center gap-0.5 p-1"
+                    style={{
+                      borderColor: picked ? "rgba(201,162,77,0.8)" : `${style.color}55`,
+                      background: picked ? "rgba(201,162,77,0.1)" : `${style.color}0f`,
+                    }}
+                  >
+                    <ItemArt
+                      slot={item.slot}
+                      shape={item.shape}
+                      rarity={item.rarity}
+                      id={item.id}
+                      size={40}
+                    />
+                    {/* What it would do to the total, on the tile itself. A grid
+                        of pictures is readable and says nothing; this is the
+                        answer the bag was opened for. */}
+                    <span
+                      className="tabular text-[0.56rem] leading-none"
+                      style={{ color: better ? "#7ed08f" : "#d98d8d" }}
+                    >
+                      {formatGain(item.gain)}
+                    </span>
+                    {/* One pip per bonus. A number here would be a second '+3'
+                        next to '+18 %' and the two would be read as one. */}
+                    {item.affixes.length > 0 && (
+                      <span className="absolute left-1 top-1 flex gap-0.5">
+                        {item.affixes.map((affix, pip) => (
+                          <span
+                            key={`${affix.key}-${pip}`}
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={{ background: "var(--sapphire-pale)", opacity: 0.85 }}
+                          />
+                        ))}
+                      </span>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+          )}
 
           {/* The picked tile, in full. One panel that changes rather than forty
               that are always open. */}
@@ -364,9 +519,16 @@ export function IdleBag({
                     {formatNumber(chosen.power)}
                     <span className="dim"> · </span>
                     <span className="text-[#7ed08f]">{formatNumber(chosen.vitality)}</span>
-                    {chosen.gain > 1.0001 && formatGain(chosen.gain) !== "+0%" && (
-                      <span className="text-[#7ed08f]"> · {formatGain(chosen.gain)}</span>
-                    )}
+                  </p>
+                  {/* The whole verdict, in the unit the top of the screen uses:
+                      what the cat is worth now, and what it would be worth
+                      wearing this. */}
+                  <p className="tabular mt-0.5 text-[0.68rem]">
+                    <span className="dim">{formatNumber(state.score)}</span>
+                    <span className="dim"> → </span>
+                    <span style={{ color: chosen.gain > 1.0001 ? "#7ed08f" : "#d98d8d" }}>
+                      {formatNumber(state.score * chosen.gain)} ({formatGain(chosen.gain)})
+                    </span>
                   </p>
                 </div>
               </div>
@@ -411,5 +573,33 @@ export function IdleBag({
         </>
       )}
     </div>
+  );
+}
+
+/** One filter pill. The same shape whether it names a slot or a rarity. */
+function Chip({
+  active,
+  colour,
+  onPick,
+  children,
+}: {
+  active: boolean;
+  colour?: string;
+  onPick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className="panel flex items-center gap-1.5 px-2 py-1 text-[0.64rem] transition"
+      style={{
+        borderColor: active ? "rgba(201,162,77,0.7)" : undefined,
+        color: active ? "var(--gold-bright)" : "var(--text-dim)",
+      }}
+    >
+      {colour && <span className="h-2 w-2 rounded-full" style={{ background: colour }} />}
+      {children}
+    </button>
   );
 }
