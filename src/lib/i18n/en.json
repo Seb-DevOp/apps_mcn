@@ -265,5 +265,7 @@
   "rebirth.owedOf": "of {total} at floor {floor}",
   "flair.share": "{pct}% of finds",
   "idle.sellAllAsk": "Sell all {n} spares for {gold} gold? Nothing comes back.",
-  "idle.awaySold": "{n} sold where they fell · +{gold}"
+  "idle.awaySold": "{n} sold where they fell · +{gold}",
+  "flair.quiet": "While it is on, only finds better than what the cat wears announce themselves. The rest waits in the bag.",
+  "flair.keep": "Keep {rarity}+"
 }

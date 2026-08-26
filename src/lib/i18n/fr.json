@@ -265,5 +265,7 @@
   "rebirth.owedOf": "sur {total} à l'étage {floor}",
   "flair.share": "{pct} % des trouvailles",
   "idle.sellAllAsk": "Vendre les {n} rechanges pour {gold} or ? Rien ne revient.",
-  "idle.awaySold": "{n} vendues sur place · +{gold}"
+  "idle.awaySold": "{n} vendues sur place · +{gold}",
+  "flair.quiet": "Tant qu'il est actif, seules les trouvailles meilleures que ton équipement s'annoncent. Le reste attend dans le sac.",
+  "flair.keep": "Garder {rarity}+"
 }

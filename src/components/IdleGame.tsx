@@ -231,8 +231,29 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     // Only finds from a tick the player was present for. Twelve hours of absence
     // is a summary, not twenty-five cards.
     if (next.report.seconds <= 60) {
-      const fresh = next.report.drops.filter((drop) => !seenDrops.current.has(drop.id));
-      for (const drop of fresh) seenDrops.current.add(drop.id);
+      /**
+       * What is worth interrupting for.
+       *
+       * Two things are never worth it. A find the Nose turned into gold where it
+       * fell has no row and no decision left in it — it used to reach the queue
+       * anyway, as an entry with no id that rendered nothing and could push a
+       * real card out of a queue three deep.
+       *
+       * And once the Nose is on at all, the player has said where the line
+       * between junk and treasure is. Asking them about every piece under it,
+       * one card at a time, is asking a question they have already answered — so
+       * only finds that beat what the cat is wearing speak up. Everything else
+       * waits in the bag, which is where the sorting now happens.
+       */
+      const nose = next.autoSellBelow !== "";
+      const fresh = next.report.drops.filter((drop) => {
+        if (drop.sold || !drop.id) return false;
+        if (seenDrops.current.has(drop.id)) return false;
+        if (!nose || drop.equipped) return true;
+        const item = next.items.find((entry) => entry.id === drop.id);
+        return item ? item.gain > 1.0001 : true;
+      });
+      for (const drop of next.report.drops) if (drop.id) seenDrops.current.add(drop.id);
       if (fresh.length > 0) {
         setLoot((current) =>
           [

@@ -372,6 +372,11 @@ export const IdleBag = memo(function IdleBag({
         <section className="mt-5">
           <h2 className="eyebrow">{t("flair.title")}</h2>
           <p className="dim mt-1 text-[0.68rem] italic">{t("flair.hint")}</p>
+          {state.autoSellBelow !== "" && (
+            <p className="mt-1 text-[0.66rem] italic" style={{ color: "var(--sapphire-pale)" }}>
+              {t("flair.quiet")}
+            </p>
+          )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {["", ...flair.offered].map((rarity) => {
               const active = state.autoSellBelow === rarity;
@@ -395,8 +400,16 @@ export const IdleBag = memo(function IdleBag({
                       style={{ background: style.color }}
                     />
                   )}
+                  {/*
+                    Named by what it keeps, not by what it sells.
+
+                    "Sell below Epic" and "I sell everything purple and down" are
+                    two readings of the same chip that differ by one rarity, and
+                    the difference is invisible until the piece you wanted is
+                    gold. What a rule keeps is the half a player checks.
+                  */}
                   <span>
-                    {rarity ? t(`idle.rarity.${rarity}`) : t("flair.off")}
+                    {rarity ? t("flair.keep", { rarity: t(`idle.rarity.${rarity}`) }) : t("flair.off")}
                     {rarity !== "" && (
                       <span className="dim tabular block text-[0.56rem] leading-tight">
                         {t("flair.share", { pct: Math.round(caught * 100) })}
