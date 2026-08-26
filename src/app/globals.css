@@ -296,6 +296,53 @@ body {
   pointer-events: none;
 }
 
+/* --- The four numbers, at the top of every screen ------------------------- */
+
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  /* Full bleed: the shell pads its children by a rem, and a bar that stops
+     short of the edge reads as a card rather than as furniture. */
+  margin: 0 -1rem;
+  padding: 0.4rem 0.5rem calc(0.4rem + 1px);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+  background: linear-gradient(180deg, rgba(5, 8, 15, 0.97), rgba(10, 17, 40, 0.88));
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(201, 162, 77, 0.22);
+}
+
+.top-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.top-cell-label {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-family: var(--font-display);
+  font-size: 0.5rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.top-cell-value {
+  font-size: 0.82rem;
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- Bottom navigation --------------------------------------------------- */
 
 .nav-bar {

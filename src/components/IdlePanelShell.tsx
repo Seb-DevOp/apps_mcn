@@ -5,9 +5,9 @@ import type { IdleState } from "@/lib/engine/idle";
 import { IdleRebirth } from "./IdleRebirth";
 import { IdleShop } from "./IdleShop";
 import { LootPrompt, type LootEntry } from "./LootPrompt";
+import { resourcesOf } from "@/lib/engine/resources";
+import { publishResources } from "./ResourceBar";
 import { useI18n } from "./I18nProvider";
-import { formatNumber } from "./format";
-import { GemIcon } from "./ui/Icons";
 
 /**
  * The shell the Shop and Rebirth screens share.
@@ -102,29 +102,18 @@ export function IdlePanelShell({
     return () => window.clearInterval(timer);
   }, [sync]);
 
+  // Buying something is the one moment a player is watching a currency: the bar
+  // has to move with the purchase, not twenty seconds later.
+  useEffect(() => publishResources(resourcesOf(state)), [state]);
+
   return (
     <div className="pb-4">
-      <header className="pt-5 text-center">
+      {/* Each screen used to head itself with the currency it spends. The bar
+          above carries all four now, on every screen, which is the whole point
+          of it. */}
+      <header className="pt-4 text-center">
         <p className="eyebrow">
           {t(panel === "SHOP" ? "idle.tabShop" : "idle.tabRebirth")}
-        </p>
-        {/* The Shop counts in gems and the Rebirth screen in gold, because that
-            is what each of them spends. A header showing the wrong currency is a
-            header nobody reads twice. */}
-        {panel === "SHOP" ? (
-          <div className="mt-2 flex items-center justify-center gap-2">
-            <span style={{ color: "#8ef0ff" }}>
-              <GemIcon size={20} />
-            </span>
-            <span className="tabular text-2xl" style={{ color: "#8ef0ff" }}>
-              {formatNumber(state.shop.gems)}
-            </span>
-          </div>
-        ) : (
-          <p className="gold-text tabular mt-2 text-2xl">{formatNumber(state.gold)}</p>
-        )}
-        <p className="dim text-[0.6rem] uppercase tracking-widest">
-          {t(panel === "SHOP" ? "shop.gems" : "idle.gold")}
         </p>
       </header>
 

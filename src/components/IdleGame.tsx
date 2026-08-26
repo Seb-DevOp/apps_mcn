@@ -19,6 +19,7 @@ import { EnemyCanvas } from "./EnemyCanvas";
 import { FloorBackdrop, themeFor } from "./FloorBackdrop";
 import { IdleBag } from "./IdleBag";
 import { LootPrompt, type LootEntry } from "./LootPrompt";
+import { publishResources } from "./ResourceBar";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
@@ -63,6 +64,14 @@ const MERGE_MS = 240;
 const HIT_LIFE_MS = 700;
 /** The ceiling on numbers on screen at once, whatever is happening. */
 const MAX_HITS = 8;
+/**
+ * How often the top bar is told what the gold is doing.
+ *
+ * The replay moves gold a dozen times a second and the bar cannot usefully be
+ * read that fast; twice a second is a counter that visibly climbs and one
+ * render of four cells instead of twelve.
+ */
+const PUBLISH_MS = 500;
 
 interface Hit {
   id: number;
@@ -147,6 +156,9 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     killsSinceDefeat: 1,
   });
 
+  /** When the top bar was last told. */
+  const lastPublish = useRef(0);
+
   const nextHitId = useRef(0);
 
   /**
@@ -209,6 +221,12 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
   const adopt = useCallback((next: IdleState) => {
     setState(next);
+    publishResources({
+      score: next.score,
+      gold: next.gold,
+      gems: next.shop.gems,
+      relics: next.rebirth.relics,
+    });
 
     // Only finds from a tick the player was present for. Twelve hours of absence
     // is a summary, not twenty-five cards.
@@ -425,6 +443,19 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         shield: w.shield,
       });
 
+      // The bar above every screen cannot see the replay, so the replay tells
+      // it. Throttled: it is four numbers, not a fight.
+      if (now - lastPublish.current > PUBLISH_MS) {
+        lastPublish.current = now;
+        const live = stateRef.current;
+        publishResources({
+          score: live.score,
+          gold: w.gold,
+          gems: live.shop.gems,
+          relics: live.rebirth.relics,
+        });
+      }
+
       // Same batch as the line above, so expiring numbers cost no render of
       // their own. Returning the array untouched when nothing died lets React
       // bail out instead of reconciling.
@@ -481,8 +512,6 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         </h1>
         <p className="dim mt-1 text-[0.7rem] italic">{L(themeFor(here.floor).nameEn, themeFor(here.floor).nameFr)}</p>
         <FloorPips position={here.position} />
-        <p className="gold-text tabular mt-3 text-lg">{formatNumber(shown.gold)}</p>
-        <p className="dim text-[0.6rem] uppercase tracking-widest">{t("idle.gold")}</p>
       </header>
 
       {/* --- Two tabs, one running game --------------------------------- */}
@@ -654,15 +683,8 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
           <Verdict outcome={state.outcome} isBoss={here.isBoss} />
 
-          {/* One number the other six can be read against, and the one every
-              "+18 %" in the bag is a percentage of. */}
-          <div className="panel mt-3 flex items-center justify-between px-3 py-2">
-            <span className="dim text-[0.6rem] uppercase tracking-widest">{t("idle.score")}</span>
-            <span className="tabular text-[1.05rem] text-[var(--gold-bright)]">
-              {formatNumber(state.score)}
-            </span>
-          </div>
-
+          {/* Power itself lives in the bar at the top of every screen now.
+              These six are what it is made of. */}
           {/* --- The six statistics ----------------------------------- */}
           <section className="mt-3 grid grid-cols-3 gap-2">
             <Stat label={t("idle.dps")} value={`${formatNumber(stats.power)}/s`} tone="gold" />

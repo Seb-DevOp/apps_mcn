@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getAccountStatus } from "@/lib/auth/account";
-import { getIdleState } from "@/lib/engine/idle";
+import { idleStateForRequest } from "@/lib/engine/idle-request";
 import { levelInfo, weaponFor } from "@/lib/content/idle";
 import { ProfileView } from "@/components/ProfileView";
 
@@ -13,7 +13,7 @@ export default async function ProfilePage() {
 
   // Reading the idle state advances it, which is exactly right: time spent on the
   // profile page is time the cat spent descending.
-  const [state, account] = await Promise.all([getIdleState(user.id), getAccountStatus(user.id)]);
+  const [state, account] = await Promise.all([idleStateForRequest(user.id), getAccountStatus(user.id)]);
 
   return (
     <ProfileView
