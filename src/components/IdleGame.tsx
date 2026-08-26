@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ENEMY_ATTACK_INTERVAL,
@@ -43,10 +43,26 @@ import { ItemIcon } from "./ui/Icons";
 
 /** How often the replay is replaced by the server's answer. */
 const SYNC_INTERVAL_MS = 10_000;
-/** The replay runs on a timer rather than a frame loop: bars step, they do not slide. */
-const STEP_MS = 60;
-/** However fast the cat gets, blows never land closer together than this. */
-const MIN_SWING_SECONDS = 0.15;
+/**
+ * The replay runs on a timer rather than a frame loop: bars step, they do not
+ * slide. Every step is one React render of the arena, so this is the frame rate
+ * of the whole screen and not just of the maths.
+ */
+const STEP_MS = 80;
+/**
+ * However fast the cat gets, blows never land closer together than this.
+ *
+ * Eleven swings a second is a real speed by floor thirty and an unreadable one
+ * on a phone: four drawn swings a second carry the same damage — the batch
+ * factor below scales each one — at a third of the animation cost.
+ */
+const MIN_SWING_SECONDS = 0.22;
+/** Blows landing closer together than this share one number rather than stacking. */
+const MERGE_MS = 240;
+/** How long a number stays in the air before it is swept. */
+const HIT_LIFE_MS = 700;
+/** The ceiling on numbers on screen at once, whatever is happening. */
+const MAX_HITS = 8;
 
 interface Hit {
   id: number;
@@ -59,6 +75,10 @@ interface Hit {
   lift: number;
   /** How many blows this one number stands for, when several were merged. */
   strikes: number;
+  /** When it appeared, so a blow landing just after it can join it. */
+  born: number;
+  /** When it goes. Swept by the replay step rather than by a timer of its own. */
+  dies: number;
 }
 
 /** The predicted world. Kept in a ref: it changes far faster than it renders. */
@@ -128,20 +148,61 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   });
 
   const nextHitId = useRef(0);
+
+  /**
+   * Put a number in the air — or add to one already there.
+   *
+   * Blows that land within a few frames of each other grow the last number
+   * instead of spawning another. At eleven swings a second with double strikes
+   * that was twenty animated elements a second, each with its own removal timer
+   * and so its own render: a screen too busy to read that also made the phone
+   * work for the privilege. Merged, the same damage arrives as four or five
+   * numbers a second that visibly climb.
+   *
+   * Nothing here schedules its own removal. Every number carries the moment it
+   * dies and the replay step sweeps them, which folds the removals into a render
+   * that was going to happen anyway.
+   */
   const addHit = useCallback(
     (target: Hit["target"], value: number, crit = false, side = 0, strikes = 1) => {
-      const id = nextHitId.current++;
-      // A double strike puts its two numbers on opposite sides on purpose; every
-      // other blow is scattered. Landing them all on one line made four hits look
-      // like one unreadable smear.
-      const drift = side === 0 ? Math.random() * 56 - 28 : side * (16 + Math.random() * 16);
-      setHits((current) => [
-        ...current.slice(-13),
-        { id, target, value, crit, drift, lift: Math.random() * 16 - 8, strikes },
-      ]);
-      window.setTimeout(() => {
-        setHits((current) => current.filter((hit) => hit.id !== id));
-      }, 900);
+      const now = performance.now();
+      setHits((current) => {
+        for (let index = current.length - 1; index >= 0; index--) {
+          const hit = current[index];
+          if (hit.target !== target) continue;
+          // Only the newest number of this target is a candidate; once it is too
+          // old, every one before it is older still.
+          if (now - hit.born > MERGE_MS) break;
+          const merged = current.slice();
+          merged[index] = {
+            ...hit,
+            value: hit.value + value,
+            strikes: hit.strikes + strikes,
+            crit: hit.crit || crit,
+          };
+          return merged;
+        }
+
+        const id = nextHitId.current++;
+        // A double strike puts its two numbers on opposite sides on purpose; every
+        // other blow is scattered. Landing them all on one line made four hits look
+        // like one unreadable smear.
+        const drift = side === 0 ? Math.random() * 56 - 28 : side * (16 + Math.random() * 16);
+        return [
+          ...current.slice(-(MAX_HITS - 1)),
+          {
+            id,
+            target,
+            value,
+            crit,
+            drift,
+            lift: Math.random() * 16 - 8,
+            strikes,
+            born: now,
+            dies: now + HIT_LIFE_MS,
+          },
+        ];
+      });
     },
     [],
   );
@@ -282,9 +343,9 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           const blows = 1 + whole + (Math.random() < stats.extraStrikes - whole ? 1 : 0);
           const damage = stats.hitDamage * (crit ? stats.critMultiplier : 1) * batch;
 
-          // Up to three blows are worth seeing separately; beyond that they are
-          // one number with a count on it.
-          if (blows <= 3) {
+          // Two blows are worth seeing separately; beyond that they are one
+          // number with a count on it.
+          if (blows <= 2) {
             for (let blow = 0; blow < blows; blow++) {
               w.enemyHp -= damage;
               addHit("ENEMY", damage, crit, blows === 1 ? 0 : blow === 0 ? -1 : 1);
@@ -362,6 +423,14 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         gold: w.gold,
         recovering: w.recovering,
         shield: w.shield,
+      });
+
+      // Same batch as the line above, so expiring numbers cost no render of
+      // their own. Returning the array untouched when nothing died lets React
+      // bail out instead of reconciling.
+      setHits((current) => {
+        const live = current.filter((hit) => hit.dies > now);
+        return live.length === current.length ? current : live;
       });
     }, STEP_MS);
 
@@ -631,37 +700,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
           {/* --- Upgrades --------------------------------------------- */}
           <h2 className="eyebrow mt-6">{t("idle.upgrades")}</h2>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {state.upgrades.map((upgrade) => {
-              const affordable = shown.gold >= upgrade.cost && !upgrade.maxed;
-              return (
-                <button
-                  key={upgrade.key}
-                  type="button"
-                  disabled={!affordable || busy !== null}
-                  onClick={() => act({ action: "upgrade", key: upgrade.key }, upgrade.key)}
-                  className="panel p-3 text-left transition disabled:opacity-45"
-                  style={affordable ? { borderColor: "rgba(201,162,77,0.45)" } : undefined}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-[var(--gold)]">
-                      <ItemIcon icon={upgrade.icon} size={18} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[0.78rem] text-[var(--parchment)]">
-                      {L(upgrade.nameEn, upgrade.nameFr)}
-                    </span>
-                    <span className="tabular dim text-[0.7rem]">{upgrade.level}</span>
-                  </div>
-                  <p className="dim mt-1 text-[0.65rem] leading-snug">
-                    {L(upgrade.descEn, upgrade.descFr)}
-                  </p>
-                  <p className="gold-text tabular mt-2 text-[0.72rem]">
-                    {upgrade.maxed ? t("idle.maxed") : formatNumber(upgrade.cost)}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
+          <UpgradeGrid upgrades={state.upgrades} gold={shown.gold} busy={busy} act={act} />
 
           {defeats + state.defeats > 0 && (
             <p className="dim mt-5 text-center text-[0.66rem]">
@@ -733,6 +772,60 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 }
 
 // ---------------------------------------------------------------------------
+
+/**
+ * The six upgrades.
+ *
+ * Its own memoised component because the arena above it re-renders a dozen times
+ * a second and these six cards only change when gold does. Gold moves on a kill,
+ * not on a frame, so this went from twelve renders a second to a handful.
+ */
+const UpgradeGrid = memo(function UpgradeGrid({
+  upgrades,
+  gold,
+  busy,
+  act,
+}: {
+  upgrades: IdleState["upgrades"];
+  gold: number;
+  busy: string | null;
+  act: (body: Record<string, unknown>, key: string) => void;
+}) {
+  const { t, L } = useI18n();
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-2">
+      {upgrades.map((upgrade) => {
+        const affordable = gold >= upgrade.cost && !upgrade.maxed;
+        return (
+          <button
+            key={upgrade.key}
+            type="button"
+            disabled={!affordable || busy !== null}
+            onClick={() => act({ action: "upgrade", key: upgrade.key }, upgrade.key)}
+            className="panel p-3 text-left transition disabled:opacity-45"
+            style={affordable ? { borderColor: "rgba(201,162,77,0.45)" } : undefined}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[var(--gold)]">
+                <ItemIcon icon={upgrade.icon} size={18} />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[0.78rem] text-[var(--parchment)]">
+                {L(upgrade.nameEn, upgrade.nameFr)}
+              </span>
+              <span className="tabular dim text-[0.7rem]">{upgrade.level}</span>
+            </div>
+            <p className="dim mt-1 text-[0.65rem] leading-snug">
+              {L(upgrade.descEn, upgrade.descFr)}
+            </p>
+            <p className="gold-text tabular mt-2 text-[0.72rem]">
+              {upgrade.maxed ? t("idle.maxed") : formatNumber(upgrade.cost)}
+            </p>
+          </button>
+        );
+      })}
+    </div>
+  );
+});
 
 function TabButton({
   active,
@@ -813,8 +906,12 @@ function HitStream({
                 scale: hit.crit ? 1.5 : 0.6,
               }}
               animate={{ opacity: 1, y: (feet ? -22 : -30) + hit.lift, scale: 1 }}
-              exit={{ opacity: 0, y: (feet ? -40 : -50) + hit.lift }}
-              transition={{ duration: 0.78, ease: "easeOut" }}
+              // A number that has said what it had to say leaves quickly. The
+              // slow fade it used to keep meant every one sat in the DOM for a
+              // second and a half after its life was over, so a burst of blows
+              // left twenty animated elements behind for the compositor.
+              exit={{ opacity: 0, y: (feet ? -40 : -50) + hit.lift, transition: { duration: 0.24 } }}
+              transition={{ duration: 0.7, ease: "easeOut" }}
             >
               {prefix}
               {formatNumber(hit.value)}

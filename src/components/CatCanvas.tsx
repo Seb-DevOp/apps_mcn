@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   RARITY_STYLE,
@@ -35,7 +35,12 @@ export interface WornPiece {
   weapon?: WeaponKind;
 }
 
-export function CatCanvas({
+/**
+ * Memoised: the arena re-renders a dozen times a second and this cat changes
+ * only when the player equips something. Reconciling sixty paths per frame for
+ * a drawing that never moved was most of what the phone was doing.
+ */
+export const CatCanvas = memo(function CatCanvas({
   worn,
   size = 260,
   breathing = true,
@@ -193,7 +198,7 @@ export function CatCanvas({
       {shape("HEAD") && <Head shape={shape("HEAD")!} colour={colour("HEAD")!} />}
     </motion.svg>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Equipment layers

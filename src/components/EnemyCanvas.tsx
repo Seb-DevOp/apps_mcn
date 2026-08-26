@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { motion } from "framer-motion";
 import type { EnemyKind } from "@/lib/content/idle";
 
@@ -18,7 +19,8 @@ import type { EnemyKind } from "@/lib/content/idle";
  * is one function and nothing else.
  */
 
-export function EnemyCanvas({
+/** Memoised for the same reason as the cat: it changes on a recoil, not a frame. */
+export const EnemyCanvas = memo(function EnemyCanvas({
   kind,
   isBoss,
   elite,
@@ -71,7 +73,7 @@ export function EnemyCanvas({
       </motion.g>
     </motion.svg>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 

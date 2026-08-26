@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   RARITIES,
@@ -30,7 +30,14 @@ import { ItemIcon } from "./ui/Icons";
  * the server keeps resolving time either way, and coming back to the arena should
  * be instant rather than a navigation.
  */
-export function IdleBag({
+/**
+ * Memoised, and it matters more here than anywhere.
+ *
+ * The replay ticks a dozen times a second whichever tab is open, so a bag of
+ * seventy tiles — each one an SVG — was being reconciled a dozen times a second
+ * while the player read it. Nothing in it moves between two syncs.
+ */
+export const IdleBag = memo(function IdleBag({
   state,
   busy,
   act,
@@ -574,7 +581,7 @@ export function IdleBag({
       )}
     </div>
   );
-}
+});
 
 /** One filter pill. The same shape whether it names a slot or a rarity. */
 function Chip({

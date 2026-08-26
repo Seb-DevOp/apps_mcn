@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { motion } from "framer-motion";
 
 /**
@@ -344,7 +345,8 @@ export function themeFor(floor: number) {
   return { nameEn: theme.nameEn, nameFr: theme.nameFr };
 }
 
-export function FloorBackdrop({ floor }: { floor: number }) {
+/** Memoised: the chamber changes once a level and was being redrawn every step. */
+export const FloorBackdrop = memo(function FloorBackdrop({ floor }: { floor: number }) {
   const index = (Math.max(1, floor) - 1) % THEMES.length;
   const theme = THEMES[index];
   const cycle = Math.floor((Math.max(1, floor) - 1) / THEMES.length);
@@ -385,7 +387,7 @@ export function FloorBackdrop({ floor }: { floor: number }) {
       {theme.motes && <Motes colour={theme.motes} seed={index} />}
     </div>
   );
-}
+});
 
 /**
  * Specks drifting upward. Positions come from the theme index rather than
