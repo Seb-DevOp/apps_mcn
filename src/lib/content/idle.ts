@@ -239,12 +239,16 @@ export const UPGRADES: UpgradeDef[] = [
     key: "crit",
     nameEn: "Critical Chance",
     nameFr: "Chance Critique",
-    descEn: "+1.5% crit chance",
-    descFr: "+1,5 % critique",
+    descEn: "+1% crit chance",
+    descFr: "+1 % critique",
     baseCost: 25,
     costGrowth: 1.27,
-    perLevel: 0.015,
-    maxLevel: 64,
+    perLevel: 0.01,
+    // Ninety-five, not a round hundred: the cat starts at 5 %, so 95 levels of
+    // one point is exactly the level that reaches certainty. Levels past that
+    // would take gold and change nothing, which is the one thing an upgrade
+    // must never do.
+    maxLevel: 95,
     axis: "OFFENCE",
     icon: "aura",
   },
