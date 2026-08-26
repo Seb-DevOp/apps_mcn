@@ -9,6 +9,7 @@ import {
   RECOVERY_SECONDS,
   enemyKindFor,
   enemyName,
+  weaponFor,
   floorStart,
   levelInfo,
 } from "@/lib/content/idle";
@@ -375,7 +376,13 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     () =>
       state.items
         .filter((item) => item.equipped && !item.onPack)
-        .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity })),
+        .map((item) => ({
+          slot: item.slot,
+          shape: item.shape,
+          rarity: item.rarity,
+          // Only the hands carry one; the other five ignore it.
+          weapon: weaponFor(item.id),
+        })),
     [state.items],
   );
 
@@ -383,7 +390,13 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     () =>
       state.items
         .filter((item) => item.onPack)
-        .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity })),
+        .map((item) => ({
+          slot: item.slot,
+          shape: item.shape,
+          rarity: item.rarity,
+          // Only the hands carry one; the other five ignore it.
+          weapon: weaponFor(item.id),
+        })),
     [state.items],
   );
 

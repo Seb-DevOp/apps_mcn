@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getAccountStatus } from "@/lib/auth/account";
 import { getIdleState } from "@/lib/engine/idle";
-import { levelInfo } from "@/lib/content/idle";
+import { levelInfo, weaponFor } from "@/lib/content/idle";
 import { ProfileView } from "@/components/ProfileView";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,12 @@ export default async function ProfilePage() {
       }}
       worn={state.items
         .filter((item) => item.equipped)
-        .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity }))}
+        .map((item) => ({
+          slot: item.slot,
+          shape: item.shape,
+          rarity: item.rarity,
+          weapon: weaponFor(item.id),
+        }))}
       account={account}
     />
   );

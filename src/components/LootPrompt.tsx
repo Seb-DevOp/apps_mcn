@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { RARITY_STYLE, affixLabel, itemName, type Rarity, type Slot } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
+import { ItemArt } from "./ItemArt";
 import { useI18n } from "./I18nProvider";
 import { formatGain, formatNumber } from "./format";
 
@@ -132,9 +133,12 @@ function Card({
       }}
     >
       <div className="flex items-start gap-2">
-        <span
-          className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ background: style.color, boxShadow: `0 0 8px ${style.color}` }}
+        <ItemArt
+          slot={entry.slot}
+          shape={item.shape}
+          rarity={entry.rarity}
+          id={entry.id}
+          size={44}
         />
         <div className="min-w-0 flex-1">
           <p className="dim text-[0.58rem] uppercase tracking-widest">

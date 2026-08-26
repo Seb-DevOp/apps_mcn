@@ -1,7 +1,14 @@
 "use client";
 
+import { useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { RARITY_STYLE, SKIN_BY_KEY, type Slot, type Rarity } from "@/lib/content/idle";
+import {
+  RARITY_STYLE,
+  SKIN_BY_KEY,
+  type Slot,
+  type Rarity,
+  type WeaponKind,
+} from "@/lib/content/idle";
 
 /**
  * The cat, wearing what it found.
@@ -24,6 +31,8 @@ export interface WornPiece {
   slot: Slot;
   shape: string;
   rarity: Rarity;
+  /** Only ever set on the hands: which of the four weapons is being held. */
+  weapon?: WeaponKind;
 }
 
 export function CatCanvas({
@@ -125,6 +134,12 @@ export function CatCanvas({
       <ellipse cx="50" cy="201" rx="12" ry="8" fill={FUR} />
       <ellipse cx="150" cy="201" rx="12" ry="8" fill={FUR} />
       {shape("HANDS") && <Hands shape={shape("HANDS")!} colour={colour("HANDS")!} />}
+      {/* A gauntlet and the thing it is holding. The bag shows a photograph of
+          the weapon; drawing the same *kind* here is what stops the two screens
+          from disagreeing about what the cat is carrying. */}
+      {bySlot.get("HANDS")?.weapon && (
+        <Weapon kind={bySlot.get("HANDS")!.weapon!} colour={colour("HANDS")!} />
+      )}
 
       {shape("SHOULDERS") && <Shoulders shape={shape("SHOULDERS")!} colour={colour("SHOULDERS")!} />}
 
@@ -471,5 +486,193 @@ function Trinket({ shape, colour }: { shape: string; colour: string }) {
       <path d="M87 136 l-3 -13 l10 7 l6 -12 l6 12 l10 -7 l-3 13 Z" fill="url(#cat-gold)" />
       <circle cx="100" cy="146" r="6.5" fill={colour} stroke="url(#cat-gold)" strokeWidth="2" />
     </g>
+  );
+}
+
+/** What the right paw is holding, in the same four kinds the bag shows. */
+function Weapon({ kind, colour }: { kind: WeaponKind; colour: string }) {
+  if (kind === "sword") {
+    return (
+      <g>
+        <path d="M158 196 L158 120" stroke={colour} strokeWidth="7" strokeLinecap="round" />
+        <path d="M158 116 l5 8 h-10 z" fill="url(#cat-gold)" />
+        <path d="M148 190 h20" stroke="url(#cat-gold)" strokeWidth="5" strokeLinecap="round" />
+      </g>
+    );
+  }
+  if (kind === "staff") {
+    return (
+      <g>
+        <path d="M158 214 L158 116" stroke="#6b5540" strokeWidth="6" strokeLinecap="round" />
+        <circle cx="158" cy="110" r="9" fill={colour} stroke="url(#cat-gold)" strokeWidth="2.5" />
+        <path d="M150 122 q8 -6 16 0" stroke="url(#cat-gold)" strokeWidth="2.5" fill="none" />
+      </g>
+    );
+  }
+  if (kind === "bow") {
+    return (
+      <g>
+        <path d="M164 122 C182 150 182 182 164 210" stroke={colour} strokeWidth="6" fill="none" strokeLinecap="round" />
+        <path d="M164 122 L164 210" stroke="url(#cat-gold)" strokeWidth="2" opacity="0.8" />
+      </g>
+    );
+  }
+  return (
+    <g>
+      <path d="M156 148 h30 v26 q0 20 -15 28 q-15 -8 -15 -28 z" fill={colour} />
+      <path d="M156 148 h30 v26 q0 20 -15 28 q-15 -8 -15 -28 z" fill="none" stroke="url(#cat-gold)" strokeWidth="2.5" />
+      <circle cx="171" cy="172" r="5" fill="url(#cat-gold)" />
+    </g>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The same pieces, on their own
+// ---------------------------------------------------------------------------
+
+/**
+ * Where each slot sits on the cat, so a piece can be shown alone by framing the
+ * part of the drawing it occupies.
+ *
+ * This is why the bag and the cat can never disagree about what a Horned Helm
+ * looks like: it is not a second icon that has to be kept in step, it is the
+ * same path, cropped.
+ */
+const SLOT_FRAME: Record<Slot, string> = {
+  HEAD: "18 -10 164 96",
+  SHOULDERS: "8 104 184 72",
+  CHEST: "56 122 88 102",
+  HANDS: "30 164 140 56",
+  LEGS: "58 186 84 58",
+  TRINKET: "60 102 80 62",
+};
+
+const RENDERERS: Record<Slot, (props: { shape: string; colour: string }) => React.ReactElement> = {
+  HEAD: Head,
+  SHOULDERS: Shoulders,
+  CHEST: Chest,
+  HANDS: Hands,
+  LEGS: Legs,
+  TRINKET: Trinket,
+};
+
+/**
+ * The part of the cat a piece is worn on, in silhouette.
+ *
+ * Without it a headband and a necklace are both "a coloured arc" and the bag is
+ * a wall of indistinguishable curves. Behind a faint head, one is obviously a
+ * band and the other obviously hangs at the neck — and since these are the same
+ * paths the cat is drawn from, the tile cannot drift from the figure.
+ */
+function Ghost({ slot }: { slot: Slot }) {
+  const skin = { fill: "#8093b5", opacity: 0.2 };
+  if (slot === "HEAD") {
+    return (
+      <g {...skin}>
+        <path d="M66 58 L57 16 L93 42 Z" />
+        <path d="M134 58 L143 16 L107 42 Z" />
+        <path d="M64 88 Q46 96 48 112 Q62 108 70 96 Z" />
+        <path d="M136 88 Q154 96 152 112 Q138 108 130 96 Z" />
+        <ellipse cx="100" cy="78" rx="42" ry="37" />
+      </g>
+    );
+  }
+  if (slot === "LEGS") {
+    return (
+      <g {...skin}>
+        <rect x="71" y="198" width="24" height="46" rx="12" />
+        <rect x="105" y="198" width="24" height="46" rx="12" />
+        <ellipse cx="83" cy="245" rx="15" ry="7" />
+        <ellipse cx="117" cy="245" rx="15" ry="7" />
+      </g>
+    );
+  }
+  if (slot === "HANDS") {
+    return (
+      <g {...skin}>
+        <path d="M62 148 C51 166 48 182 50 196" stroke="#8093b5" strokeWidth="18" strokeLinecap="round" fill="none" />
+        <path d="M138 148 C149 166 152 182 150 196" stroke="#8093b5" strokeWidth="18" strokeLinecap="round" fill="none" />
+      </g>
+    );
+  }
+  const barrel = (
+    <path d="M64 140 C59 168 58 196 67 212 C82 224 118 224 133 212 C142 196 141 168 136 140 C122 130 78 130 64 140 Z" />
+  );
+  const ruff = (
+    <path d="M52 112 Q62 140 72 128 Q80 150 92 138 Q100 156 108 138 Q120 150 128 128 Q138 140 148 112 Q100 94 52 112 Z" />
+  );
+  return (
+    <g {...skin}>
+      {barrel}
+      {slot !== "CHEST" && ruff}
+    </g>
+  );
+}
+
+/**
+ * One worn piece, drawn alone in a box.
+ *
+ * The frame is measured, not tabulated. The shapes differ wildly in extent — a
+ * plain headband is a flat sliver, a crown reaches half the cat's height — so a
+ * fixed box per slot left most pieces as a few pixels of colour in an empty
+ * square. Measuring what the paths actually cover fills the tile with the item,
+ * whatever it is, and keeps working when a new shape is added.
+ *
+ * The aspect is clamped at 2:1 so a headband stays wide and thin (which it is)
+ * without being blown up to a square band, and nothing is ever distorted.
+ */
+export function SlotArt({
+  slot,
+  shape,
+  rarity,
+  size = 48,
+}: {
+  slot: Slot;
+  shape: string;
+  rarity: Rarity;
+  size?: number;
+}) {
+  const Renderer = RENDERERS[slot];
+  const group = useRef<SVGGElement>(null);
+  const [frame, setFrame] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    const node = group.current;
+    if (!node) return;
+    let box: DOMRect;
+    try {
+      box = node.getBBox();
+    } catch {
+      // A detached or display:none subtree has no box to measure; the slot's
+      // rough frame is still a usable answer.
+      return;
+    }
+    if (box.width === 0 || box.height === 0) return;
+
+    // getBBox measures fills, not strokes, and several shapes are stroke-only.
+    const pad = Math.max(box.width, box.height) * 0.1 + 4;
+    let width = box.width + pad * 2;
+    let height = box.height + pad * 2;
+    height = Math.max(height, width / 2);
+    width = Math.max(width, height / 2);
+
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    setFrame(`${cx - width / 2} ${cy - height / 2} ${width} ${height}`);
+  }, [slot, shape]);
+
+  return (
+    <svg viewBox={frame ?? SLOT_FRAME[slot]} width={size} height={size} aria-hidden>
+      <defs>
+        <linearGradient id="cat-gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f3d68f" />
+          <stop offset="100%" stopColor="#a97f31" />
+        </linearGradient>
+      </defs>
+      <g ref={group}>
+        <Ghost slot={slot} />
+        <Renderer shape={shape} colour={RARITY_STYLE[rarity].color} />
+      </g>
+    </svg>
   );
 }

@@ -203,8 +203,8 @@ export const UPGRADES: UpgradeDef[] = [
     key: "attack",
     nameEn: "Attack",
     nameFr: "Attaque",
-    descEn: "×1.10 damage per hit, per level. Never stops being worth it.",
-    descFr: "×1,10 de dégâts par coup et par niveau. Ne cesse jamais de payer.",
+    descEn: "×1.10 damage",
+    descFr: "×1,10 dégâts",
     baseCost: 30,
     costGrowth: 2.88,
     perLevel: 0.1,
@@ -215,8 +215,8 @@ export const UPGRADES: UpgradeDef[] = [
     key: "health",
     nameEn: "Health",
     nameFr: "Points de Vie",
-    descEn: "×1.12 health per level. The only answer to a Guardian that hits hard.",
-    descFr: "×1,12 de vie par niveau. La seule réponse à un Gardien qui frappe fort.",
+    descEn: "×1.12 health",
+    descFr: "×1,12 vie",
     baseCost: 40,
     costGrowth: 1.46,
     perLevel: 0.12,
@@ -227,8 +227,8 @@ export const UPGRADES: UpgradeDef[] = [
     key: "speed",
     nameEn: "Attack Speed",
     nameFr: "Vitesse",
-    descEn: "×1.06 attacks per second, per level. No ceiling.",
-    descFr: "×1,06 attaque par seconde et par niveau. Sans plafond.",
+    descEn: "×1.06 attacks/s",
+    descFr: "×1,06 attaques/s",
     baseCost: 45,
     costGrowth: 1.91,
     perLevel: 0.06,
@@ -239,8 +239,8 @@ export const UPGRADES: UpgradeDef[] = [
     key: "crit",
     nameEn: "Critical Chance",
     nameFr: "Chance Critique",
-    descEn: "+1.5% chance to strike critically. Stops at certainty, and nowhere earlier.",
-    descFr: "+1,5 % de chance de coup critique. S'arrête à la certitude, pas avant.",
+    descEn: "+1.5% crit chance",
+    descFr: "+1,5 % critique",
     baseCost: 25,
     costGrowth: 1.27,
     perLevel: 0.015,
@@ -252,8 +252,8 @@ export const UPGRADES: UpgradeDef[] = [
     key: "critDamage",
     nameEn: "Critical Damage",
     nameFr: "Dégâts Critiques",
-    descEn: "×1.08 on a critical hit, per level. Grows with how often you crit.",
-    descFr: "×1,08 sur un coup critique, par niveau. Vaut ce que vaut ta chance critique.",
+    descEn: "×1.08 critical damage",
+    descFr: "×1,08 dégâts critiques",
     baseCost: 150,
     costGrowth: 2.35,
     perLevel: 0.08,
@@ -264,8 +264,8 @@ export const UPGRADES: UpgradeDef[] = [
     key: "double",
     nameEn: "Double Strike",
     nameFr: "Double Coup",
-    descEn: "+2% chance the blow lands twice. Past 100%, every whole point is another certain blow.",
-    descFr: "+2 % de chance que le coup parte deux fois. Au-delà de 100 %, chaque point entier est un coup de plus garanti.",
+    descEn: "+2% double strike",
+    descFr: "+2 % coup double",
     baseCost: 60,
     costGrowth: 1.55,
     perLevel: 0.02,
@@ -749,8 +749,8 @@ export const RELICS: RelicDef[] = [
     key: "memory",
     nameEn: "Memory",
     nameFr: "Mémoire",
-    descEn: "+15% damage per relic. Everything the cat learned about hitting.",
-    descFr: "+15 % de dégâts par relique. Tout ce que le chat a appris à frapper.",
+    descEn: "+15% damage",
+    descFr: "+15 % dégâts",
     baseCost: 1,
     costGrowth: 1.35,
     perLevel: 0.15,
@@ -760,8 +760,8 @@ export const RELICS: RelicDef[] = [
     key: "tenacity",
     nameEn: "Tenacity",
     nameFr: "Ténacité",
-    descEn: "+15% health per relic. Everything it learned about not dying.",
-    descFr: "+15 % de vie par relique. Tout ce qu'il a appris à ne pas mourir.",
+    descEn: "+15% health",
+    descFr: "+15 % vie",
     baseCost: 1,
     costGrowth: 1.35,
     perLevel: 0.15,
@@ -771,8 +771,8 @@ export const RELICS: RelicDef[] = [
     key: "greed",
     nameEn: "Greed",
     nameFr: "Avidité",
-    descEn: "+25% gold per relic. The run pays for its own upgrades sooner.",
-    descFr: "+25 % d'or par relique. La partie finance ses améliorations plus tôt.",
+    descEn: "+25% gold",
+    descFr: "+25 % or",
     baseCost: 2,
     costGrowth: 1.4,
     perLevel: 0.25,
@@ -782,8 +782,8 @@ export const RELICS: RelicDef[] = [
     key: "luck",
     nameEn: "Fortune",
     nameFr: "Chance",
-    descEn: "+3% chance a fallen enemy leaves something. Stops at three in four.",
-    descFr: "+3 % de chance qu'un ennemi vaincu laisse quelque chose. S'arrête à trois sur quatre.",
+    descEn: "+3% drop chance",
+    descFr: "+3 % de butin",
     baseCost: 3,
     costGrowth: 1.4,
     perLevel: 0.03,
@@ -1266,4 +1266,44 @@ const ENEMY_NAMES: Record<EnemyKind, { en: string; fr: string }> = {
 export function enemyName(kind: EnemyKind, locale: string): string {
   const names = ENEMY_NAMES[kind];
   return locale === "fr" ? names.fr : names.en;
+}
+
+// ---------------------------------------------------------------------------
+// What a piece looks like
+// ---------------------------------------------------------------------------
+
+/**
+ * The hands hold a weapon, and there are four of them.
+ *
+ * Which one a piece is comes from its own id rather than from a column: the
+ * choice has no effect on any number, so storing it would be a migration for a
+ * decision the id already makes — and deriving it means every screen showing the
+ * same piece shows the same weapon, for ever, without asking the database.
+ */
+export type WeaponKind = "sword" | "staff" | "bow" | "shield";
+
+const WEAPONS: WeaponKind[] = ["sword", "staff", "bow", "shield"];
+
+export function weaponFor(id: string): WeaponKind {
+  let hash = 0;
+  for (let index = 0; index < id.length; index++) {
+    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+  }
+  return WEAPONS[hash % WEAPONS.length];
+}
+
+/**
+ * Three finishes across eight rarities: bare wood and steel, blue runes, blue
+ * fire. The art came in threes, so the ladder reads in threes — a Sovereign
+ * blade is on fire and a common one is not, which is the whole job of a finish.
+ */
+export function weaponFinish(rarity: Rarity): "plain" | "runed" | "flame" {
+  const tier = RARITIES.indexOf(rarity);
+  if (tier >= 5) return "flame";
+  if (tier >= 2) return "runed";
+  return "plain";
+}
+
+export function weaponIcon(id: string, rarity: Rarity): string {
+  return `/weapons/${weaponFor(id)}-${weaponFinish(rarity)}.webp`;
 }

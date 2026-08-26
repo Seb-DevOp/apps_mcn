@@ -250,5 +250,9 @@
   "nav.shop": "Shop",
   "nav.rebirth": "Lives",
   "shop.gems": "Gems",
-  "shop.gemsHint": "Gems come from Guardians, one floor at a time. They do not inflate, so a price here means the same thing at any depth."
+  "shop.gemsHint": "Gems come from Guardians, one floor at a time. They do not inflate, so a price here means the same thing at any depth.",
+  "weapon.sword": "Sword",
+  "weapon.staff": "Staff",
+  "weapon.bow": "Bow",
+  "weapon.shield": "Shield"
 }

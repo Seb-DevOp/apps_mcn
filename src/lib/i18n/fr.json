@@ -250,5 +250,9 @@
   "nav.shop": "Boutique",
   "nav.rebirth": "Vies",
   "shop.gems": "Gemmes",
-  "shop.gemsHint": "Les gemmes viennent des Gardiens, un étage à la fois. Elles n'inflatent pas : un prix ici veut dire la même chose à n'importe quelle profondeur."
+  "shop.gemsHint": "Les gemmes viennent des Gardiens, un étage à la fois. Elles n'inflatent pas : un prix ici veut dire la même chose à n'importe quelle profondeur.",
+  "weapon.sword": "Épée",
+  "weapon.staff": "Bâton",
+  "weapon.bow": "Arc",
+  "weapon.shield": "Bouclier"
 }

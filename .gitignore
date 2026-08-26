@@ -16,3 +16,6 @@ tsconfig.tsbuildinfo
 
 # built Android artefacts and the test signing key — never in git
 /dist
+
+# weapon masters: 12 MB of renders that public/weapons/*.webp is derived from
+/art

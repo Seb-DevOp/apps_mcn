@@ -8,11 +8,13 @@ import {
   SLOTS,
   affixLabel,
   itemName,
+  weaponFor,
   type Rarity,
   type Slot,
 } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
+import { ItemArt } from "./ItemArt";
 import { useI18n } from "./I18nProvider";
 import { formatGain, formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
@@ -43,13 +45,20 @@ export function IdleBag({
   // toggle with one option is a toggle that lies about having a choice.
   const packOpen = state.unlocks.some((entry) => entry.key === "pack" && entry.open);
   const [dressing, setDressing] = useState<"CAT" | "PACK">("CAT");
+  const [selected, setSelected] = useState<string | null>(null);
   const onPack = packOpen && dressing === "PACK";
 
   const worn = useMemo<WornPiece[]>(
     () =>
       state.items
         .filter((item) => item.equipped && item.onPack === onPack)
-        .map((item) => ({ slot: item.slot, shape: item.shape, rarity: item.rarity })),
+        .map((item) => ({
+          slot: item.slot,
+          shape: item.shape,
+          rarity: item.rarity,
+          // Only the hands carry one; the other five ignore it.
+          weapon: weaponFor(item.id),
+        })),
     [state.items, onPack],
   );
 
@@ -101,6 +110,9 @@ export function IdleBag({
     [spares],
   );
 
+  // The tile that is open, if it still exists — selling one leaves an id behind.
+  const chosen = spares.find((item) => item.id === selected) ?? null;
+
   return (
     <div className="pb-4">
       {packOpen && (
@@ -147,28 +159,29 @@ export function IdleBag({
               </p>
               {item ? (
                 <>
+                  <div className="mt-1 flex justify-center">
+                    <ItemArt
+                      slot={item.slot}
+                      shape={item.shape}
+                      rarity={item.rarity}
+                      id={item.id}
+                      size={40}
+                    />
+                  </div>
                   <p
-                    className="mt-1 line-clamp-2 text-[0.66rem] leading-tight"
+                    className="mt-0.5 line-clamp-2 text-[0.62rem] leading-tight"
                     style={{ color: style!.color }}
                   >
                     {itemName(item.slot, item.floor, item.rarity, locale)}
                   </p>
-                  <p className="tabular mt-1 text-[0.62rem] text-[var(--parchment)]">
+                  <p className="tabular mt-0.5 text-[0.6rem] text-[var(--parchment)]">
                     {formatNumber(item.power)}
                     <span className="dim"> · </span>
                     <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
                   </p>
-                  {item.affixes.map((affix, index) => (
-                    <p
-                      key={`${affix.key}-${index}`}
-                      className="mt-0.5 truncate text-[0.58rem] text-[var(--sapphire-pale)]"
-                    >
-                      {affixLabel(affix, locale)}
-                    </p>
-                  ))}
                 </>
               ) : (
-                <p className="dim mt-1 text-[0.68rem]">{t("idle.empty")}</p>
+                <p className="dim mt-3 text-[0.68rem]">{t("idle.empty")}</p>
               )}
             </div>
           );
@@ -256,116 +269,147 @@ export function IdleBag({
       )}
 
       {/* --- Everything else it owns ------------------------------------ */}
-      <h2 className="eyebrow mt-6">{t("idle.spares", { n: spares.length })}</h2>
-
-      {spares.length === 0 ? (
-        <p className="dim mt-2 text-center text-[0.72rem] italic">{t("idle.bagEmpty")}</p>
-      ) : (
-        <div className="mt-2 space-y-4">
-          {SLOTS.map((slot) => {
-            const forSlot = spares
-              .filter((item) => item.slot === slot)
-              .sort((a, b) => b.gain - a.gain);
-            if (forSlot.length === 0) return null;
-
-            return (
-              <div key={slot}>
-                <p className="dim text-[0.62rem] uppercase tracking-widest">
-                  {t(`idle.slot.${slot}`)}
-                </p>
-                <div className="mt-1.5 space-y-1.5">
-                  {forSlot.map((item, index) => (
-                    <Row
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      better={item.gain > 1.0001}
-                      busy={busy !== null}
-                      onEquip={() => act({ action: "equip", itemId: item.id, onPack }, item.id)}
-                      onSell={() => act({ action: "sell", itemId: item.id }, item.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-
+      <div className="mt-6 flex items-center justify-between">
+        <h2 className="eyebrow">{t("idle.spares", { n: spares.length })}</h2>
+        {spares.length > 0 && (
           <button
             type="button"
-            className="btn btn-ghost w-full py-2 text-[0.72rem]"
+            className="btn btn-ghost px-3 py-1 text-[0.68rem]"
             disabled={busy !== null}
             onClick={() => act({ action: "sellAll" }, "sellAll")}
           >
             {t("idle.sellAll")}
           </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Row({
-  item,
-  index,
-  better,
-  busy,
-  onEquip,
-  onSell,
-}: {
-  item: IdleState["items"][number];
-  index: number;
-  better: boolean;
-  busy: boolean;
-  onEquip: () => void;
-  onSell: () => void;
-}) {
-  const { t, locale } = useI18n();
-  const style = RARITY_STYLE[item.rarity as Rarity];
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index, 6) * 0.02 }}
-      className="panel flex items-center gap-2 p-2"
-      style={{ borderColor: better ? "rgba(126,208,143,0.5)" : `${style.color}33` }}
-    >
-      <span style={{ color: style.color }}>
-        <ItemIcon icon="badge" size={18} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[0.72rem]" style={{ color: style.color }}>
-          {itemName(item.slot as Slot, item.floor, item.rarity as Rarity, locale)}
-        </p>
-        <p className="dim tabular text-[0.64rem]">
-          {formatNumber(item.power)} ·{" "}
-          <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
-          {better && formatGain(item.gain) !== "+0%" && (
-            <span className="text-[#7ed08f]"> · {formatGain(item.gain)}</span>
-          )}
-        </p>
-        {item.affixes.length > 0 && (
-          <p className="truncate text-[0.6rem] text-[var(--sapphire-pale)]">
-            {item.affixes.map((affix) => affixLabel(affix, locale)).join(" · ")}
-          </p>
         )}
       </div>
-      <button
-        type="button"
-        className="btn btn-royal px-2 py-1 text-[0.68rem]"
-        disabled={busy}
-        onClick={onEquip}
-      >
-        {t("idle.equip")}
-      </button>
-      <button
-        type="button"
-        className="btn btn-ghost px-2 py-1 text-[0.68rem]"
-        disabled={busy}
-        onClick={onSell}
-      >
-        {t("idle.sell")}
-      </button>
-    </motion.div>
+
+      {spares.length === 0 ? (
+        <p className="dim mt-2 text-center text-[0.72rem] italic">{t("idle.bagEmpty")}</p>
+      ) : (
+        <>
+          {/*
+            A grid of squares rather than a list of rows.
+            Forty spares as full-width rows is four screens of scrolling to find
+            out what you have; as tiles it is one glance. The picture, the rarity
+            border and the green corner carry everything a first pass needs, and
+            the numbers wait until a tile is picked.
+          */}
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {spares.map((item, index) => {
+              const style = RARITY_STYLE[item.rarity];
+              const better = item.gain > 1.0001;
+              const picked = selected === item.id;
+              return (
+                <motion.button
+                  key={item.id}
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: Math.min(index, 12) * 0.015 }}
+                  onClick={() => setSelected(picked ? null : item.id)}
+                  className="panel relative flex aspect-square items-center justify-center p-1"
+                  style={{
+                    borderColor: picked ? "rgba(201,162,77,0.8)" : `${style.color}55`,
+                    background: picked ? "rgba(201,162,77,0.1)" : `${style.color}0f`,
+                  }}
+                >
+                  <ItemArt
+                    slot={item.slot}
+                    shape={item.shape}
+                    rarity={item.rarity}
+                    id={item.id}
+                    size={46}
+                  />
+                  {better && (
+                    <span
+                      className="absolute right-1 top-1 h-2 w-2 rounded-full"
+                      style={{ background: "#7ed08f", boxShadow: "0 0 6px #7ed08f" }}
+                    />
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+
+          {/* The picked tile, in full. One panel that changes rather than forty
+              that are always open. */}
+          {chosen && (
+            <motion.div
+              key={chosen.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="panel mt-3 p-3"
+              style={{ borderColor: `${RARITY_STYLE[chosen.rarity].color}88` }}
+            >
+              <div className="flex items-start gap-3">
+                <ItemArt
+                  slot={chosen.slot}
+                  shape={chosen.shape}
+                  rarity={chosen.rarity}
+                  id={chosen.id}
+                  size={54}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="dim text-[0.58rem] uppercase tracking-widest">
+                    {t(`idle.slot.${chosen.slot}`)}
+                    {chosen.slot === "HANDS" && ` · ${t(`weapon.${weaponFor(chosen.id)}`)}`}
+                  </p>
+                  <p
+                    className="truncate text-[0.82rem]"
+                    style={{ color: RARITY_STYLE[chosen.rarity].color }}
+                  >
+                    {itemName(chosen.slot, chosen.floor, chosen.rarity, locale)}
+                  </p>
+                  <p className="tabular mt-0.5 text-[0.7rem] text-[var(--parchment)]">
+                    {formatNumber(chosen.power)}
+                    <span className="dim"> · </span>
+                    <span className="text-[#7ed08f]">{formatNumber(chosen.vitality)}</span>
+                    {chosen.gain > 1.0001 && formatGain(chosen.gain) !== "+0%" && (
+                      <span className="text-[#7ed08f]"> · {formatGain(chosen.gain)}</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {chosen.affixes.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {chosen.affixes.map((affix, index) => (
+                    <span
+                      key={`${affix.key}-${index}`}
+                      className="rounded px-1.5 py-0.5 text-[0.62rem]"
+                      style={{ background: "rgba(79,147,255,0.12)", color: "var(--sapphire-pale)" }}
+                    >
+                      {affixLabel(affix, locale)}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-2.5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className="btn btn-royal py-1.5 text-[0.72rem]"
+                  disabled={busy !== null}
+                  onClick={() => act({ action: "equip", itemId: chosen.id, onPack }, chosen.id)}
+                >
+                  {t("idle.equip")}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost py-1.5 text-[0.72rem]"
+                  disabled={busy !== null}
+                  onClick={() => {
+                    setSelected(null);
+                    act({ action: "sell", itemId: chosen.id }, chosen.id);
+                  }}
+                >
+                  {t("idle.sell")} +{formatNumber(Math.max(1, Math.round(chosen.power * 4)))}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
