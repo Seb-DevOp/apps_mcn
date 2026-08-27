@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { BoardKey, BoardResult, BoardRow } from "@/lib/engine/leaderboard";
+import Link from "next/link";
 import { CatCanvas } from "./CatCanvas";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
@@ -151,8 +152,15 @@ function Podium({ rows, board }: { rows: BoardRow[]; board: BoardKey }) {
             transition={{ delay: (rank === 1 ? 0 : rank) * 0.06 }}
             className="flex min-w-0 flex-1 flex-col items-center"
           >
+            {/* The whole plinth is the link: a name is a small target on a
+                phone, and the cat above it is what anyone is actually
+                pointing at. */}
             {/* The winner is drawn larger and is the only one still breathing:
                 a podium where all three are the same size is a list in a row. */}
+            <Link
+              href={`/player/${encodeURIComponent(row.handle)}`}
+              className="flex w-full flex-col items-center"
+            >
             <CatCanvas
               worn={row.cat?.worn ?? []}
               size={top ? 96 : 74}
@@ -178,6 +186,7 @@ function Podium({ rows, board }: { rows: BoardRow[]; board: BoardKey }) {
                 {valueLabel(row, board, t)}
               </p>
             </div>
+            </Link>
           </motion.div>
         );
       })}
@@ -236,9 +245,12 @@ function Row({ row, board, index }: { row: BoardRow; board: BoardKey; index: num
         </span>
       )}
 
-      <span className="min-w-0 flex-1 truncate text-[0.82rem] text-[var(--parchment)]">
+      <Link
+        href={`/player/${encodeURIComponent(row.handle)}`}
+        className="min-w-0 flex-1 truncate text-[0.82rem] text-[var(--parchment)] underline-offset-2 hover:underline"
+      >
         {row.handle}
-      </span>
+      </Link>
 
       <span className="text-right">
         <span className="tabular gold-text block text-[0.85rem]">

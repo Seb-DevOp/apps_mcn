@@ -301,5 +301,9 @@
   "forge.hint": "Les {n} meilleures rechanges d'une couleur en font une du rang au-dessus, à leur étage.",
   "idle.rarity.ASTRAL": "Astral",
   "idle.rarity.ORIGIN": "Origine",
-  "idle.equipBestPack": "Habiller ce chat avec le sac"
+  "idle.equipBestPack": "Habiller ce chat avec le sac",
+  "player.title": "Joueur",
+  "player.since": "Grimpe depuis {date}",
+  "player.back": "Retour aux classements",
+  "player.bare": "Ce chat ne porte encore rien."
 }

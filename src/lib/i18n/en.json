@@ -301,5 +301,9 @@
   "forge.hint": "The {n} best spares of a colour become one of the colour above, at their floor.",
   "idle.rarity.ASTRAL": "Astral",
   "idle.rarity.ORIGIN": "Origin",
-  "idle.equipBestPack": "Dress this cat from the bag"
+  "idle.equipBestPack": "Dress this cat from the bag",
+  "player.title": "Player",
+  "player.since": "Climbing since {date}",
+  "player.back": "Back to the boards",
+  "player.bare": "This cat is not wearing anything yet."
 }

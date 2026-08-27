@@ -32,6 +32,7 @@ export interface FarcasterHints {
   /** From sdk.context.user — cosmetic only, never trusted as identity. */
   username?: string;
   displayName?: string;
+  avatar?: string;
 }
 
 export function farcasterEnabled(): boolean {
@@ -98,6 +99,7 @@ export async function signInWithFarcaster(
       metaJson: JSON.stringify({
         username: hints.username ?? null,
         displayName: hints.displayName ?? null,
+        avatar: hints.avatar ?? null,
       }),
     },
   });

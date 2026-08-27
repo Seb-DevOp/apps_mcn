@@ -11,6 +11,7 @@ const Schema = z.object({
   token: z.string().min(20).max(4096),
   username: z.string().max(64).optional(),
   displayName: z.string().max(64).optional(),
+  avatar: z.string().url().max(512).optional(),
 });
 
 export async function POST(request: Request) {
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
   const result = await signInWithFarcaster(request, body.data.token, {
     username: body.data.username,
     displayName: body.data.displayName,
+    avatar: body.data.avatar,
   });
   if (!result.ok) return fail(result.error, result.error === "DISABLED" ? 503 : 401);
 

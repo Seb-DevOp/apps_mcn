@@ -62,6 +62,9 @@ export function FarcasterGate({
             token,
             username: context?.user?.username,
             displayName: context?.user?.displayName,
+            // Cosmetic, and never trusted as identity: the client hands it over
+            // and the server only ever shows it next to a name it proved.
+            avatar: context?.user?.pfpUrl,
           }),
         });
         const data = await response.json();
