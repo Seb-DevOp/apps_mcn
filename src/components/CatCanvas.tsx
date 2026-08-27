@@ -99,6 +99,11 @@ export const CatCanvas = memo(function CatCanvas({
           <stop offset="60%" stopColor="#f3d68f" stopOpacity="0.12" />
           <stop offset="100%" stopColor="#f3d68f" stopOpacity="0" />
         </radialGradient>
+        <radialGradient id="cat-fire" cx="50%" cy="70%">
+          <stop offset="0%" stopColor="#ff9d3d" stopOpacity="0.5" />
+          <stop offset="55%" stopColor="#e0432a" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#8e2b2b" stopOpacity="0" />
+        </radialGradient>
         <radialGradient id="cat-psychic" cx="50%" cy="50%">
           <stop offset="0%" stopColor="#b98cff" stopOpacity="0.4" />
           <stop offset="100%" stopColor="#4f93ff" stopOpacity="0" />
@@ -113,6 +118,7 @@ export const CatCanvas = memo(function CatCanvas({
       {coat.effect === "shine" && <Shine />}
       {coat.effect === "psychic" && <Psychic />}
       {coat.effect === "halo" && <Wings />}
+      {coat.effect === "horns" && <Fire />}
       {coat.effect === "horns" && <DevilTail />}
 
       {/* --- Tail, sweeping up behind ------------------------------------ */}
@@ -238,6 +244,7 @@ export const CatCanvas = memo(function CatCanvas({
       {coat.effect === "halo" && <Halo />}
       {coat.effect === "horns" && <Horns />}
       {coat.effect === "halo" && <Motes colour="#fff6d8" rising />}
+      {coat.effect === "horns" && <Fire front />}
       {coat.effect === "horns" && <Motes colour="#ff7a3d" rising />}
       {coat.effect === "shine" && <Sparkles />}
       {coat.effect === "psychic" && <Motes colour="#c8a8ff" />}
@@ -343,6 +350,90 @@ function DevilTail() {
       />
       <path d="M178 154 l-9 -4 l9 -16 l9 16 Z" fill="#ff7a3d" />
     </motion.g>
+  );
+}
+
+/**
+ * The Imp stands in a fire.
+ *
+ * Drawn twice, behind and in front: flames only behind read as a backdrop the
+ * cat happens to be standing against, and the two short tongues over its paws
+ * are what put it *in* the fire instead.
+ *
+ * Every tongue runs on its own delay and on four keyframes rather than two.
+ * Fire is not a pulse — anything that grows and shrinks evenly reads as
+ * breathing, and this had to read as burning.
+ */
+function Fire({ front = false }: { front?: boolean }) {
+  const tongues = front
+    ? [
+        { x: 84, h: 26, at: 0.15 },
+        { x: 118, h: 30, at: 0.55 },
+      ]
+    : [
+        // The outer two are the tall ones: the body covers everything between
+        // 64 and 136, so a flame in the middle is a flame nobody sees. These
+        // frame the cat rather than hiding behind it.
+        { x: 42, h: 94, at: 0 },
+        { x: 66, h: 62, at: 0.34 },
+        { x: 100, h: 48, at: 0.68 },
+        { x: 136, h: 68, at: 0.22 },
+        { x: 160, h: 88, at: 0.5 },
+      ];
+
+  const tongue = (x: number, height: number, colour: string, width = 13) =>
+    `M${x} 250 C${x - width} ${250 - height * 0.45} ${x - width * 0.45} ${250 - height * 0.72} ${x} ${250 - height} ` +
+    `C${x + width * 0.45} ${250 - height * 0.72} ${x + width} ${250 - height * 0.45} ${x} 250 Z` +
+    colour;
+
+  return (
+    <g>
+      {!front && (
+        <motion.ellipse
+          cx="100"
+          cy="206"
+          rx="88"
+          ry="72"
+          fill="url(#cat-fire)"
+          animate={{ opacity: [0.5, 0.95, 0.6, 0.85], scale: [0.96, 1.05, 0.99, 1.03] }}
+          transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}
+          style={{ originX: "100px", originY: "230px" }}
+        />
+      )}
+
+      {tongues.map((flame) => (
+        <g key={`${front ? "f" : "b"}-${flame.x}`}>
+          <motion.path
+            d={tongue(flame.x, flame.h, "")}
+            fill="#e0432a"
+            animate={{ scaleY: [0.68, 1.18, 0.85, 1.05, 0.68], opacity: [0.5, 0.95, 0.7, 0.9, 0.5] }}
+            transition={{
+              duration: 1.25,
+              repeat: Infinity,
+              delay: flame.at,
+              ease: "easeInOut",
+              times: [0, 0.26, 0.5, 0.76, 1],
+            }}
+            style={{ originX: `${flame.x}px`, originY: "250px" }}
+          />
+          {/* The bright core lags the outer flame slightly, which is what stops
+              the two from reading as one shape with a gradient. */}
+          <motion.path
+            d={tongue(flame.x, flame.h * 0.58, "", 7)}
+            fill="#ffc25e"
+            animate={{ scaleY: [0.8, 1.25, 0.9, 1.1, 0.8], opacity: [0.6, 1, 0.75, 0.95, 0.6] }}
+            transition={{
+              duration: 1.25,
+              repeat: Infinity,
+              delay: flame.at + 0.12,
+              ease: "easeInOut",
+              times: [0, 0.26, 0.5, 0.76, 1],
+            }}
+            style={{ originX: `${flame.x}px`, originY: "250px" }}
+          />
+        </g>
+      ))}
+    </g>
   );
 }
 
