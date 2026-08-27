@@ -5,7 +5,7 @@ import { RARITY_STYLE, type Rarity } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas } from "./CatCanvas";
 import { IdleCalendar } from "./IdleCalendar";
-import { GemIcon } from "./ui/Icons";
+import { GemIcon, ItemIcon } from "./ui/Icons";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 
@@ -96,6 +96,45 @@ export function IdleShop({
           {t("shop.chestsBought", { n: shop.chestsOpened })}
         </p>
       </section>
+
+      {/* --- The boosts --------------------------------------------------- */}
+      <h2 className="eyebrow mt-6">{t("shop.boosts")}</h2>
+      <p className="dim mt-1 text-[0.68rem] italic">{t("shop.boostsHint")}</p>
+
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {state.boosts.catalogue.map((boost) => (
+          <button
+            key={boost.key}
+            type="button"
+            disabled={!boost.affordable || busy !== null}
+            onClick={() => act({ action: "buyBoost", key: boost.key }, `buy-${boost.key}`)}
+            className="panel flex flex-col items-center gap-1 p-2 text-center transition disabled:opacity-45"
+            style={boost.affordable ? { borderColor: "rgba(201,162,77,0.4)" } : undefined}
+          >
+            <span className="text-[var(--gold)]">
+              <ItemIcon icon={boost.icon} size={18} />
+            </span>
+            <span className="text-[0.66rem] leading-tight text-[var(--parchment)]">
+              {L(boost.descEn, boost.descFr)}
+            </span>
+            <span className="dim tabular text-[0.56rem]">
+              {t("boost.minutes", { n: Math.round(boost.seconds / 60) })}
+            </span>
+            <span
+              className="tabular flex items-center gap-1 text-[0.68rem]"
+              style={{ color: "#8ef0ff" }}
+            >
+              {boost.price}
+              <GemIcon size={11} />
+            </span>
+            {state.boosts.owned[boost.key] > 0 && (
+              <span className="dim tabular text-[0.56rem]">
+                {t("shop.boostHeld", { n: state.boosts.owned[boost.key] })}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
 
       {/* --- The coats ---------------------------------------------------- */}
       <h2 className="eyebrow mt-6">{t("shop.coats")}</h2>

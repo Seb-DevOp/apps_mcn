@@ -31,6 +31,7 @@ import {
 } from "../src/lib/content/idle";
 import {
   derive,
+  combatScore,
   scoreWith,
   simulate,
   type Relics,
@@ -135,7 +136,11 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
       equippedSlot: null,
     };
     const now = derive(items, upgrades, relics, rebirths);
-    if (scoreWith(items, upgrades, candidate, relics) > now.power * now.maxHp) {
+    // Both sides through the same function. This line used to spell the
+    // baseline out as `power * maxHp`, which was the same number until the
+    // score became a geometric mean — and then the probe silently stopped
+    // equipping anything and reported floor 3.
+    if (scoreWith(items, upgrades, candidate, relics, rebirths) > combatScore(now)) {
       items = items.filter((item) => item.equippedSlot !== drop.slot);
       items.push({ ...candidate, equippedSlot: drop.slot });
     }

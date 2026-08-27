@@ -289,5 +289,8 @@
   "item.level": "Lv {n}",
   "item.atk": "ATK",
   "item.hp": "HP",
-  "item.gold": "GOLD"
+  "item.gold": "GOLD",
+  "shop.boosts": "Boosts",
+  "shop.boostsHint": "One use each, started from the arena. The calendar hands them out too.",
+  "shop.boostHeld": "{n} held"
 }

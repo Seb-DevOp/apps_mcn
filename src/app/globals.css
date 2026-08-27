@@ -307,7 +307,10 @@ body {
   margin: 0 -1rem;
   padding: 0.4rem 0.5rem calc(0.4rem + 1px);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Four numbers and the day's door. The door takes only what it needs: it is
+     a way in, not a fifth quantity. */
+  grid-template-columns: repeat(4, 1fr) auto;
+  align-items: center;
   gap: 0.25rem;
   background: linear-gradient(180deg, rgba(5, 8, 15, 0.97), rgba(10, 17, 40, 0.88));
   backdrop-filter: blur(14px);

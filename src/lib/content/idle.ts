@@ -1082,6 +1082,15 @@ export function chestFloorRarity(rebirths: number): Rarity {
 export interface SkinDef {
   /** Given by the calendar rather than sold. Never listed with a price. */
   calendar?: boolean;
+  /**
+   * Something drawn on top that moves.
+   *
+   * Every other coat is five colours and nothing else, which is what keeps a
+   * new one a row in a table rather than a second drawing to maintain. These
+   * two are the exception the price pays for: wings that beat, a halo that
+   * breathes, a tail that flicks.
+   */
+  effect?: "halo" | "horns";
   key: string;
   nameEn: string;
   nameFr: string;
@@ -1214,6 +1223,15 @@ export interface BoostDef {
   descFr: string;
   /** Seconds it runs for once started. */
   seconds: number;
+  /**
+   * Gems, for the shop.
+   *
+   * Priced against the chest, which is six: a boost is worth a handful of
+   * chests, not a coat. Gold is deliberately the dearest of the three — it is
+   * the one that compounds, since gold buys upgrades that buy floors, where
+   * damage and loot only make the next twenty minutes better.
+   */
+  price: number;
   icon: string;
 }
 
@@ -1236,6 +1254,7 @@ export const BOOSTS: BoostDef[] = [
     descEn: "x2 gold",
     descFr: "×2 or",
     seconds: 30 * 60,
+    price: 45,
     icon: "gold",
   },
   {
@@ -1245,6 +1264,7 @@ export const BOOSTS: BoostDef[] = [
     descEn: "x2 damage",
     descFr: "×2 dégâts",
     seconds: 20 * 60,
+    price: 30,
     icon: "sword",
   },
   {
@@ -1254,6 +1274,7 @@ export const BOOSTS: BoostDef[] = [
     descEn: "x2 find chance",
     descFr: "×2 chance de butin",
     seconds: 20 * 60,
+    price: 30,
     icon: "key",
   },
 ];
@@ -1358,6 +1379,32 @@ export const SKINS: SkinDef[] = [
     furLight: "#8f7fd4",
     ear: "#a98fd4",
     eyes: "#8ef0ff",
+  },
+  {
+    key: "seraph",
+    nameEn: "Seraph",
+    nameFr: "Séraphin",
+    price: 2000,
+    effect: "halo",
+    fur: "#f2ead7",
+    furDark: "#d6c9ab",
+    furDeep: "#b3a684",
+    furLight: "#fffaf0",
+    ear: "#f4c9c9",
+    eyes: "#8ed7ff",
+  },
+  {
+    key: "imp",
+    nameEn: "Imp",
+    nameFr: "Diablotin",
+    price: 2000,
+    effect: "horns",
+    fur: "#8e2b2b",
+    furDark: "#6a1d1d",
+    furDeep: "#451111",
+    furLight: "#c4453f",
+    ear: "#e0705f",
+    eyes: "#ffd23d",
   },
   {
     key: "aurora",

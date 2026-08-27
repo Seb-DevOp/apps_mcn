@@ -362,9 +362,19 @@ export function derive(
  * product is what a piece of equipment actually moves. It is a heuristic and is
  * named as one, but it is the same heuristic everywhere: what the recommendation
  * button optimises is exactly what the arrow next to an item promises.
+ *
+ * The **square root** of that product, though, and the root is the whole point.
+ *
+ * A raw product is a squared quantity: it is measured in damage-times-health,
+ * so a piece 4.7 times better moves it by twenty-two, and the screen read
+ * "120No became 2.6Dc" for a single swap. Nobody can hold that. The geometric
+ * mean is the same ranking — a square root is monotonic, so the recommendation
+ * button and every arrow keep their order — expressed in the units the six
+ * statistics are already in. The gain a piece promises becomes the factor the
+ * cat actually gets stronger by, rather than its square.
  */
 export function combatScore(stats: DerivedStats): number {
-  return stats.power * stats.maxHp;
+  return Math.sqrt(stats.power * stats.maxHp);
 }
 
 /**
@@ -1096,6 +1106,8 @@ function view(
         key: def.key,
         seconds: def.seconds,
         factor: BOOST_FACTOR,
+        price: def.price,
+        affordable: profile.gems >= def.price,
         nameEn: def.nameEn,
         nameFr: def.nameFr,
         descEn: def.descEn,
@@ -1599,6 +1611,37 @@ export async function claimCalendar(userId: string) {
       boost,
       finished,
     };
+  });
+}
+
+/**
+ * Buys one boost with gems.
+ *
+ * The same currency as the chest and the coats, for the same reason: gems come
+ * from Guardians one floor at a time, so a price here means the same thing at
+ * every depth. Bought boosts go into the same pocket the calendar fills, and
+ * are started from the arena like any other.
+ */
+export async function buyBoost(userId: string, key: string) {
+  const def = BOOST_BY_KEY[key];
+  if (!def) return { ok: false as const, error: "UNKNOWN_BOOST" as const };
+
+  await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    if (profile.gems < def.price) {
+      return { ok: false as const, error: "NOT_ENOUGH_GEMS" as const };
+    }
+
+    const boosts = parseBoosts(profile.boostsJson);
+    boosts[def.key] += 1;
+
+    await tx.idleProfile.update({
+      where: { userId },
+      data: { gems: profile.gems - def.price, boostsJson: JSON.stringify(boosts) },
+    });
+    return { ok: true as const, boost: def.key };
   });
 }
 

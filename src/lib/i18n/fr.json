@@ -289,5 +289,8 @@
   "item.level": "Niv {n}",
   "item.atk": "ATQ",
   "item.hp": "VIE",
-  "item.gold": "OR"
+  "item.gold": "OR",
+  "shop.boosts": "Boosts",
+  "shop.boostsHint": "À usage unique, lancés depuis l'arène. Le calendrier en distribue aussi.",
+  "shop.boostHeld": "{n} en poche"
 }

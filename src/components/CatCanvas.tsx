@@ -91,6 +91,10 @@ export const CatCanvas = memo(function CatCanvas({
       {/* Light pooling underfoot, so the cat stands on something. */}
       <ellipse cx="100" cy="252" rx="62" ry="11" fill="url(#cat-ground)" />
 
+      {/* Wings go behind everything, including the tail. */}
+      {coat.effect === "halo" && <Wings />}
+      {coat.effect === "horns" && <DevilTail />}
+
       {/* --- Tail, sweeping up behind ------------------------------------ */}
       <motion.g
         animate={{ rotate: [0, 4, 0] }}
@@ -196,9 +200,116 @@ export const CatCanvas = memo(function CatCanvas({
       </g>
 
       {shape("HEAD") && <Head shape={shape("HEAD")!} colour={colour("HEAD")!} />}
+
+      {/* And what the coat itself wears, over the armour: a halo sits above a
+          helm, and horns come through it. */}
+      {coat.effect === "halo" && <Halo />}
+      {coat.effect === "horns" && <Horns />}
     </motion.svg>
   );
 });
+
+// ---------------------------------------------------------------------------
+// What two coats wear that no other coat does
+// ---------------------------------------------------------------------------
+
+/** Feathered wings, beating slowly enough to be watched rather than noticed. */
+function Wings() {
+  const feather = (mirror: boolean) => {
+    const s = mirror ? -1 : 1;
+    return (
+      // Wider than the cat and lifted to shoulder height: behind the body at
+      // their old size they read as a pale smudge rather than as wings.
+      <g transform={`translate(100 142) scale(${s * 1.25} 1.2)`}>
+        <path
+          d="M8 -8 C34 -30 62 -26 76 -6 C60 -12 44 -8 34 2 C52 2 66 10 74 24 C56 16 38 16 24 26 C22 12 16 0 8 -8 Z"
+          fill="#fdfaf2"
+          opacity="0.94"
+        />
+        <path
+          d="M14 -4 C36 -20 56 -18 68 -4"
+          stroke="#d9cfae"
+          strokeWidth="1.6"
+          fill="none"
+          opacity="0.8"
+        />
+      </g>
+    );
+  };
+
+  return (
+    <motion.g
+      animate={{ scaleY: [1, 0.9, 1], scaleX: [1, 1.05, 1] }}
+      transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+      style={{ originX: "100px", originY: "150px" }}
+    >
+      {feather(true)}
+      {feather(false)}
+    </motion.g>
+  );
+}
+
+/** A ring of light that breathes above the ears. */
+function Halo() {
+  return (
+    <motion.g
+      animate={{ opacity: [0.7, 1, 0.7], y: [0, -2.5, 0] }}
+      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <ellipse
+        cx="100"
+        cy="12"
+        rx="30"
+        ry="8"
+        fill="none"
+        stroke="#ffe9a8"
+        strokeWidth="4.5"
+        opacity="0.9"
+      />
+      <ellipse cx="100" cy="12" rx="30" ry="8" fill="none" stroke="#fffdf4" strokeWidth="1.6" />
+    </motion.g>
+  );
+}
+
+/** Two horns, and the ember they hold between them. */
+function Horns() {
+  return (
+    <g>
+      <path d="M70 34 C62 20 64 8 74 2 C74 14 78 24 84 32 Z" fill="#c4453f" />
+      <path d="M130 34 C138 20 136 8 126 2 C126 14 122 24 116 32 Z" fill="#c4453f" />
+      <path d="M72 30 C68 20 69 12 74 7" stroke="#7a1f1f" strokeWidth="1.6" fill="none" />
+      <path d="M128 30 C132 20 131 12 126 7" stroke="#7a1f1f" strokeWidth="1.6" fill="none" />
+      <motion.circle
+        cx="100"
+        cy="16"
+        r="4.5"
+        fill="#ff7a3d"
+        animate={{ opacity: [0.45, 1, 0.45], r: [3.6, 5.2, 3.6] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+      />
+    </g>
+  );
+}
+
+/** A barbed tail that flicks, drawn behind the body like the ordinary one. */
+function DevilTail() {
+  return (
+    <motion.g
+      animate={{ rotate: [-6, 8, -6] }}
+      transition={{ duration: 2.9, repeat: Infinity, ease: "easeInOut" }}
+      style={{ originX: "132px", originY: "208px" }}
+    >
+      <path
+        d="M132 208 C168 206 186 178 178 152"
+        stroke="#8e2b2b"
+        strokeWidth="9"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path d="M178 154 l-9 -4 l9 -16 l9 16 Z" fill="#ff7a3d" />
+    </motion.g>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Equipment layers

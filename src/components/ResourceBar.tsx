@@ -1,10 +1,12 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 import type { Resources } from "@/lib/engine/resources";
-import { GemIcon, ItemIcon, RebirthIcon } from "./ui/Icons";
+import { CalendarIcon, GemIcon, ItemIcon, RebirthIcon } from "./ui/Icons";
 
 /**
  * THE FOUR NUMBERS, EVERYWHERE
@@ -103,6 +105,38 @@ export const ResourceBar = memo(function ResourceBar({ initial }: { initial: Res
         colour="#c9a2ff"
         icon={<RebirthIcon size={13} />}
       />
+
+      {/*
+        The day's door, where it can be seen from every screen.
+
+        It was three sections down a page a player only opens to buy something,
+        which is the wrong place for the one thing here that expires. It lights
+        up when a door is waiting and goes quiet when it is not — a permanent
+        badge is a badge nobody reads.
+      */}
+      <Link
+        href="/shop"
+        aria-label={t("calendar.title")}
+        className="flex h-8 w-8 items-center justify-center rounded-lg transition"
+        style={{
+          border: values.daily
+            ? "1px solid rgba(201,162,77,0.85)"
+            : "1px solid rgba(255,255,255,0.1)",
+          background: values.daily ? "rgba(201,162,77,0.16)" : "transparent",
+        }}
+      >
+        <motion.span
+          style={{ color: values.daily ? "var(--gold-bright)" : "var(--text-faint)", lineHeight: 0 }}
+          animate={
+            values.daily
+              ? { opacity: [0.65, 1, 0.65], scale: [0.94, 1.06, 0.94] }
+              : { opacity: 1, scale: 1 }
+          }
+          transition={{ duration: 1.7, repeat: values.daily ? Infinity : 0, ease: "easeInOut" }}
+        >
+          <CalendarIcon size={17} />
+        </motion.span>
+      </Link>
     </div>
   );
 });
