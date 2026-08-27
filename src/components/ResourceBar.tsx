@@ -63,6 +63,7 @@ export const ResourceBar = memo(function ResourceBar({ initial }: { initial: Res
             gold: data.state.gold,
             gems: data.state.shop.gems,
             relics: data.state.rebirth.relics,
+            daily: data.state.calendar.claimable,
           });
         }
       } catch {

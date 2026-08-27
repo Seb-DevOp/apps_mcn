@@ -1080,6 +1080,8 @@ export function chestFloorRarity(rebirths: number): Rarity {
 }
 
 export interface SkinDef {
+  /** Given by the calendar rather than sold. Never listed with a price. */
+  calendar?: boolean;
   key: string;
   nameEn: string;
   nameFr: string;
@@ -1101,6 +1103,165 @@ export interface SkinDef {
  * bought in an afternoon. Here the numbers are small, the spacing is gentle, and
  * a coat is a fortnight of Guardians rather than an accident of depth.
  */
+
+// ---------------------------------------------------------------------------
+// The calendar
+// ---------------------------------------------------------------------------
+
+/**
+ * THIRTY DOORS, ONE A DAY
+ *
+ * The state is a count, not a grid. A player who misses Tuesday opens door
+ * seven on Wednesday — nothing resets, nothing is lost, and the only thing a
+ * missed day costs is the day. That is deliberate: a calendar that punishes an
+ * absence is a calendar that punishes a holiday, and this game already asks
+ * nothing of a player who closes it.
+ *
+ * The day boundary is UTC, like every other daily thing here. A device clock is
+ * a lever anyone can pull, and one global midnight gives everyone the same
+ * rhythm.
+ */
+export const CALENDAR_DAYS = 30;
+
+export type CalendarKind = "GEMS" | "GOLD" | "BOOST" | "SKIN";
+
+export interface CalendarDay {
+  day: number;
+  kind: CalendarKind;
+  /** Gems, or minutes of the player's own income, or one boost of this key. */
+  amount: number;
+  boost?: BoostKey;
+}
+
+/**
+ * What each door holds.
+ *
+ * Gems are a fixed number because gems do not inflate — a Guardian pays the same
+ * at floor 3 and floor 300, which is what lets a price mean something. Gold
+ * cannot be fixed for the same reason inverted: it is exponential, so a number
+ * that matters on day one is a rounding error by floor forty. Gold is therefore
+ * paid in **minutes of the cat's own current income**, which is worth the same
+ * amount of progress whenever it is opened.
+ */
+export const CALENDAR: CalendarDay[] = [
+  { day: 1, kind: "GEMS", amount: 3 },
+  { day: 2, kind: "GOLD", amount: 15 },
+  { day: 3, kind: "BOOST", amount: 1, boost: "gold" },
+  { day: 4, kind: "GEMS", amount: 5 },
+  { day: 5, kind: "GOLD", amount: 30 },
+  { day: 6, kind: "BOOST", amount: 1, boost: "damage" },
+  { day: 7, kind: "GEMS", amount: 8 },
+  { day: 8, kind: "GOLD", amount: 45 },
+  { day: 9, kind: "BOOST", amount: 1, boost: "loot" },
+  { day: 10, kind: "GEMS", amount: 12 },
+  { day: 11, kind: "GOLD", amount: 60 },
+  { day: 12, kind: "BOOST", amount: 1, boost: "gold" },
+  { day: 13, kind: "GEMS", amount: 15 },
+  { day: 14, kind: "GOLD", amount: 90 },
+  // The middle of the month is the prize, and it is the only thing on this table
+  // that cannot be bought: six coats, one per calendar, six months of them.
+  { day: 15, kind: "SKIN", amount: 1 },
+  { day: 16, kind: "GEMS", amount: 10 },
+  { day: 17, kind: "BOOST", amount: 1, boost: "damage" },
+  { day: 18, kind: "GOLD", amount: 60 },
+  { day: 19, kind: "GEMS", amount: 12 },
+  { day: 20, kind: "GEMS", amount: 20 },
+  { day: 21, kind: "BOOST", amount: 1, boost: "loot" },
+  { day: 22, kind: "GOLD", amount: 90 },
+  { day: 23, kind: "GEMS", amount: 15 },
+  { day: 24, kind: "BOOST", amount: 1, boost: "gold" },
+  { day: 25, kind: "GEMS", amount: 25 },
+  { day: 26, kind: "GOLD", amount: 120 },
+  { day: 27, kind: "BOOST", amount: 1, boost: "damage" },
+  { day: 28, kind: "GEMS", amount: 20 },
+  { day: 29, kind: "GOLD", amount: 150 },
+  { day: 30, kind: "GEMS", amount: 60 },
+];
+
+/**
+ * The coat behind door fifteen, one per calendar.
+ *
+ * Six of them, which is six months of calendars planned in advance. Past the
+ * sixth the door pays gems instead — a promise of "a new coat every month for
+ * ever" is one nobody can keep, and an empty door on month seven would be worse
+ * than an honest handful of gems.
+ */
+export const CALENDAR_SKINS = ["aurora", "obsidian", "sakura", "abyss", "solstice", "nebula"];
+
+/** What door fifteen pays once the six coats have all been given. */
+export const CALENDAR_SKIN_FALLBACK_GEMS = 80;
+
+/** The coat owed for a calendar, or null when there is none left to give. */
+export function calendarSkinFor(cycle: number): string | null {
+  return CALENDAR_SKINS[cycle] ?? null;
+}
+
+export function calendarDay(day: number): CalendarDay {
+  return CALENDAR[Math.min(Math.max(1, day), CALENDAR_DAYS) - 1];
+}
+
+// ---------------------------------------------------------------------------
+// Boosts
+// ---------------------------------------------------------------------------
+
+export type BoostKey = "gold" | "damage" | "loot";
+
+export interface BoostDef {
+  key: BoostKey;
+  nameEn: string;
+  nameFr: string;
+  descEn: string;
+  descFr: string;
+  /** Seconds it runs for once started. */
+  seconds: number;
+  icon: string;
+}
+
+/** Everything a boost multiplies, it doubles. One number to remember. */
+export const BOOST_FACTOR = 2;
+
+/**
+ * Three boosts, and deliberately not four.
+ *
+ * "Damage x2" and "attack speed x2" are the same multiplier: power is damage
+ * times attacks per second, so doubling either doubles exactly the same number.
+ * Two buttons with one effect is a menu that lies, so the third slot went to
+ * loot instead, which multiplies something no other boost touches.
+ */
+export const BOOSTS: BoostDef[] = [
+  {
+    key: "gold",
+    nameEn: "Greed",
+    nameFr: "Avidité",
+    descEn: "x2 gold",
+    descFr: "×2 or",
+    seconds: 30 * 60,
+    icon: "gold",
+  },
+  {
+    key: "damage",
+    nameEn: "Fury",
+    nameFr: "Fureur",
+    descEn: "x2 damage",
+    descFr: "×2 dégâts",
+    seconds: 20 * 60,
+    icon: "sword",
+  },
+  {
+    key: "loot",
+    nameEn: "Scent",
+    nameFr: "Odorat",
+    descEn: "x2 find chance",
+    descFr: "×2 chance de butin",
+    seconds: 20 * 60,
+    icon: "key",
+  },
+];
+
+export const BOOST_BY_KEY: Record<string, BoostDef> = Object.fromEntries(
+  BOOSTS.map((boost) => [boost.key, boost]),
+);
+
 export const SKINS: SkinDef[] = [
   {
     key: "classic",
@@ -1197,6 +1358,90 @@ export const SKINS: SkinDef[] = [
     furLight: "#8f7fd4",
     ear: "#a98fd4",
     eyes: "#8ef0ff",
+  },
+  {
+    key: "aurora",
+    nameEn: "Aurora",
+    nameFr: "Aurore",
+    price: 0,
+    // Behind a door, never behind a price: the calendar is the only way in.
+    calendar: true,
+    fur: "#4c7f8f",
+    furDark: "#31586a",
+    furDeep: "#203c4c",
+    furLight: "#7fc0cd",
+    ear: "#a8d8e0",
+    eyes: "#c8ff6a",
+  },
+  {
+    key: "obsidian",
+    nameEn: "Obsidian",
+    nameFr: "Obsidienne",
+    price: 0,
+    // Behind a door, never behind a price: the calendar is the only way in.
+    calendar: true,
+    fur: "#2a2f3d",
+    furDark: "#1b1f29",
+    furDeep: "#101319",
+    furLight: "#454d63",
+    ear: "#6d5f77",
+    eyes: "#ff7a3d",
+  },
+  {
+    key: "sakura",
+    nameEn: "Sakura",
+    nameFr: "Sakura",
+    price: 0,
+    // Behind a door, never behind a price: the calendar is the only way in.
+    calendar: true,
+    fur: "#e8bcc6",
+    furDark: "#c78d9c",
+    furDeep: "#a06a79",
+    furLight: "#f6dde2",
+    ear: "#f2b8c6",
+    eyes: "#5fd18f",
+  },
+  {
+    key: "abyss",
+    nameEn: "Abyss",
+    nameFr: "Abysse",
+    price: 0,
+    // Behind a door, never behind a price: the calendar is the only way in.
+    calendar: true,
+    fur: "#2f3a72",
+    furDark: "#212a55",
+    furDeep: "#141a38",
+    furLight: "#5566a8",
+    ear: "#7a6fa8",
+    eyes: "#ffd45e",
+  },
+  {
+    key: "solstice",
+    nameEn: "Solstice",
+    nameFr: "Solstice",
+    price: 0,
+    // Behind a door, never behind a price: the calendar is the only way in.
+    calendar: true,
+    fur: "#efe0bd",
+    furDark: "#cdb98d",
+    furDeep: "#a8926a",
+    furLight: "#fbf3e0",
+    ear: "#e8c7a8",
+    eyes: "#ff9d3d",
+  },
+  {
+    key: "nebula",
+    nameEn: "Nebula",
+    nameFr: "Nébuleuse",
+    price: 0,
+    // Behind a door, never behind a price: the calendar is the only way in.
+    calendar: true,
+    fur: "#6b3f8f",
+    furDark: "#4c2b66",
+    furDeep: "#331d47",
+    furLight: "#a06fc9",
+    ear: "#c58fd8",
+    eyes: "#e8fbff",
   },
 ];
 

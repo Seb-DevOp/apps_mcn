@@ -270,5 +270,19 @@
   "leaderboard.chests.hint": "Chests opened. Gems come from Guardians, so this is a record of height spent on luck.",
   "leaderboard.chestValue": "{n} chests",
   "nav.climb": "Climb",
-  "idle.recordShort": "highest floor {n}"
+  "idle.recordShort": "highest floor {n}",
+  "calendar.title": "The thirty doors",
+  "calendar.hint": "One a day. Miss a day and you lose the day, never the door — the count waits for you.",
+  "calendar.cycle": "Calendar {n}",
+  "calendar.open": "Open door {n}",
+  "calendar.tomorrow": "Next door in {time}",
+  "calendar.minutes": "{n}m",
+  "calendar.prize": "Behind door {n}",
+  "calendar.prizeHint": "A coat that is never for sale.",
+  "calendar.gotGems": "+{n} gems",
+  "calendar.gotGold": "+{n} gold",
+  "calendar.gotBoost": "One boost added",
+  "calendar.gotSkin": "A new coat: {name}",
+  "boost.minutes": "{n} min",
+  "boost.running": "Running"
 }

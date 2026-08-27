@@ -46,6 +46,13 @@ export function IdlePanelShell({
    * silently into the bag and the only evidence was a counter going up. It is the
    * same decision a drop is, so it gets the same card.
    */
+  /**
+   * What the last action reported, kept so a screen can say what it gave.
+   * A door that empties itself and pays into a counter three sections away is a
+   * door nobody feels opening.
+   */
+  const [claim, setClaim] = useState<Record<string, unknown> | null>(null);
+
   const [loot, setLoot] = useState<LootEntry[]>([]);
   const dismissLoot = useCallback((id: string) => {
     setLoot((current) => current.filter((entry) => entry.id !== id));
@@ -73,6 +80,7 @@ export function IdlePanelShell({
       if (data.ok) {
         const next = data.state as IdleState;
         setState(next);
+        setClaim(body.action === "calendar" ? (data as Record<string, unknown>) : null);
 
         if (typeof data.itemId === "string") {
           const item = next.items.find((entry) => entry.id === data.itemId);
@@ -118,7 +126,7 @@ export function IdlePanelShell({
       </header>
 
       {panel === "SHOP" ? (
-        <IdleShop state={state} busy={busy} act={act} />
+        <IdleShop state={state} busy={busy} act={act} claim={claim} />
       ) : (
         <IdleRebirth state={state} busy={busy} act={act} />
       )}

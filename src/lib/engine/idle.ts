@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { dayKey, msUntilNextDay } from "@/lib/time";
 import { randomInt } from "@/lib/rng";
 import {
   SLOTS,
@@ -44,6 +45,15 @@ import {
   unlocked,
   sealBonus,
   sealBonusFor,
+  BOOSTS,
+  BOOST_BY_KEY,
+  BOOST_FACTOR,
+  CALENDAR,
+  CALENDAR_DAYS,
+  CALENDAR_SKIN_FALLBACK_GEMS,
+  calendarDay,
+  calendarSkinFor,
+  type BoostKey,
   rebirthFloorFor,
   eliteLevel,
   ELITE_CHANCE,
@@ -114,6 +124,35 @@ export function parseRelics(json: string): Relics {
 }
 
 const NO_RELICS: Relics = { memory: 0, tenacity: 0, greed: 0, luck: 0 };
+
+export type Boosts = Record<BoostKey, number>;
+
+/**
+ * Seconds left on the running boost.
+ *
+ * The truth is an absolute end time, never a countdown written back on every
+ * tick: a stored countdown drifts with the tick rate and stops entirely while
+ * the game is closed, which is the one thing an idle game must not do.
+ */
+export function boostSecondsLeft(profile: { boostKey: string; boostUntil: Date }): number {
+  if (!profile.boostKey) return 0;
+  return Math.max(0, (profile.boostUntil.getTime() - Date.now()) / 1000);
+}
+
+/** How many of each boost are held. Same shape and same forgiveness as upgrades. */
+export function parseBoosts(json: string): Boosts {
+  const base: Boosts = { gold: 0, damage: 0, loot: 0 };
+  try {
+    const parsed = JSON.parse(json) as Partial<Boosts>;
+    for (const key of Object.keys(base) as BoostKey[]) {
+      const value = Number(parsed[key]);
+      if (Number.isFinite(value) && value > 0) base[key] = Math.floor(value);
+    }
+  } catch {
+    // A corrupt blob costs the player their unspent boosts, not their session.
+  }
+  return base;
+}
 
 export interface DerivedStats {
   /** Damage of one ordinary blow. */
@@ -429,6 +468,9 @@ export function simulate(
     recoverFor: number;
     shieldFor: number;
     highestLevel: number;
+    /** The boost running, if one is, and the seconds it has left. */
+    boostKey: string;
+    boostFor: number;
   },
   stats: DerivedStats,
   /** Elites only exist once a fourth life has brought them back. */
@@ -443,8 +485,11 @@ export function simulate(
   recoverFor: number;
   shieldFor: number;
   highestLevel: number;
+  boostKey: string;
+  boostFor: number;
 } {
   let { level, enemyHp, elite, hp, recoverFor, shieldFor, highestLevel } = state;
+  let { boostKey, boostFor } = state;
   let remaining = seconds;
   // Gold comes from kills and from nothing else. Waiting is not an income.
   let goldEarned = 0;
@@ -469,6 +514,7 @@ export function simulate(
       const spent = Math.min(remaining, recoverFor);
       recoverFor -= spent;
       remaining -= spent;
+      boostFor = Math.max(0, boostFor - spent);
       hp = clampHp(hp + stats.regen * spent);
       continue;
     }
@@ -484,7 +530,24 @@ export function simulate(
     // Both sides grow exponentially, so at absurd depth both overflow to
     // Infinity and their ratio becomes NaN. Falling back to the floor keeps the
     // loop finite instead of silently producing a broken save.
-    const ratio = enemyHp / stats.power;
+    /**
+     * What the running boost multiplies, and nothing else.
+     *
+     * Deliberately applied here rather than in `derive`: derived stats are what
+     * the cat *is*, and they are what item comparisons and the combat score are
+     * built on. A boost that leaked into `derive` would make every "+18 %" in
+     * the bag swing by a factor of two for twenty minutes.
+     */
+    const boosted = boostFor > 0;
+    const power = boosted && boostKey === "damage" ? stats.power * BOOST_FACTOR : stats.power;
+    const goldMultiplier =
+      boosted && boostKey === "gold" ? stats.goldMultiplier * BOOST_FACTOR : stats.goldMultiplier;
+    const dropChance =
+      boosted && boostKey === "loot"
+        ? Math.min(1, stats.dropChance * BOOST_FACTOR)
+        : stats.dropChance;
+
+    const ratio = enemyHp / power;
     const timeToKill = Number.isFinite(ratio)
       ? Math.max(MIN_KILL_SECONDS, ratio)
       : MIN_KILL_SECONDS;
@@ -498,32 +561,40 @@ export function simulate(
 
     // The shield running out is an event like any other: the rates change when it
     // does, so the step has to stop there rather than average across it.
+    // Three things can end a step: the enemy dies, the cat falls, or one of the
+    // two timers runs out. Averaging across a timer would pay the boost for
+    // seconds it did not cover.
     const decidedAt = Math.min(
       timeToKill,
       timeToFall,
       shielded ? shieldFor : Number.POSITIVE_INFINITY,
+      boosted ? boostFor : Number.POSITIVE_INFINITY,
     );
 
     if (remaining < decidedAt) {
       // The tick runs out mid-fight: carry the wound and the enemy's wound over.
-      enemyHp = Math.max(0.0001, enemyHp - stats.power * remaining);
+      enemyHp = Math.max(0.0001, enemyHp - power * remaining);
       hp = clampHp(hp + netHealth * remaining);
       if (shielded) shieldFor = Math.max(0, shieldFor - remaining);
+      if (boosted) boostFor = Math.max(0, boostFor - remaining);
       remaining = 0;
       break;
     }
 
-    if (shielded && shieldFor < timeToKill && shieldFor < timeToFall) {
-      // Nothing died and nobody fell — the Breath simply stopped. Chip what the
-      // cat managed in that window and let the loop reprice the fight.
-      remaining -= shieldFor;
-      enemyHp = Math.max(0.0001, enemyHp - stats.power * shieldFor);
-      hp = clampHp(hp + netHealth * shieldFor);
-      shieldFor = 0;
+    if (decidedAt < timeToKill && decidedAt < timeToFall) {
+      // Nothing died and nobody fell — a timer simply stopped. Chip what the cat
+      // managed in that window and let the loop reprice the fight at the new
+      // rates.
+      remaining -= decidedAt;
+      enemyHp = Math.max(0.0001, enemyHp - power * decidedAt);
+      hp = clampHp(hp + netHealth * decidedAt);
+      if (shielded) shieldFor = Math.max(0, shieldFor - decidedAt);
+      if (boosted) boostFor = Math.max(0, boostFor - decidedAt);
       continue;
     }
 
     if (shielded) shieldFor = Math.max(0, shieldFor - decidedAt);
+    if (boosted) boostFor = Math.max(0, boostFor - decidedAt);
 
     if (timeToFall < timeToKill) {
       // Beaten. Back to the first chamber of this floor, full health, but the
@@ -549,7 +620,7 @@ export function simulate(
 
     remaining -= timeToKill;
     hp = clampHp(hp + netHealth * timeToKill);
-    goldEarned += info.goldReward * stats.goldMultiplier;
+    goldEarned += info.goldReward * goldMultiplier;
     kills += 1;
     killsSinceDefeat += 1;
 
@@ -565,7 +636,7 @@ export function simulate(
     if (elite) gemsEarned += ELITE_GEMS;
 
     const guaranteed = info.isBoss || elite;
-    if (drops.length < MAX_DROPS_PER_TICK && (guaranteed || Math.random() < stats.dropChance)) {
+    if (drops.length < MAX_DROPS_PER_TICK && (guaranteed || Math.random() < dropChance)) {
       const slot = SLOTS[randomInt(0, SLOTS.length - 1)];
       // An Elite always leaves something, and something better than the floor
       // would otherwise give — one tier up, which is the whole reward for the
@@ -617,6 +688,8 @@ export function simulate(
     recoverFor,
     shieldFor,
     highestLevel,
+    boostKey,
+    boostFor,
   };
 }
 
@@ -682,6 +755,8 @@ export async function getIdleState(userId: string) {
         recoverFor: profile.recoverFor,
         shieldFor: profile.shieldFor,
         highestLevel: profile.highestLevel,
+        boostKey: profile.boostKey,
+        boostFor: boostSecondsLeft(profile),
       },
       stats,
       unlocked("elites", profile.rebirths),
@@ -757,6 +832,9 @@ export async function getIdleState(userId: string) {
         totalLevels: profile.totalLevels + result.levelsCleared,
         gems: profile.gems + result.gemsEarned,
         gemsEarned: profile.gemsEarned + result.gemsEarned,
+        // A boost that ran out during the tick is cleared here rather than left
+        // for every reader to subtract two dates for themselves.
+        boostKey: boostSecondsLeft(profile) > 0 ? profile.boostKey : "",
         lastTickAt: now,
       },
     });
@@ -794,6 +872,12 @@ function view(
     lastBreathAt: Date;
     shieldFor: number;
     autoSellBelow: string;
+    calendarDay: number;
+    calendarCycle: number;
+    calendarDayKey: string;
+    boostsJson: string;
+    boostKey: string;
+    boostUntil: Date;
     gems: number;
     gemsEarned: number;
     chestsOpened: number;
@@ -961,13 +1045,62 @@ function view(
       guaranteedRarity: chestFloorRarity(profile.rebirths),
       pity: CHEST_PITY,
       skinKey: profile.skinKey,
-      skins: SKINS.map((skin) => ({
+      // A calendar coat appears here only once it has been won: listing one at
+      // a price of zero would read as a free coat nobody had bothered to take.
+      skins: SKINS.filter(
+        (skin) => !skin.calendar || parseSkins(profile.skinsJson).includes(skin.key),
+      ).map((skin) => ({
         key: skin.key,
         nameEn: skin.nameEn,
         nameFr: skin.nameFr,
         price: skin.price,
+        calendar: skin.calendar ?? false,
         owned: skin.price === 0 || parseSkins(profile.skinsJson).includes(skin.key),
         worn: profile.skinKey === skin.key,
+      })),
+    },
+
+    /**
+     * The thirty doors, and which one is next.
+     *
+     * A missed day costs the day and nothing else, so this is a count rather
+     * than a grid of dates: door seven is door seven whether it is opened on
+     * Tuesday or a fortnight later. What the screen still needs is *when* the
+     * next one can be opened, which is the next UTC midnight.
+     */
+    calendar: {
+      day: profile.calendarDay,
+      cycle: profile.calendarCycle,
+      claimable: profile.calendarDayKey !== dayKey(),
+      /** Seconds to the next UTC midnight — only meaningful once claimed. */
+      nextInSeconds: Math.round(msUntilNextDay() / 1000),
+      total: CALENDAR_DAYS,
+      /** The coat this calendar is holding at door fifteen, if any is left. */
+      skin: calendarSkinFor(profile.calendarCycle),
+      days: CALENDAR.map((entry) => ({
+        day: entry.day,
+        kind: entry.kind,
+        amount: entry.amount,
+        boost: entry.boost ?? null,
+        opened: entry.day < profile.calendarDay,
+        next: entry.day === profile.calendarDay,
+      })),
+    },
+
+    boosts: {
+      owned: parseBoosts(profile.boostsJson),
+      active: profile.boostKey
+        ? { key: profile.boostKey, secondsLeft: Math.round(boostSecondsLeft(profile)) }
+        : null,
+      catalogue: BOOSTS.map((def) => ({
+        key: def.key,
+        seconds: def.seconds,
+        factor: BOOST_FACTOR,
+        nameEn: def.nameEn,
+        nameFr: def.nameFr,
+        descEn: def.descEn,
+        descFr: def.descFr,
+        icon: def.icon,
       })),
     },
 
@@ -1382,6 +1515,129 @@ export async function breath(userId: string) {
   });
 }
 
+/**
+ * Opens today's door.
+ *
+ * Server-side in every part that matters: which door is next, whether today has
+ * already been used, and what the door holds. The client is told the table so it
+ * can draw it, and is never asked what it thinks it should get.
+ *
+ * Gold is paid as minutes of the cat's *own* income at the moment of opening.
+ * A fixed number of gold is either an insult or an exploit depending on the
+ * floor, because gold is exponential in depth and a calendar is not.
+ */
+export async function claimCalendar(userId: string) {
+  // Settle time first: the gold rate this pays is the rate the cat has now.
+  await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    const today = dayKey();
+    if (profile.calendarDayKey === today) {
+      return { ok: false as const, error: "ALREADY_TODAY" as const };
+    }
+
+    const door = calendarDay(profile.calendarDay);
+    const boosts = parseBoosts(profile.boostsJson);
+    const skins = parseSkins(profile.skinsJson);
+
+    let gems = 0;
+    let gold = 0;
+    let skin: string | null = null;
+    let boost: BoostKey | null = null;
+
+    if (door.kind === "GEMS") {
+      gems = door.amount;
+    } else if (door.kind === "GOLD") {
+      const items = await tx.idleItem.findMany({ where: { userId } });
+      const stats = derive(
+        items,
+        parseUpgrades(profile.upgradesJson),
+        parseRelics(profile.relicsJson),
+        profile.rebirths,
+      );
+      const info = levelInfo(profile.level);
+      const secondsToKill = Math.max(MIN_KILL_SECONDS, info.enemyHp / stats.power);
+      const perSecond = (info.goldReward * stats.goldMultiplier) / secondsToKill;
+      gold = perSecond * door.amount * 60;
+    } else if (door.kind === "BOOST" && door.boost) {
+      boost = door.boost;
+      boosts[boost] += door.amount;
+    } else if (door.kind === "SKIN") {
+      const owed = calendarSkinFor(profile.calendarCycle);
+      // Past the sixth calendar there is no coat left to give, and an empty door
+      // would be worse than an honest handful of gems.
+      if (owed && !skins.includes(owed)) skin = owed;
+      else gems = CALENDAR_SKIN_FALLBACK_GEMS;
+    }
+
+    const finished = profile.calendarDay >= CALENDAR_DAYS;
+
+    await tx.idleProfile.update({
+      where: { userId },
+      data: {
+        calendarDayKey: today,
+        // The thirty-first day is the first day of the next calendar.
+        calendarDay: finished ? 1 : profile.calendarDay + 1,
+        calendarCycle: finished ? profile.calendarCycle + 1 : profile.calendarCycle,
+        gems: profile.gems + gems,
+        gemsEarned: profile.gemsEarned + gems,
+        gold: profile.gold + gold,
+        totalGold: profile.totalGold + gold,
+        boostsJson: JSON.stringify(boosts),
+        skinsJson: skin ? JSON.stringify([...skins, skin]) : profile.skinsJson,
+      },
+    });
+
+    return {
+      ok: true as const,
+      day: profile.calendarDay,
+      kind: door.kind,
+      gems,
+      gold,
+      skin,
+      boost,
+      finished,
+    };
+  });
+}
+
+/**
+ * Starts one of the held boosts.
+ *
+ * One at a time, and never extended: two multipliers on the same number is a
+ * stack nobody can read, and letting a second one restart the clock would turn
+ * "twenty minutes" into "twenty minutes from whenever you last tapped".
+ */
+export async function useBoost(userId: string, key: string) {
+  const def = BOOST_BY_KEY[key];
+  if (!def) return { ok: false as const, error: "UNKNOWN_BOOST" as const };
+
+  // Settle time first: the seconds before the boost are worth what they were.
+  await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    if (boostSecondsLeft(profile) > 0) {
+      return { ok: false as const, error: "BOOST_RUNNING" as const };
+    }
+
+    const boosts = parseBoosts(profile.boostsJson);
+    if (boosts[def.key] <= 0) return { ok: false as const, error: "NOT_OWNED" as const };
+    boosts[def.key] -= 1;
+
+    await tx.idleProfile.update({
+      where: { userId },
+      data: {
+        boostsJson: JSON.stringify(boosts),
+        boostKey: def.key,
+        boostUntil: new Date(Date.now() + def.seconds * 1000),
+      },
+    });
+    return { ok: true as const };
+  });
+}
+
 /** Chooses what the Nose sells on sight. An empty string keeps everything. */
 export async function setAutoSell(userId: string, rarity: string) {
   const valid = rarity === "" || RARITIES.includes(rarity as Rarity);
@@ -1469,6 +1725,12 @@ export async function buySkin(userId: string, key: string) {
   return prisma.$transaction(async (tx) => {
     const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
     const owned = parseSkins(profile.skinsJson);
+
+    // A calendar coat has no price, which without this line would mean anyone
+    // could ask for one and be given it. Free is not the same as unearned.
+    if (def.calendar && !owned.includes(key)) {
+      return { ok: false as const, error: "NOT_FOUND" as const };
+    }
 
     if (owned.includes(key) || def.price === 0) {
       await tx.idleProfile.update({ where: { userId }, data: { skinKey: key } });

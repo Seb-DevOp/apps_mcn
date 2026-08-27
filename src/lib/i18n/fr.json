@@ -270,5 +270,19 @@
   "leaderboard.chests.hint": "Coffres ouverts. Les gemmes viennent des Gardiens : c'est un record de hauteur dépensée en chance.",
   "leaderboard.chestValue": "{n} coffres",
   "nav.climb": "Ascension",
-  "idle.recordShort": "étage record {n}"
+  "idle.recordShort": "étage record {n}",
+  "calendar.title": "Les trente portes",
+  "calendar.hint": "Une par jour. Un jour manqué coûte le jour, jamais la porte — le compte t'attend.",
+  "calendar.cycle": "Calendrier {n}",
+  "calendar.open": "Ouvrir la porte {n}",
+  "calendar.tomorrow": "Prochaine porte dans {time}",
+  "calendar.minutes": "{n}min",
+  "calendar.prize": "Derrière la porte {n}",
+  "calendar.prizeHint": "Un pelage qui n'est jamais en vente.",
+  "calendar.gotGems": "+{n} gemmes",
+  "calendar.gotGold": "+{n} or",
+  "calendar.gotBoost": "Un boost ajouté",
+  "calendar.gotSkin": "Un nouveau pelage : {name}",
+  "boost.minutes": "{n} min",
+  "boost.running": "En cours"
 }

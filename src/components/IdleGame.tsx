@@ -226,6 +226,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
       gold: next.gold,
       gems: next.shop.gems,
       relics: next.rebirth.relics,
+      daily: next.calendar.claimable,
     });
 
     // Only finds from a tick the player was present for. Twelve hours of absence
@@ -474,6 +475,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           gold: w.gold,
           gems: live.shop.gems,
           relics: live.rebirth.relics,
+          daily: live.calendar.claimable,
         });
       }
 
@@ -704,6 +706,8 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
           <Verdict outcome={state.outcome} isBoss={here.isBoss} />
 
+          <Boosts state={state} busy={busy} act={act} />
+
           {/* Power itself lives in the bar at the top of every screen now.
               These six are what it is made of. */}
           {/* --- The six statistics ----------------------------------- */}
@@ -826,6 +830,84 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 }
 
 // ---------------------------------------------------------------------------
+
+/**
+ * WHAT THE CALENDAR GAVE
+ *
+ * Held boosts, and the one that is running. Here rather than in the shop
+ * because a boost is spent while watching a fight, not while browsing: doubling
+ * gold is a decision about the next twenty minutes of *this* floor.
+ *
+ * One runs at a time. Two multipliers on the same number is a stack nobody can
+ * read, and the running one takes the whole row so it cannot be missed.
+ */
+function Boosts({
+  state,
+  busy,
+  act,
+}: {
+  state: IdleState;
+  busy: string | null;
+  act: (body: Record<string, unknown>, key: string) => void;
+}) {
+  const { t, L } = useI18n();
+  const { boosts } = state;
+  const held = boosts.catalogue.filter((def) => boosts.owned[def.key] > 0);
+
+  if (boosts.active) {
+    const def = boosts.catalogue.find((entry) => entry.key === boosts.active!.key);
+    const minutes = Math.floor(boosts.active.secondsLeft / 60);
+    const seconds = Math.floor(boosts.active.secondsLeft % 60);
+    return (
+      <div
+        className="panel mt-3 flex items-center gap-2 px-3 py-2"
+        style={{ borderColor: "rgba(201,162,77,0.55)", background: "rgba(201,162,77,0.08)" }}
+      >
+        <span className="text-[var(--gold)]">
+          <ItemIcon icon={def?.icon ?? "gold"} size={16} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[0.74rem] text-[var(--gold-bright)]">
+          {def ? L(def.descEn, def.descFr) : ""}
+        </span>
+        <span className="tabular text-[0.74rem] text-[var(--parchment)]">
+          {minutes}:{String(seconds).padStart(2, "0")}
+        </span>
+      </div>
+    );
+  }
+
+  if (held.length === 0) return null;
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {held.map((def) => (
+        <button
+          key={def.key}
+          type="button"
+          disabled={busy !== null}
+          onClick={() => act({ action: "boost", key: def.key }, `boost-${def.key}`)}
+          className="panel flex flex-1 items-center gap-2 px-2 py-1.5 text-left text-[0.68rem] disabled:opacity-45"
+          style={{ borderColor: "rgba(201,162,77,0.35)" }}
+        >
+          <span className="text-[var(--gold)]">
+            <ItemIcon icon={def.icon} size={15} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[var(--parchment)]">
+              {L(def.descEn, def.descFr)}
+            </span>
+            <span className="dim tabular block text-[0.58rem]">
+              {t("boost.minutes", { n: Math.round(def.seconds / 60) })}
+            </span>
+          </span>
+          <span className="tabular shrink-0 text-[var(--gold-bright)]">
+            ×{boosts.owned[def.key]}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * The six upgrades.

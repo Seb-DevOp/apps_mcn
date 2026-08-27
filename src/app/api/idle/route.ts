@@ -17,6 +17,8 @@ import {
   setAutoSell,
   buyChest,
   buySkin,
+  claimCalendar,
+  useBoost,
 } from "@/lib/engine/idle";
 
 /**
@@ -54,6 +56,8 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("autoSell"), rarity: z.string().max(20) }),
   z.object({ action: z.literal("chest") }),
   z.object({ action: z.literal("skin"), key: z.string().min(1).max(32) }),
+  z.object({ action: z.literal("calendar") }),
+  z.object({ action: z.literal("boost"), key: z.string().min(1).max(32) }),
 ]);
 
 export async function POST(request: Request) {
@@ -108,5 +112,9 @@ function run(userId: string, input: z.infer<typeof Schema>) {
       return buyChest(userId);
     case "skin":
       return buySkin(userId, input.key);
+    case "calendar":
+      return claimCalendar(userId);
+    case "boost":
+      return useBoost(userId, input.key);
   }
 }

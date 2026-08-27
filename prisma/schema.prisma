@@ -160,6 +160,24 @@ model IdleProfile {
   skinKey      String @default("classic")
   skinsJson    String @default("[]")
 
+  /// --- The calendar --------------------------------------------------
+  /// Which of the thirty doors is next, and how many calendars have been
+  /// finished. Nothing here is a date: a missed day costs the day, never the
+  /// progress, so the state is a count and not a grid.
+  calendarDay   Int    @default(1)
+  calendarCycle Int    @default(0)
+  /// The UTC day the last door was opened, so a second opening has to wait for
+  /// tomorrow. UTC on purpose — a device clock is a lever anyone can pull.
+  calendarDayKey String @default("")
+
+  /// --- Boosts --------------------------------------------------------
+  /// { gold: 2, damage: 1 } — how many of each are held, unspent.
+  boostsJson String @default("{}")
+  /// The one currently running, and when it stops. One at a time: two
+  /// multipliers on the same number is a stack nobody can read.
+  boostKey   String   @default("")
+  boostUntil DateTime @default(now())
+
   /// --- The Nose ------------------------------------------------------
   /// Rarity below which a find sells itself. Empty means keep everything.
   autoSellBelow String @default("")

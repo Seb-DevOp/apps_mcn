@@ -105,7 +105,7 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
   const stats = derive(items, upgrades, relics, rebirths);
   const result = simulate(
     MINUTE,
-    { level, enemyHp, elite, hp, recoverFor, shieldFor, highestLevel },
+    { level, enemyHp, elite, hp, recoverFor, shieldFor, highestLevel, boostKey: "", boostFor: 0 },
     stats,
     unlocked("elites", rebirths),
     rebirths,

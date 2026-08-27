@@ -10,6 +10,8 @@ export interface Resources {
   gold: number;
   gems: number;
   relics: number;
+  /** A calendar door is waiting. Not a number, but it travels with them. */
+  daily: boolean;
 }
 
 /** Pull the four out of a full state, so no screen has to remember the shape. */
@@ -18,11 +20,13 @@ export function resourcesOf(state: {
   gold: number;
   shop: { gems: number };
   rebirth: { relics: number };
+  calendar: { claimable: boolean };
 }): Resources {
   return {
     score: state.score,
     gold: state.gold,
     gems: state.shop.gems,
     relics: state.rebirth.relics,
+    daily: state.calendar.claimable,
   };
 }
