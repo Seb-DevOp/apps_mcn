@@ -1341,7 +1341,7 @@ export async function roar(userId: string) {
 }
 
 /**
- * The Breath: heal completely, and let nothing land for fifteen seconds.
+ * The Breath: heal completely, and let nothing land for ten seconds.
  *
  * The immunity is stored as seconds owed rather than an expiry timestamp,
  * because the tick resolver works in elapsed spans and not in wall clock — the

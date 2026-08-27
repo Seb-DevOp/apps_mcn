@@ -911,8 +911,8 @@ export const UNLOCKS: UnlockDef[] = [
     rebirths: 3,
     nameEn: "The Breath",
     nameFr: "Le Souffle",
-    descEn: "Heal completely and take nothing for fifteen seconds.",
-    descFr: "Soin complet, et plus rien n'atteint le chat pendant quinze secondes.",
+    descEn: "Heal completely and take nothing for ten seconds.",
+    descFr: "Soin complet, et plus rien n'atteint le chat pendant dix secondes.",
     icon: "essence",
   },
   {
@@ -990,7 +990,23 @@ export function sealBonus(worn: Rarity[]): SealBonus {
 // ---------------------------------------------------------------------------
 
 export const BREATH_COOLDOWN_SECONDS = 120;
-export const BREATH_SHIELD_SECONDS = 15;
+/**
+ * Ten, and it was fifteen.
+ *
+ * Measured over two hours at every chamber around a cat's limit, re-casting the
+ * Breath the moment it was ready: fifteen seconds and ten seconds hold exactly
+ * the same chambers. Only one chamber in the whole ladder separates ten from
+ * five, and past that the shield stops deciding anything — it postpones a death
+ * that arrives anyway.
+ *
+ * The reason is the curve, not the number. Damage grows 1.152 per chamber and
+ * 2.34 per floor, so the band where "a little more invulnerability" flips the
+ * outcome is one chamber wide. Fifteen seconds bought nothing over ten but the
+ * appearance of a stronger spell.
+ *
+ * What the Breath is actually for is the full heal and the cancelled recovery.
+ */
+export const BREATH_SHIELD_SECONDS = 10;
 
 // ---------------------------------------------------------------------------
 // The Elites, and the Pack
