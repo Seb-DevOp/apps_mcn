@@ -305,5 +305,8 @@
   "player.title": "Player",
   "player.since": "Climbing since {date}",
   "player.back": "Back to the boards",
-  "player.bare": "This cat is not wearing anything yet."
+  "player.bare": "This cat is not wearing anything yet.",
+  "shop.backdrops": "Backdrops",
+  "shop.backdropsHint": "The wall your cat stands against, on your profile and on the boards.",
+  "shop.backdropNone": "Bare wall"
 }

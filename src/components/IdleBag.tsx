@@ -16,6 +16,7 @@ import {
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
 import { ItemArt } from "./ItemArt";
+import { ProfileBackdrop } from "./ProfileBackdrop";
 import { useI18n } from "./I18nProvider";
 import { formatGain, formatNumber } from "./format";
 import { ItemIcon } from "./ui/Icons";
@@ -203,8 +204,13 @@ export const IdleBag = memo(function IdleBag({
       )}
 
       {/* --- The cat, as it currently stands --------------------------- */}
-      <div className="panel panel-sapphire mt-4 flex justify-center py-3">
-        <CatCanvas worn={worn} size={190} skin={coatOf(state, dressing)} />
+      {/* The same wall the profile shows, so a player buying one can see what
+          they bought without leaving the game. */}
+      <div className="panel panel-sapphire relative mt-4 flex justify-center overflow-hidden py-3">
+        <ProfileBackdrop backdrop={state.shop.backdropKey} />
+        <span className="relative">
+          <CatCanvas worn={worn} size={190} skin={coatOf(state, dressing)} />
+        </span>
       </div>
 
       {/*

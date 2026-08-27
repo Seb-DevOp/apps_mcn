@@ -30,6 +30,8 @@ export interface PublicCat {
 export interface PublicProfile {
   handle: string;
   joinedAt: string;
+  /** The wall the cat stands against. Empty means the plain one. */
+  backdrop: string;
   /** The player's own cat, then the Pack and the Pride if they have them. */
   cats: PublicCat[];
   stats: {
@@ -124,6 +126,7 @@ export async function getPublicProfile(handle: string): Promise<PublicProfile | 
   return {
     handle: user.handle,
     joinedAt: user.createdAt.toISOString(),
+    backdrop: profile.backdropKey,
     cats,
     stats: {
       floor: levelInfo(profile.highestLevel).floor,

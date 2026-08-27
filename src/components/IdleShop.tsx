@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { RARITY_STYLE, type Rarity } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas } from "./CatCanvas";
+import { ProfileBackdrop } from "./ProfileBackdrop";
 import { GemIcon, ItemIcon } from "./ui/Icons";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
@@ -127,6 +128,67 @@ export function IdleShop({
             )}
           </button>
         ))}
+      </div>
+
+      {/* --- The walls ---------------------------------------------------- */}
+      <h2 className="eyebrow mt-6">{t("shop.backdrops")}</h2>
+      <p className="dim mt-1 text-[0.68rem] italic">{t("shop.backdropsHint")}</p>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {/* The bare wall first, and free: a shop where the plain option is
+            missing is a shop that has taken something away. */}
+        {[{ key: "", nameEn: "", nameFr: "", price: 0, owned: true, worn: state.shop.backdropKey === "" }, ...state.shop.backdrops].map(
+          (wall, index) => {
+            const affordable = wall.owned || shop.gems >= wall.price;
+            return (
+              <motion.button
+                key={wall.key || "none"}
+                type="button"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03 }}
+                disabled={!affordable || busy !== null || wall.worn}
+                onClick={() => act({ action: "backdrop", key: wall.key }, `wall-${wall.key || "none"}`)}
+                className="panel overflow-hidden p-0 transition disabled:opacity-45"
+                style={{
+                  borderColor: wall.worn ? "rgba(201,162,77,0.6)" : undefined,
+                }}
+              >
+                {/* The preview is the thing itself, moving. A still thumbnail of
+                    an animated wall sells the wrong object. */}
+                <span className="relative block h-16 w-full">
+                  <ProfileBackdrop backdrop={wall.key} />
+                </span>
+                <span className="block px-2 py-1.5">
+                  <span className="block truncate text-[0.7rem] text-[var(--parchment)]">
+                    {wall.key ? L(wall.nameEn, wall.nameFr) : t("shop.backdropNone")}
+                  </span>
+                  <span
+                    className="tabular flex items-center justify-center gap-1 text-[0.66rem]"
+                    style={{
+                      color: wall.worn
+                        ? "var(--gold-bright)"
+                        : wall.owned
+                          ? "var(--text-dim)"
+                          : "#8ef0ff",
+                    }}
+                  >
+                    {wall.worn ? (
+                      t("shop.worn")
+                    ) : wall.owned ? (
+                      t("shop.wear")
+                    ) : (
+                      <>
+                        {wall.price}
+                        <GemIcon size={11} />
+                      </>
+                    )}
+                  </span>
+                </span>
+              </motion.button>
+            );
+          },
+        )}
       </div>
 
       {/* --- The coats ---------------------------------------------------- */}

@@ -19,6 +19,7 @@ import {
   setAutoSell,
   buyChest,
   buySkin,
+  buyBackdrop,
   claimCalendar,
   useBoost,
   buyBoost,
@@ -69,6 +70,7 @@ const Schema = z.discriminatedUnion("action", [
     key: z.string().min(1).max(32),
     cat: z.number().int().min(0).max(2).optional(),
   }),
+  z.object({ action: z.literal("backdrop"), key: z.string().max(32) }),
   z.object({ action: z.literal("calendar") }),
   z.object({ action: z.literal("boost"), key: z.string().min(1).max(32) }),
   z.object({ action: z.literal("buyBoost"), key: z.string().min(1).max(32) }),
@@ -129,6 +131,8 @@ function run(userId: string, input: z.infer<typeof Schema>) {
       return buyChest(userId);
     case "skin":
       return buySkin(userId, input.key, input.cat ?? 0);
+    case "backdrop":
+      return buyBackdrop(userId, input.key);
     case "calendar":
       return claimCalendar(userId);
     case "boost":

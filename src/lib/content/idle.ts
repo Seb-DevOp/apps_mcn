@@ -1477,6 +1477,37 @@ export const BOOST_BY_KEY: Record<string, BoostDef> = Object.fromEntries(
   BOOSTS.map((boost) => [boost.key, boost]),
 );
 
+// ---------------------------------------------------------------------------
+// What a cat stands against
+// ---------------------------------------------------------------------------
+
+/**
+ * Profile backdrops.
+ *
+ * Cosmetic, priced in gems like the coats, and all of them animated: a still
+ * picture behind a breathing cat reads as a mistake, the eye takes the cat for
+ * a sticker on a wall. They survive a rebirth for the same reason coats do —
+ * making a player buy the same wall twice is not a gold sink.
+ */
+export interface BackdropDef {
+  key: string;
+  nameEn: string;
+  nameFr: string;
+  price: number;
+}
+
+export const BACKDROPS: BackdropDef[] = [
+  { key: "stars", nameEn: "Starfield", nameFr: "Champ d'étoiles", price: 150 },
+  { key: "aurora", nameEn: "Aurora", nameFr: "Aurore", price: 300 },
+  { key: "embers", nameEn: "Embers", nameFr: "Braises", price: 500 },
+  { key: "abyss", nameEn: "The Abyss", nameFr: "L'Abysse", price: 800 },
+  { key: "gilded", nameEn: "The Hoard", nameFr: "Le Trésor", price: 1200 },
+];
+
+export const BACKDROP_BY_KEY: Record<string, BackdropDef> = Object.fromEntries(
+  BACKDROPS.map((entry) => [entry.key, entry]),
+);
+
 export const SKINS: SkinDef[] = [
   {
     key: "classic",

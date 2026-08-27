@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { RARITY_STYLE, SKIN_BY_KEY } from "@/lib/content/idle";
 import type { PublicProfile } from "@/lib/engine/profile";
 import { CatCanvas } from "./CatCanvas";
+import { ProfileBackdrop } from "./ProfileBackdrop";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 
@@ -68,8 +69,11 @@ export function PlayerProfile({ profile }: { profile: PublicProfile }) {
       {/* --- The cat itself ---------------------------------------------- */}
       {first ? (
         <>
-          <div className="panel panel-sapphire mt-4 flex justify-center py-3">
-            <CatCanvas worn={first.worn} size={190} skin={first.skin} />
+          <div className="panel panel-sapphire relative mt-4 flex justify-center overflow-hidden py-3">
+            <ProfileBackdrop backdrop={profile.backdrop} />
+            <span className="relative">
+              <CatCanvas worn={first.worn} size={190} skin={first.skin} />
+            </span>
           </div>
           <p className="dim mt-1 text-center text-[0.64rem]">
             {L(SKIN_BY_KEY[first.skin]?.nameEn ?? first.skin, SKIN_BY_KEY[first.skin]?.nameFr ?? first.skin)}

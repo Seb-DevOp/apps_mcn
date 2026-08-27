@@ -164,6 +164,11 @@ model IdleProfile {
   /// otherwise. ["ember", "shadow"] dresses the second and third.
   catSkinsJson String @default("[]")
 
+  /// The profile backdrop worn, and every one ever bought. Cosmetic, so both
+  /// survive a rebirth: making a player buy the same wall twice is not a sink.
+  backdropKey   String @default("")
+  backdropsJson String @default("[]")
+
   /// --- The calendar --------------------------------------------------
   /// Which of the thirty doors is next, and how many calendars have been
   /// finished. Nothing here is a date: a missed day costs the day, never the

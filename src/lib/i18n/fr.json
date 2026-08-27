@@ -305,5 +305,8 @@
   "player.title": "Joueur",
   "player.since": "Grimpe depuis {date}",
   "player.back": "Retour aux classements",
-  "player.bare": "Ce chat ne porte encore rien."
+  "player.bare": "Ce chat ne porte encore rien.",
+  "shop.backdrops": "Fonds",
+  "shop.backdropsHint": "Le mur devant lequel se tient ton chat, sur ton profil et sur les classements.",
+  "shop.backdropNone": "Mur nu"
 }

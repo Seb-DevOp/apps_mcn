@@ -45,6 +45,8 @@ import {
   unlocked,
   sealBonus,
   sealBonusFor,
+  BACKDROPS,
+  BACKDROP_BY_KEY,
   BOOSTS,
   BOOST_BY_KEY,
   BOOST_FACTOR,
@@ -1000,6 +1002,8 @@ function view(
     skinKey: string;
     skinsJson: string;
     catSkinsJson: string;
+    backdropKey: string;
+    backdropsJson: string;
   },
   items: (ItemRow & { id: string; floor: number; rarity: string; shape: string; foundAt: Date })[],
   report: TickReport,
@@ -1164,6 +1168,15 @@ function view(
       skinKey: profile.skinKey,
       /** One entry per extra cat; an empty string means it wears the first's. */
       catSkins: parseCatSkins(profile.catSkinsJson),
+      backdropKey: profile.backdropKey,
+      backdrops: BACKDROPS.map((entry) => ({
+        key: entry.key,
+        nameEn: entry.nameEn,
+        nameFr: entry.nameFr,
+        price: entry.price,
+        owned: parseSkins(profile.backdropsJson).includes(entry.key),
+        worn: profile.backdropKey === entry.key,
+      })),
       // A calendar coat appears here only once it has been won: listing one at
       // a price of zero would read as a free coat nobody had bothered to take.
       skins: SKINS.filter(
@@ -2052,6 +2065,48 @@ export async function buySkin(userId: string, key: string, cat = 0) {
       },
     });
     await wear();
+    return { ok: true as const, worn: true };
+  });
+}
+
+/**
+ * Buys a profile backdrop, or puts on one already owned.
+ *
+ * The same shape as a coat and the same currency, because it is the same kind
+ * of thing: something to be seen wearing. The only wall that costs nothing is
+ * the plain one, which is what a profile shows until a player picks otherwise.
+ */
+export async function buyBackdrop(userId: string, key: string) {
+  const def = BACKDROP_BY_KEY[key];
+  if (!def && key !== "") return { ok: false as const, error: "NOT_FOUND" as const };
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+
+    // The empty key is the bare wall: always available, never bought.
+    if (key === "") {
+      await tx.idleProfile.update({ where: { userId }, data: { backdropKey: "" } });
+      return { ok: true as const, worn: true };
+    }
+
+    const owned = parseSkins(profile.backdropsJson);
+    if (owned.includes(key)) {
+      await tx.idleProfile.update({ where: { userId }, data: { backdropKey: key } });
+      return { ok: true as const, worn: true };
+    }
+
+    if (profile.gems < def!.price) {
+      return { ok: false as const, error: "NOT_ENOUGH_GEMS" as const };
+    }
+
+    await tx.idleProfile.update({
+      where: { userId },
+      data: {
+        gems: profile.gems - def!.price,
+        backdropKey: key,
+        backdropsJson: JSON.stringify([...owned, key]),
+      },
+    });
     return { ok: true as const, worn: true };
   });
 }
