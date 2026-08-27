@@ -139,6 +139,18 @@ export function boostSecondsLeft(profile: { boostKey: string; boostUntil: Date }
   return Math.max(0, (profile.boostUntil.getTime() - Date.now()) / 1000);
 }
 
+/**
+ * What a running boost does to a blow struck by hand.
+ *
+ * The boost lives in `simulate` rather than in `derive`, which keeps item
+ * comparisons honest — and left the two things the player does with their own
+ * thumb outside it. "x2 damage" that doubles everything except the damage you
+ * deal yourself is a label that lies.
+ */
+export function damageBoostFactor(profile: { boostKey: string; boostUntil: Date }): number {
+  return profile.boostKey === "damage" && boostSecondsLeft(profile) > 0 ? BOOST_FACTOR : 1;
+}
+
 /** How many of each boost are held. Same shape and same forgiveness as upgrades. */
 export function parseBoosts(json: string): Boosts {
   const base: Boosts = { gold: 0, damage: 0, loot: 0 };
@@ -1449,7 +1461,8 @@ export async function strike(userId: string, count: number) {
     const allowed = Math.floor(Math.min(count, elapsed * MAX_STRIKES_PER_SECOND + 1));
     if (allowed <= 0) return { ok: true as const, damage: 0, landed: 0 };
 
-    const damage = state.stats.hitDamage * STRIKE_DAMAGE_MULTIPLIER * allowed;
+    const damage =
+      state.stats.hitDamage * STRIKE_DAMAGE_MULTIPLIER * allowed * damageBoostFactor(profile);
     await tx.idleProfile.update({
       where: { userId },
       data: {
@@ -1473,7 +1486,7 @@ export async function roar(userId: string) {
       return { ok: false as const, error: "COOLING_DOWN" as const };
     }
 
-    const damage = state.stats.power * ROAR_DAMAGE_SECONDS;
+    const damage = state.stats.power * ROAR_DAMAGE_SECONDS * damageBoostFactor(profile);
     await tx.idleProfile.update({
       where: { userId },
       data: {

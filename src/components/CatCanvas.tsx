@@ -86,12 +86,31 @@ export const CatCanvas = memo(function CatCanvas({
           <stop offset="0%" stopColor="#f3d68f" />
           <stop offset="100%" stopColor="#a97f31" />
         </linearGradient>
+        {/* The three filters and gradients the animated coats need. Defined
+            unconditionally: they cost nothing unless something references them,
+            and a coat that has to remember to bring its own defs is a coat that
+            will one day forget. */}
+        <filter id="cat-haze" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="7" />
+        </filter>
+        <radialGradient id="cat-shine" cx="50%" cy="45%">
+          <stop offset="0%" stopColor="#ffe9a8" stopOpacity="0.55" />
+          <stop offset="60%" stopColor="#f3d68f" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="#f3d68f" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="cat-psychic" cx="50%" cy="50%">
+          <stop offset="0%" stopColor="#b98cff" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#4f93ff" stopOpacity="0" />
+        </radialGradient>
       </defs>
 
       {/* Light pooling underfoot, so the cat stands on something. */}
       <ellipse cx="100" cy="252" rx="62" ry="11" fill="url(#cat-ground)" />
 
-      {/* Wings go behind everything, including the tail. */}
+      {/* Auras go behind everything, including the tail. */}
+      {coat.effect === "haze" && <Haze colour={coat.furLight} />}
+      {coat.effect === "shine" && <Shine />}
+      {coat.effect === "psychic" && <Psychic />}
       {coat.effect === "halo" && <Wings />}
       {coat.effect === "horns" && <DevilTail />}
 
@@ -205,6 +224,10 @@ export const CatCanvas = memo(function CatCanvas({
           helm, and horns come through it. */}
       {coat.effect === "halo" && <Halo />}
       {coat.effect === "horns" && <Horns />}
+      {coat.effect === "halo" && <Motes colour="#fff6d8" rising />}
+      {coat.effect === "horns" && <Motes colour="#ff7a3d" rising />}
+      {coat.effect === "shine" && <Sparkles />}
+      {coat.effect === "psychic" && <Motes colour="#c8a8ff" />}
     </motion.svg>
   );
 });
@@ -239,9 +262,12 @@ function Wings() {
 
   return (
     <motion.g
-      animate={{ scaleY: [1, 0.9, 1], scaleX: [1, 1.05, 1] }}
-      transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
-      style={{ originX: "100px", originY: "150px" }}
+      // A beat, not a breath: the whole wing swings from the shoulder as well as
+      // stretching, which is what makes it read as a wing rather than a shape
+      // that is being scaled.
+      animate={{ scaleY: [1, 0.82, 1], scaleX: [1, 1.08, 1], rotate: [-4, 5, -4] }}
+      transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}
+      style={{ originX: "100px", originY: "142px" }}
     >
       {feather(true)}
       {feather(false)}
@@ -253,19 +279,13 @@ function Wings() {
 function Halo() {
   return (
     <motion.g
-      animate={{ opacity: [0.7, 1, 0.7], y: [0, -2.5, 0] }}
-      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+      // Tilting rather than only pulsing: a ring seen edge-on and then flatter
+      // is a ring turning in space, and it costs one more animated attribute.
+      animate={{ opacity: [0.7, 1, 0.7], y: [0, -3, 0], scaleY: [1, 0.55, 1], rotate: [-4, 4, -4] }}
+      transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+      style={{ originX: "100px", originY: "12px" }}
     >
-      <ellipse
-        cx="100"
-        cy="12"
-        rx="30"
-        ry="8"
-        fill="none"
-        stroke="#ffe9a8"
-        strokeWidth="4.5"
-        opacity="0.9"
-      />
+      <ellipse cx="100" cy="12" rx="30" ry="8" fill="none" stroke="#ffe9a8" strokeWidth="4.5" opacity="0.9" />
       <ellipse cx="100" cy="12" rx="30" ry="8" fill="none" stroke="#fffdf4" strokeWidth="1.6" />
     </motion.g>
   );
@@ -279,13 +299,15 @@ function Horns() {
       <path d="M130 34 C138 20 136 8 126 2 C126 14 122 24 116 32 Z" fill="#c4453f" />
       <path d="M72 30 C68 20 69 12 74 7" stroke="#7a1f1f" strokeWidth="1.6" fill="none" />
       <path d="M128 30 C132 20 131 12 126 7" stroke="#7a1f1f" strokeWidth="1.6" fill="none" />
+      {/* A flame flickers unevenly. Three keyframes at irregular spacing read
+          as fire; two at even spacing read as a blinking light. */}
       <motion.circle
         cx="100"
         cy="16"
         r="4.5"
         fill="#ff7a3d"
-        animate={{ opacity: [0.45, 1, 0.45], r: [3.6, 5.2, 3.6] }}
-        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        animate={{ opacity: [0.4, 1, 0.6, 0.95, 0.4], r: [3.2, 5.6, 4, 5.2, 3.2] }}
+        transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut", times: [0, 0.28, 0.5, 0.74, 1] }}
       />
     </g>
   );
@@ -295,8 +317,8 @@ function Horns() {
 function DevilTail() {
   return (
     <motion.g
-      animate={{ rotate: [-6, 8, -6] }}
-      transition={{ duration: 2.9, repeat: Infinity, ease: "easeInOut" }}
+      animate={{ rotate: [-12, 14, -12], scaleX: [1, 1.06, 1] }}
+      transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}
       style={{ originX: "132px", originY: "208px" }}
     >
       <path
@@ -308,6 +330,141 @@ function DevilTail() {
       />
       <path d="M178 154 l-9 -4 l9 -16 l9 16 Z" fill="#ff7a3d" />
     </motion.g>
+  );
+}
+
+/**
+ * The Spectre's haze: the cat's own silhouette, blurred, breathing behind it.
+ *
+ * A blurred copy rather than a glow, because a glow says "lit" and a blurred
+ * double says "not entirely here" — which is the difference between a lantern
+ * and a ghost.
+ */
+function Haze({ colour }: { colour: string }) {
+  return (
+    <motion.g
+      filter="url(#cat-haze)"
+      animate={{ opacity: [0.22, 0.5, 0.22], scale: [1, 1.07, 1] }}
+      transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
+      style={{ originX: "100px", originY: "170px" }}
+    >
+      <ellipse cx="100" cy="180" rx="52" ry="62" fill={colour} />
+      <ellipse cx="100" cy="80" rx="40" ry="36" fill={colour} />
+    </motion.g>
+  );
+}
+
+/** The Gilded coat's aura: a slow sweep of light around the whole figure. */
+function Shine() {
+  return (
+    <motion.ellipse
+      cx="100"
+      cy="140"
+      rx="86"
+      ry="118"
+      fill="url(#cat-shine)"
+      animate={{ opacity: [0.5, 1, 0.5], scale: [0.94, 1.06, 0.94] }}
+      transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+      style={{ originX: "100px", originY: "140px" }}
+    />
+  );
+}
+
+/** Four sparkles that catch the light one after another, never together. */
+function Sparkles() {
+  const spots = [
+    { x: 62, y: 96, at: 0 },
+    { x: 142, y: 118, at: 0.9 },
+    { x: 80, y: 196, at: 1.7 },
+    { x: 132, y: 62, at: 2.4 },
+  ];
+  return (
+    <g>
+      {spots.map((spot) => (
+        <motion.path
+          key={`${spot.x}-${spot.y}`}
+          d={`M${spot.x} ${spot.y - 7} l2 5 l5 2 l-5 2 l-2 5 l-2 -5 l-5 -2 l5 -2 Z`}
+          fill="#fff6d8"
+          animate={{ opacity: [0, 1, 0], scale: [0.4, 1.15, 0.4] }}
+          transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 1.7, delay: spot.at, ease: "easeInOut" }}
+          style={{ originX: `${spot.x}px`, originY: `${spot.y}px` }}
+        />
+      ))}
+    </g>
+  );
+}
+
+/**
+ * The Vault Heart thinking out loud.
+ *
+ * Rings leaving the chest one after another, each fading as it widens — a wave
+ * rather than a pulse, which is what separates a mind from a heartbeat.
+ */
+function Psychic() {
+  const rings = [0, 1.1, 2.2];
+  return (
+    <g>
+      <motion.ellipse
+        cx="100"
+        cy="150"
+        rx="80"
+        ry="100"
+        fill="url(#cat-psychic)"
+        animate={{ opacity: [0.4, 0.85, 0.4] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {rings.map((delay) => (
+        <motion.circle
+          key={delay}
+          cx="100"
+          cy="150"
+          r="34"
+          fill="none"
+          stroke="#b98cff"
+          strokeWidth="2"
+          initial={{ opacity: 0 }}
+          animate={{ scale: [0.6, 1.9], opacity: [0.75, 0] }}
+          transition={{ duration: 3.3, repeat: Infinity, delay, ease: "easeOut" }}
+          style={{ originX: "100px", originY: "150px" }}
+        />
+      ))}
+    </g>
+  );
+}
+
+/**
+ * Small lights around the cat.
+ *
+ * Rising for the two coats that burn or shine from above, drifting in place for
+ * the one that thinks. Positions are fixed rather than random: this component
+ * renders on the server too, and a random mote is a hydration mismatch.
+ */
+function Motes({ colour, rising = false }: { colour: string; rising?: boolean }) {
+  const spots = [
+    { x: 52, y: 150, at: 0 },
+    { x: 150, y: 128, at: 1.2 },
+    { x: 68, y: 206, at: 2.1 },
+    { x: 140, y: 186, at: 0.7 },
+    { x: 100, y: 46, at: 1.7 },
+  ];
+  return (
+    <g>
+      {spots.map((spot) => (
+        <motion.circle
+          key={`${spot.x}-${spot.y}`}
+          cx={spot.x}
+          cy={spot.y}
+          r="2.4"
+          fill={colour}
+          animate={
+            rising
+              ? { y: [0, -26], opacity: [0, 0.9, 0], scale: [0.6, 1, 0.5] }
+              : { y: [0, -6, 0], x: [0, 4, 0], opacity: [0.25, 0.9, 0.25] }
+          }
+          transition={{ duration: rising ? 2.6 : 3.4, repeat: Infinity, delay: spot.at, ease: "easeOut" }}
+        />
+      ))}
+    </g>
   );
 }
 

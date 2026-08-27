@@ -1090,7 +1090,7 @@ export interface SkinDef {
    * two are the exception the price pays for: wings that beat, a halo that
    * breathes, a tail that flicks.
    */
-  effect?: "halo" | "horns";
+  effect?: "halo" | "horns" | "haze" | "shine" | "psychic";
   key: string;
   nameEn: string;
   nameFr: string;
@@ -1349,6 +1349,7 @@ export const SKINS: SkinDef[] = [
     nameEn: "Spectre",
     nameFr: "Fantôme",
     price: 550,
+    effect: "haze",
     fur: "#6f86a8",
     furDark: "#4a5c78",
     furDeep: "#2f3c52",
@@ -1361,6 +1362,7 @@ export const SKINS: SkinDef[] = [
     nameEn: "Gilded",
     nameFr: "Doré",
     price: 900,
+    effect: "shine",
     fur: "#d4a94e",
     furDark: "#a67f30",
     furDeep: "#75581e",
@@ -1373,6 +1375,7 @@ export const SKINS: SkinDef[] = [
     nameEn: "Vault Heart",
     nameFr: "Cœur du Vault",
     price: 1500,
+    effect: "psychic",
     fur: "#5a4b9c",
     furDark: "#3d3270",
     furDeep: "#26204a",

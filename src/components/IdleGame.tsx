@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  BOOST_FACTOR,
   ENEMY_ATTACK_INTERVAL,
   LEVELS_PER_FLOOR,
   STRIKE_DAMAGE_MULTIPLIER,
@@ -362,6 +363,15 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
       const w = world.current;
       const stats = stateRef.current.stats;
+      /**
+       * The replay has to double what the server doubles.
+       *
+       * Without this the bars crawled for twenty minutes and then jumped on
+       * every sync, which reads as a boost that does not work rather than as a
+       * screen that has not been told about it.
+       */
+      const boost =
+        stateRef.current.boosts.active?.key === "damage" ? BOOST_FACTOR : 1;
 
       if (w.recovering > 0) {
         w.recovering = Math.max(0, w.recovering - dt);
@@ -389,7 +399,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           // 2.4 extra strikes is two certain extra blows and a 40% chance of a third.
           const whole = Math.floor(stats.extraStrikes);
           const blows = 1 + whole + (Math.random() < stats.extraStrikes - whole ? 1 : 0);
-          const damage = stats.hitDamage * (crit ? stats.critMultiplier : 1) * batch;
+          const damage = stats.hitDamage * (crit ? stats.critMultiplier : 1) * batch * boost;
 
           // Two blows are worth seeing separately; beyond that they are one
           // number with a count on it.
@@ -634,7 +644,9 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                       // that waits a third of a second to appear does not feel
                       // like a tap.
                       const blow =
-                        stateRef.current.stats.hitDamage * STRIKE_DAMAGE_MULTIPLIER;
+                        stateRef.current.stats.hitDamage *
+                        STRIKE_DAMAGE_MULTIPLIER *
+                        (stateRef.current.boosts.active?.key === "damage" ? BOOST_FACTOR : 1);
                       world.current.enemyHp -= blow;
                       addHit("TAP", blow, false, 0);
                       setCatSwings((n) => n + 1);
