@@ -24,6 +24,7 @@ import {
   relicCost,
   relicsForFloor,
   levelInfo,
+  LEVELS_PER_FLOOR,
   BASE_MAX_HP,
   rebirthFloorFor,
   unlocked,
@@ -238,6 +239,18 @@ console.log(`  coups par frappe   ${(1 + stats.extraStrikes).toFixed(2)}`);
 console.log(`  dps effectif       ${stats.power.toExponential(2)}`);
 console.log(`  vie                ${stats.maxHp.toExponential(2)} (+${stats.regen.toExponential(2)}/s)`);
 console.log(`  dégâts subis ici   ${here.enemyDamage.toExponential(2)}/s`);
+
+// Combien de temps dure un combat, ici : c'est la question que pose un joueur
+// bloqué, et la seule que la profondeur atteinte ne répond pas.
+{
+  const floorStartLevel = (here.floor - 1) * LEVELS_PER_FLOOR + 1;
+  const salle = levelInfo(floorStartLevel);
+  const gardien = levelInfo(floorStartLevel + LEVELS_PER_FLOOR - 1);
+  const temps = (hp: number) => Math.max(0.2, hp / stats.power);
+  console.log(
+    `  une salle          ${temps(salle.enemyHp).toFixed(1)} s · Gardien ${(temps(gardien.enemyHp) / 60).toFixed(1)} min`,
+  );
+}
 
 console.log("\nrépartition de l'or, et rôle de chaque statistique :");
 for (const def of UPGRADES) {

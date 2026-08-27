@@ -83,11 +83,21 @@ export interface LevelInfo {
  * slower than health. That gap is the whole tension of an idle game: raw progress
  * stalls, and upgrading is what unsticks it.
  */
-const HP_BASE = 12;
+/**
+ * A floor costs what it always cost. The Guardian now owns almost all of it.
+ *
+ * The five ordinary chambers used to be three tenths of a floor's health, which
+ * at depth is minutes each — long fights against things that were never the
+ * point. They are 35 % of what they were, and the Guardian absorbs exactly what
+ * they gave up: a floor is the same climb, spent almost entirely on the one
+ * enemy that is supposed to stop you. Gold per kill is untouched, so income per
+ * floor is untouched with it.
+ */
+const HP_BASE = 4.2;
 const HP_GROWTH = 1.19;
 const GOLD_BASE = 4;
 const GOLD_GROWTH = 1.16;
-const BOSS_HP_MULTIPLIER = 7;
+const BOSS_HP_MULTIPLIER = 26;
 const BOSS_GOLD_MULTIPLIER = 9;
 
 /**
