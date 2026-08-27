@@ -10,6 +10,7 @@ import {
   sellBelow,
   sellAllSpares,
   sellFiltered,
+  forge,
   rebirth,
   buyRelic,
   strike,
@@ -42,7 +43,8 @@ const Schema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("equip"),
     itemId: z.string().min(1).max(64),
-    onPack: z.boolean().optional(),
+    /** Which cat wears it: 0 is your own, 1 the Pack, 2 the Pride. */
+    cat: z.number().int().min(0).max(2).optional(),
   }),
   z.object({ action: z.literal("unequip"), itemId: z.string().min(1).max(64) }),
   z.object({ action: z.literal("equipBest") }),
@@ -66,6 +68,7 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("calendar") }),
   z.object({ action: z.literal("boost"), key: z.string().min(1).max(32) }),
   z.object({ action: z.literal("buyBoost"), key: z.string().min(1).max(32) }),
+  z.object({ action: z.literal("forge"), rarity: z.string().min(1).max(20) }),
 ]);
 
 export async function POST(request: Request) {
@@ -93,7 +96,7 @@ function run(userId: string, input: z.infer<typeof Schema>) {
     case "upgrade":
       return buyUpgrade(userId, input.key);
     case "equip":
-      return equipItem(userId, input.itemId, input.onPack ?? false);
+      return equipItem(userId, input.itemId, input.cat ?? 0);
     case "unequip":
       return unequipItem(userId, input.itemId);
     case "equipBest":
@@ -128,5 +131,7 @@ function run(userId: string, input: z.infer<typeof Schema>) {
       return useBoost(userId, input.key);
     case "buyBoost":
       return buyBoost(userId, input.key);
+    case "forge":
+      return forge(userId, input.rarity);
   }
 }

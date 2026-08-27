@@ -871,11 +871,38 @@ export const ROAR_DAMAGE_SECONDS = 25;
  * anyone who sleeps. The requirement keeps growing afterwards, so late lives
  * stay rare too.
  */
+/**
+ * The ten rungs, written down rather than computed.
+ *
+ * A formula cannot say this shape. The first five are where they have always
+ * been — twelve floors apart, the fifth a month of play — and the last five sit
+ * four floors apart in the band where the climb slows to a crawl: measured, a
+ * record reaches 51 on the first day, 64 in a week, 71 in a month and 80 in six.
+ * Spacing the tail evenly with the head would have put the tenth rung at floor
+ * 135, which no measured player reaches in a year.
+ *
+ * Past the tenth there is no rung left to buy, only relics, so the requirement
+ * keeps stepping by four for anyone who wants to keep spending lives.
+ */
+const REBIRTH_FLOORS = [15, 27, 39, 51, 63, 70, 73, 76, 78, 80];
+
 export function rebirthFloorFor(rebirths: number): number {
-  return REBIRTH_MIN_FLOOR + 12 * rebirths;
+  const index = Math.max(0, Math.floor(rebirths));
+  if (index < REBIRTH_FLOORS.length) return REBIRTH_FLOORS[index];
+  return REBIRTH_FLOORS[REBIRTH_FLOORS.length - 1] + 4 * (index - REBIRTH_FLOORS.length + 1);
 }
 
-export type UnlockKey = "flair" | "seals" | "breath" | "elites" | "pack";
+export type UnlockKey =
+  | "flair"
+  | "seals"
+  | "breath"
+  | "elites"
+  | "pack"
+  | "instinct"
+  | "forge"
+  | "rage"
+  | "shortcut"
+  | "horde";
 
 export interface UnlockDef {
   key: UnlockKey;
@@ -943,7 +970,95 @@ export const UNLOCKS: UnlockDef[] = [
     descFr: "Un second chat, habillé de ce que le premier a laissé dans le sac.",
     icon: "badge",
   },
+  {
+    key: "instinct",
+    rebirths: 6,
+    nameEn: "Instinct",
+    nameFr: "L'Instinct",
+    descEn: "The cat wears whatever it finds that is better, by itself.",
+    descFr: "Le chat porte de lui-même ce qu'il trouve de meilleur.",
+    icon: "aura",
+  },
+  {
+    key: "forge",
+    rebirths: 7,
+    nameEn: "The Forge",
+    nameFr: "La Forge",
+    descEn: "Three spares of one rarity become one piece of the rarity above.",
+    descFr: "Trois rechanges d'une rareté deviennent une pièce du rang au-dessus.",
+    icon: "ore",
+  },
+  {
+    key: "rage",
+    rebirths: 8,
+    nameEn: "Fury",
+    nameFr: "La Rage",
+    descEn: "Every kill without falling makes the next one harder. A defeat empties it.",
+    descFr: "Chaque ennemi tué sans tomber renforce le suivant. Une défaite vide tout.",
+    icon: "sword",
+  },
+  {
+    key: "shortcut",
+    rebirths: 9,
+    nameEn: "The Shortcut",
+    nameFr: "Le Raccourci",
+    descEn: "A new life no longer starts at the bottom, but halfway up your record.",
+    descFr: "Une nouvelle vie ne repart plus du bas, mais à mi-chemin de ton record.",
+    icon: "key",
+  },
+  {
+    key: "horde",
+    rebirths: 10,
+    nameEn: "The Pride",
+    nameFr: "La Horde",
+    descEn: "A third cat. The bag has been waiting for it.",
+    descFr: "Un troisième chat. Le sac l'attendait.",
+    icon: "crown",
+  },
 ];
+
+// ---------------------------------------------------------------------------
+// What the last five rungs are made of
+// ---------------------------------------------------------------------------
+
+/**
+ * Fury: what a kill streak is worth.
+ *
+ * Fifty kills to reach the ceiling, and a defeat empties it. It rewards the
+ * floor a cat can *hold* rather than the one it can reach — the first thing in
+ * the game that makes a death loop cost something beyond the seconds it wastes.
+ */
+export const RAGE_STEP = 0.02;
+export const RAGE_CAP = 2;
+
+/** Fury's multiplier for a streak of this length. */
+export function rageFactor(killsSinceDefeat: number): number {
+  return Math.min(RAGE_CAP, 1 + Math.max(0, killsSinceDefeat) * RAGE_STEP);
+}
+
+/**
+ * The Shortcut: where a new life begins.
+ *
+ * Halfway up the record rather than at the bottom. It is self-correcting and
+ * needs no safety net: a cat that starts above what it can hold falls, and the
+ * defeat rule already walks it back down a floor at a time until it finds
+ * ground it can fight on.
+ */
+export const SHORTCUT_SHARE = 0.5;
+
+export function shortcutFloor(bestFloor: number): number {
+  return Math.max(1, Math.floor(bestFloor * SHORTCUT_SHARE));
+}
+
+/**
+ * The Forge: three into one.
+ *
+ * It takes the three *best* spares of a rarity rather than the three worst, and
+ * returns their floor one rarity higher. Feeding it junk would make it a button
+ * that turns nothing into nothing at depth, where a piece's floor matters far
+ * more than its colour.
+ */
+export const FORGE_COST = 3;
 
 export function unlocked(key: UnlockKey, rebirths: number): boolean {
   const def = UNLOCKS.find((entry) => entry.key === key);
@@ -1060,13 +1175,35 @@ export function eliteLevel(info: LevelInfo): LevelInfo {
  */
 export const PACK_SHARE = 0.35;
 export const PACK_PREFIX = "PACK:";
+/** The third cat. Its own prefix, so one unique index still covers all three. */
+export const HORDE_PREFIX = "PACK2:";
 
-export function packSlot(slot: Slot): string {
-  return `${PACK_PREFIX}${slot}`;
+/** How many cats a player has: one, plus the two the ladder gives back. */
+export function catCount(rebirths: number): number {
+  return 1 + (unlocked("pack", rebirths) ? 1 : 0) + (unlocked("horde", rebirths) ? 1 : 0);
 }
 
+/** The prefix a given cat's worn pieces carry. The first cat has none. */
+export function catPrefix(cat: number): string {
+  return cat === 2 ? HORDE_PREFIX : cat === 1 ? PACK_PREFIX : "";
+}
+
+/** Which cat a stored slot belongs to. */
+export function catOfSlot(worn: string | null): number {
+  if (typeof worn !== "string") return 0;
+  if (worn.startsWith(HORDE_PREFIX)) return 2;
+  if (worn.startsWith(PACK_PREFIX)) return 1;
+  return 0;
+}
+
+/** Where a piece is stored when a cat other than the first is wearing it. */
+export function packSlot(slot: Slot, cat = 1): string {
+  return `${catPrefix(cat)}${slot}`;
+}
+
+/** True for any cat but the first. */
 export function isPackSlot(worn: string | null): boolean {
-  return typeof worn === "string" && worn.startsWith(PACK_PREFIX);
+  return catOfSlot(worn) > 0;
 }
 
 // ---------------------------------------------------------------------------

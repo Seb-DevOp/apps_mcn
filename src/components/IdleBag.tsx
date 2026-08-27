@@ -49,21 +49,22 @@ export const IdleBag = memo(function IdleBag({
 }) {
   const { t, locale } = useI18n();
 
-  // Which cat is being dressed. Only ever offered once the Pack exists — a
-  // toggle with one option is a toggle that lies about having a choice.
-  const packOpen = state.unlocks.some((entry) => entry.key === "pack" && entry.open);
-  const [dressing, setDressing] = useState<"CAT" | "PACK">("CAT");
+  // Which cat is being dressed. The selector only appears once there is more
+  // than one — a toggle with a single option is a toggle that lies about having
+  // a choice.
+  const [dressing, setDressing] = useState(0);
+  const cats = state.cats;
   const [selected, setSelected] = useState<string | null>(null);
   const [slotFilter, setSlotFilter] = useState<Slot | null>(null);
   const [rarityFilter, setRarityFilter] = useState<Rarity | null>(null);
   const [sellingAll, setSellingAll] = useState(false);
   const [sellingShown, setSellingShown] = useState(false);
-  const onPack = packOpen && dressing === "PACK";
+  const onPack = dressing > 0;
 
   const worn = useMemo<WornPiece[]>(
     () =>
       state.items
-        .filter((item) => item.equipped && item.onPack === onPack)
+        .filter((item) => item.equipped && item.cat === dressing)
         .map((item) => ({
           slot: item.slot,
           shape: item.shape,
@@ -71,12 +72,12 @@ export const IdleBag = memo(function IdleBag({
           // Only the hands carry one; the other five ignore it.
           weapon: weaponFor(item.id),
         })),
-    [state.items, onPack],
+    [state.items, dressing],
   );
 
   const wornBySlot = useMemo(
-    () => new Map(state.items.filter((i) => i.equipped && i.onPack === onPack).map((i) => [i.slot, i])),
-    [state.items, onPack],
+    () => new Map(state.items.filter((i) => i.equipped && i.cat === dressing).map((i) => [i.slot, i])),
+    [state.items, dressing],
   );
 
   // Anything on the other cat is not a spare — it is busy.
@@ -179,20 +180,20 @@ export const IdleBag = memo(function IdleBag({
 
   return (
     <div className="pb-4">
-      {packOpen && (
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {(["CAT", "PACK"] as const).map((who) => (
+      {cats > 1 && (
+        <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: `repeat(${cats}, 1fr)` }}>
+          {Array.from({ length: cats }, (_, who) => (
             <button
               key={who}
               type="button"
               onClick={() => setDressing(who)}
-              className="panel py-2 text-[0.74rem] uppercase tracking-widest transition"
+              className="panel py-2 text-[0.72rem] uppercase tracking-widest transition"
               style={{
                 borderColor: dressing === who ? "rgba(201,162,77,0.6)" : undefined,
                 color: dressing === who ? "var(--gold-bright)" : "var(--text-dim)",
               }}
             >
-              {t(who === "CAT" ? "pack.first" : "pack.second")}
+              {t(who === 0 ? "pack.first" : who === 1 ? "pack.second" : "pack.third")}
             </button>
           ))}
         </div>
@@ -426,6 +427,44 @@ export const IdleBag = memo(function IdleBag({
                       </span>
                     )}
                   </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/*
+        The Forge. Three of a colour become one of the next.
+
+        It sits in the bag because that is where its fuel is, and it takes the
+        three *best* spares of a rarity: fed the worst, it would turn nothing
+        into nothing at depth, where a piece's floor is worth more than its
+        colour.
+      */}
+      {state.unlocks.some((entry) => entry.key === "forge" && entry.open) && (
+        <section className="mt-6">
+          <h2 className="eyebrow">{t("forge.title")}</h2>
+          <p className="dim mt-1 text-[0.68rem] italic">{t("forge.hint", { n: 3 })}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {RARITIES.slice(0, -1).map((rarity, index) => {
+              const held = spares.filter((item) => item.rarity === rarity).length;
+              const style = RARITY_STYLE[rarity];
+              const next = RARITY_STYLE[RARITIES[index + 1]];
+              if (held === 0) return null;
+              return (
+                <button
+                  key={rarity}
+                  type="button"
+                  disabled={held < 3 || busy !== null}
+                  onClick={() => act({ action: "forge", rarity }, `forge-${rarity}`)}
+                  className="panel flex items-center gap-1.5 px-2 py-1.5 text-[0.64rem] transition disabled:opacity-40"
+                  style={{ borderColor: `${style.color}55` }}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ background: style.color }} />
+                  <span style={{ color: style.color }}>{held}</span>
+                  <span className="dim">→</span>
+                  <span className="h-2 w-2 rounded-full" style={{ background: next.color }} />
                 </button>
               );
             })}
@@ -753,7 +792,7 @@ export const IdleBag = memo(function IdleBag({
                   type="button"
                   className="btn btn-royal py-1.5 text-[0.72rem]"
                   disabled={busy !== null}
-                  onClick={() => act({ action: "equip", itemId: chosen.id, onPack }, chosen.id)}
+                  onClick={() => act({ action: "equip", itemId: chosen.id, cat: dressing }, chosen.id)}
                 >
                   {t("idle.equip")}
                 </button>

@@ -295,5 +295,8 @@
   "shop.boostHeld": "{n} en poche",
   "idle.sellShown": "Vendre les {n} affichées",
   "idle.sellShownAsk": "Vendre les {n} pièces affichées pour {gold} or ? Rien ne revient.",
-  "idle.sellShownGo": "Vendre {n}"
+  "idle.sellShownGo": "Vendre {n}",
+  "pack.third": "La Horde",
+  "forge.title": "La Forge",
+  "forge.hint": "Les {n} meilleures rechanges d'une couleur en font une du rang au-dessus, à leur étage."
 }

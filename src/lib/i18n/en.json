@@ -295,5 +295,8 @@
   "shop.boostHeld": "{n} held",
   "idle.sellShown": "Sell the {n} shown",
   "idle.sellShownAsk": "Sell the {n} pieces shown for {gold} gold? Nothing comes back.",
-  "idle.sellShownGo": "Sell {n}"
+  "idle.sellShownGo": "Sell {n}",
+  "pack.third": "The Pride",
+  "forge.title": "The Forge",
+  "forge.hint": "The {n} best spares of a colour become one of the colour above, at their floor."
 }

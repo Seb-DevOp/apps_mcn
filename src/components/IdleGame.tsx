@@ -554,17 +554,25 @@ export function IdleGame({ initial }: { initial: IdleState }) {
     [state.items],
   );
 
-  const packWorn = useMemo<WornPiece[]>(
+  /**
+   * The cats fighting alongside, one list each.
+   *
+   * Filtering on "not mine" put the Pack and the Pride into one drawing wearing
+   * twelve pieces, which is one cat with two heads rather than two cats.
+   */
+  const escort = useMemo<WornPiece[][]>(
     () =>
-      state.items
-        .filter((item) => item.onPack)
-        .map((item) => ({
-          slot: item.slot,
-          shape: item.shape,
-          rarity: item.rarity,
-          // Only the hands carry one; the other five ignore it.
-          weapon: weaponFor(item.id),
-        })),
+      [1, 2].map((cat) =>
+        state.items
+          .filter((item) => item.cat === cat)
+          .map((item) => ({
+            slot: item.slot,
+            shape: item.shape,
+            rarity: item.rarity,
+            // Only the hands carry one; the other five ignore it.
+            weapon: weaponFor(item.id),
+          })),
+      ),
     [state.items],
   );
 
@@ -652,10 +660,28 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                   style={{ background: "radial-gradient(circle, #7ed08f 0%, transparent 65%)" }}
                 />
                 <HitStream hits={hits} target="CAT" tone="#ff6b6b" />
-                {packWorn.length > 0 && (
-                  <div className="pointer-events-none absolute -left-1 bottom-0 opacity-80">
-                    <CatCanvas worn={packWorn} size={92} breathing={!fallen} skin={state.shop.skinKey} />
-                  </div>
+                {/* Behind and beside, smaller, and the third one smaller still:
+                    they fight for a share of what they are wearing, and the
+                    picture says which cat the player is. */}
+                {escort.map((worn, index) =>
+                  worn.length === 0 ? null : (
+                    <div
+                      key={index}
+                      className="pointer-events-none absolute bottom-0"
+                      style={{
+                        left: index === 0 ? "-0.25rem" : undefined,
+                        right: index === 1 ? "-1.75rem" : undefined,
+                        opacity: index === 0 ? 0.8 : 0.68,
+                      }}
+                    >
+                      <CatCanvas
+                        worn={worn}
+                        size={index === 0 ? 92 : 78}
+                        breathing={!fallen}
+                        skin={state.shop.skinKey}
+                      />
+                    </div>
+                  ),
                 )}
                 <HitStream hits={hits} target="HEAL" tone="#7ed08f" from="feet" prefix="+" />
               </div>

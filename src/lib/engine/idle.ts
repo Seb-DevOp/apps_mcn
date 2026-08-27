@@ -65,6 +65,12 @@ import {
   SKINS,
   SKIN_BY_KEY,
   PACK_SHARE,
+  FORGE_COST,
+  rageFactor,
+  shortcutFloor,
+  catCount,
+  catOfSlot,
+  catPrefix,
   isPackSlot,
   packSlot,
   type Affix,
@@ -330,17 +336,31 @@ export function derive(
    * first; a third of one turns the bottom of the bag into something worth
    * dressing.
    */
-  const packItems = withPack ? items.filter((item) => isPackSlot(item.equippedSlot)) : [];
-  const packPower =
-    packItems.length > 0 && unlocked("pack", rebirths)
-      ? derive(
-          packItems.map((item) => ({ ...item, equippedSlot: item.slot })),
-          upgrades,
-          relics,
-          rebirths,
-          false,
-        ).power * PACK_SHARE
-      : 0;
+  /**
+   * One share per extra cat, each derived from what it is actually wearing.
+   *
+   * Summed rather than averaged: a third cat in nothing adds nothing, and a
+   * third cat in the bag's leftovers adds a third of what those leftovers are
+   * worth. The bag has three floors to furnish now instead of two.
+   */
+  const packPower = withPack
+    ? [1, 2].reduce((total, cat) => {
+        if (cat >= catCount(rebirths)) return total;
+        const worn = items.filter((item) => catOfSlot(item.equippedSlot) === cat);
+        if (worn.length === 0) return total;
+        return (
+          total +
+          derive(
+            worn.map((item) => ({ ...item, equippedSlot: item.slot })),
+            upgrades,
+            relics,
+            rebirths,
+            false,
+          ).power *
+            PACK_SHARE
+        );
+      }, 0)
+    : 0;
 
   const goldMultiplier =
     (1 + worn.reduce((sum, item) => sum + item.goldBonus, 0)) * relic("greed");
@@ -560,8 +580,18 @@ export function simulate(
      * built on. A boost that leaked into `derive` would make every "+18 %" in
      * the bag swing by a factor of two for twenty minutes.
      */
+    /**
+     * Fury, if a life has been spent on it.
+     *
+     * Read fresh every iteration because the streak grows with every kill — it
+     * is the one multiplier in the fight that the fight itself moves. Capped, so
+     * a cat that has not fallen in an hour is twice as strong and never more.
+     */
+    const rage = unlocked("rage", rebirths) ? rageFactor(killsSinceDefeat) : 1;
+
     const boosted = boostFor > 0;
-    const power = boosted && boostKey === "damage" ? stats.power * BOOST_FACTOR : stats.power;
+    const power =
+      (boosted && boostKey === "damage" ? stats.power * BOOST_FACTOR : stats.power) * rage;
     const goldMultiplier =
       boosted && boostKey === "gold" ? stats.goldMultiplier * BOOST_FACTOR : stats.goldMultiplier;
     const dropChance =
@@ -792,7 +822,24 @@ export async function getIdleState(userId: string) {
     // never looked at. Filling a bare slot is still automatic, because a cat
     // wearing nothing has no decision to make and a new player should see the
     // first six pieces appear on it. After that, choosing is the game.
-    const wornBySlot = new Map(items.filter((i) => i.equippedSlot).map((i) => [i.slot, i]));
+    const wornBySlot = new Map(
+      items.filter((i) => i.equippedSlot && !isPackSlot(i.equippedSlot)).map((i) => [i.slot, i]),
+    );
+
+    /**
+     * Instinct gives back what the first five lives took away.
+     *
+     * Everything better used to go on by itself, which made the whole equipment
+     * system invisible — so it was removed and choosing became the game. Five
+     * lives of choosing is enough to have learnt it; after that, opening a bag
+     * to do what the recommendation button would have done is not a decision,
+     * it is a chore.
+     */
+    const instinct = unlocked("instinct", profile.rebirths);
+    const baseScore = combatScore(stats);
+    // Only the fields a derivation reads: the rows themselves carry ids and
+    // dates that a score has no use for.
+    let dressed: ItemRow[] = items;
 
     // The Nose. A find below the chosen rarity never reaches the bag at all —
     // it is turned into gold where it lies, which is the whole point of not
@@ -814,6 +861,30 @@ export async function getIdleState(userId: string) {
         continue;
       }
 
+      // Better than what is on, when Instinct is awake. The verdict is the one
+      // the bag and the recommendation button already use, so the three can never
+      // disagree about what "better" means.
+      const candidate = {
+        slot: drop.slot,
+        power: drop.power,
+        vitality: drop.vitality,
+        goldBonus: drop.goldBonus,
+        rarity: drop.rarity,
+        affixesJson: JSON.stringify(drop.affixes),
+        equippedSlot: null as string | null,
+      };
+      const wear =
+        bareSlot ||
+        (instinct &&
+          scoreWith(dressed, upgrades, candidate, relics, profile.rebirths) > baseScore);
+
+      if (wear && !bareSlot) {
+        const previous = wornBySlot.get(drop.slot);
+        if (previous) {
+          await tx.idleItem.update({ where: { id: previous.id }, data: { equippedSlot: null } });
+        }
+      }
+
       const created = await tx.idleItem.create({
         data: {
           userId,
@@ -825,12 +896,23 @@ export async function getIdleState(userId: string) {
           vitality: drop.vitality,
           goldBonus: drop.goldBonus,
           affixesJson: JSON.stringify(drop.affixes),
-          equippedSlot: bareSlot ? drop.slot : null,
+          equippedSlot: wear ? drop.slot : null,
         },
       });
       drop.id = created.id;
-      drop.equipped = bareSlot;
-      if (bareSlot) wornBySlot.set(drop.slot, created);
+      drop.equipped = wear;
+      if (wear) {
+        wornBySlot.set(drop.slot, created);
+        // The next drop of this tick has to be judged against the cat wearing
+        // this one, or two finds in one tick would both be measured against a
+        // cat that no longer exists.
+        dressed = [
+          ...dressed.map((item) =>
+            item.equippedSlot === drop.slot ? { ...item, equippedSlot: null } : item,
+          ),
+          { ...candidate, equippedSlot: drop.slot },
+        ];
+      }
     }
 
     result.autoSold = autoSold;
@@ -1128,6 +1210,8 @@ function view(
       })),
     },
 
+    /** How many cats the ladder has given back, including the first. */
+    cats: catCount(profile.rebirths),
     autoSellBelow: profile.autoSellBelow,
     shieldFor: profile.shieldFor,
     breathIn: Math.max(
@@ -1167,6 +1251,8 @@ function view(
       affixes: parseAffixes(item.affixesJson),
       /** Which cat wears it, when one does. */
       onPack: isPackSlot(item.equippedSlot),
+      /** 0 for the player's own cat, 1 and 2 for the Pack and the Pride. */
+      cat: catOfSlot(item.equippedSlot),
       // What wearing it would multiply the cat by. Above one is an upgrade, and
       // the screen can say so without the player doing the arithmetic.
       gain: item.equippedSlot ? 1 : scoreWith(items, upgrades, item, relics, profile.rebirths) / baseline,
@@ -1221,23 +1307,25 @@ export async function buyUpgrade(userId: string, key: string) {
   return result;
 }
 
-export async function equipItem(userId: string, itemId: string, onPack = false) {
+export async function equipItem(userId: string, itemId: string, cat = 0) {
   return prisma.$transaction(async (tx) => {
     const item = await tx.idleItem.findFirst({ where: { id: itemId, userId } });
     if (!item) return { ok: false as const, error: "NOT_FOUND" as const };
     if (item.equippedSlot) return { ok: false as const, error: "ALREADY_EQUIPPED" as const };
 
-    if (onPack) {
+    // Cat 0 is the player's own; 1 and 2 are the two the ladder gives back,
+    // and each has to have been paid for.
+    if (cat > 0) {
       const profile = await tx.idleProfile.findUnique({ where: { userId } });
-      if (!unlocked("pack", profile?.rebirths ?? 0)) {
+      if (cat >= catCount(profile?.rebirths ?? 0)) {
         return { ok: false as const, error: "LOCKED" as const };
       }
     }
 
-    const target = onPack ? packSlot(item.slot as Slot) : item.slot;
+    const target = cat > 0 ? packSlot(item.slot as Slot, cat) : item.slot;
 
     // Free the slot first — the unique index allows only one worn piece per slot,
-    // and the prefix makes that one index cover both cats.
+    // and the prefix makes that one index cover all three cats.
     await tx.idleItem.updateMany({
       where: { userId, equippedSlot: target },
       data: { equippedSlot: null },
@@ -1391,14 +1479,28 @@ export async function rebirth(userId: string) {
       return { ok: false as const, error: "TOO_SHALLOW" as const };
     }
 
+    /**
+     * The Shortcut: where the new life begins.
+     *
+     * Halfway up the record rather than at the bottom, once a life has been
+     * spent on it. It needs no safety net: a cat that starts above what it can
+     * hold falls, and the defeat rule already walks it back down a floor at a
+     * time until it finds ground it can fight on.
+     *
+     * Read against the life being spent, not the one just ended.
+     */
+    const startLevel = unlocked("shortcut", profile.rebirths + 1)
+      ? (shortcutFloor(bestFloor) - 1) * LEVELS_PER_FLOOR + 1
+      : 1;
+
     const owed = Math.max(0, relicsForFloor(bestFloor) - profile.relicsEarned);
 
     await tx.idleItem.deleteMany({ where: { userId } });
     await tx.idleProfile.update({
       where: { userId },
       data: {
-        level: 1,
-        enemyHp: levelInfo(1).enemyHp,
+        level: startLevel,
+        enemyHp: levelInfo(startLevel).enemyHp,
         hp: 0,
         recoverFor: 0,
         gold: 0,
@@ -1730,6 +1832,67 @@ export async function sellFiltered(userId: string, slot?: string, rarity?: strin
     });
 
     return { ok: true as const, sold: doomed.length, gold, purse: profile.gold };
+  });
+}
+
+/**
+ * Three spares of a rarity become one of the rarity above.
+ *
+ * It takes the three **best** spares rather than the three worst, and returns
+ * their best floor one colour higher. Fed junk it would be a button that turns
+ * nothing into nothing at depth, where a piece's floor is worth far more than
+ * its colour — so it costs the three you would actually have worn next.
+ *
+ * The slot is rolled rather than chosen. A forge that let you aim would be a
+ * way to fill six slots with Sovereigns in an afternoon; one that surprises you
+ * is a reason to keep forging.
+ */
+export async function forge(userId: string, rarity: string) {
+  const tier = RARITIES.indexOf(rarity as Rarity);
+  if (tier < 0 || tier >= RARITIES.length - 1) {
+    return { ok: false as const, error: "NOT_FOUND" as const };
+  }
+
+  await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.idleProfile.findUniqueOrThrow({ where: { userId } });
+    if (!unlocked("forge", profile.rebirths)) {
+      return { ok: false as const, error: "LOCKED" as const };
+    }
+
+    const fuel = await tx.idleItem.findMany({
+      where: { userId, equippedSlot: null, rarity },
+      orderBy: { floor: "desc" },
+      take: FORGE_COST,
+      select: { id: true, floor: true },
+    });
+    if (fuel.length < FORGE_COST) {
+      return { ok: false as const, error: "NOT_ENOUGH" as const };
+    }
+
+    const floor = Math.max(...fuel.map((item) => item.floor));
+    const nextRarity = RARITIES[tier + 1];
+    const slot = SLOTS[randomInt(0, SLOTS.length - 1)];
+    const stats = itemStats(slot, floor, nextRarity);
+
+    await tx.idleItem.deleteMany({ where: { id: { in: fuel.map((item) => item.id) } } });
+    const created = await tx.idleItem.create({
+      data: {
+        userId,
+        slot,
+        floor,
+        rarity: nextRarity,
+        shape: shapeFor(slot, floor),
+        power: stats.power,
+        vitality: stats.vitality,
+        goldBonus: stats.goldBonus,
+        affixesJson: JSON.stringify(rollAffixes(nextRarity)),
+        equippedSlot: null,
+      },
+    });
+
+    return { ok: true as const, itemId: created.id, rarity: nextRarity, floor };
   });
 }
 

@@ -27,6 +27,13 @@ import {
   LEVELS_PER_FLOOR,
   BASE_MAX_HP,
   rebirthFloorFor,
+  shortcutFloor,
+  packSlot,
+  isPackSlot,
+  itemStats,
+  RARITIES,
+  SLOTS,
+  FORGE_COST,
   unlocked,
   type UpgradeKey,
 } from "../src/lib/content/idle";
@@ -103,6 +110,60 @@ function marginalGain(key: UpgradeKey): number {
   return def.axis === "SURVIVAL" ? after.maxHp / before.maxHp : after.power / before.power;
 }
 
+
+/**
+ * What the extra cats are wearing.
+ *
+ * A player dresses them from the leftovers, so the probe does the same: the best
+ * spare in each slot goes to the Pack, the next best to the Pride. Without this
+ * the last rung of the ladder would measure as if it gave nothing.
+ */
+function dressEscort(all: Worn[]): Worn[] {
+  const spares = all.filter((item) => !item.equippedSlot);
+  const dressed: Worn[] = [];
+  for (const slot of SLOTS) {
+    const forSlot = spares
+      .filter((item) => item.slot === slot)
+      .sort((a, b) => b.power + b.vitality - (a.power + a.vitality));
+    if (forSlot[0]) dressed.push({ ...forSlot[0], equippedSlot: packSlot(slot as never, 1) });
+    if (forSlot[1]) dressed.push({ ...forSlot[1], equippedSlot: packSlot(slot as never, 2) });
+  }
+  return dressed;
+}
+
+/**
+ * The Forge, played the way a player would: fuse whenever three of a colour are
+ * spare, from the top down, so the best fuel is spent on the best result.
+ */
+function forgeAll(all: Worn[], floor: number): Worn[] {
+  let items = all;
+  for (let tier = RARITIES.length - 2; tier >= 0; tier--) {
+    const rarity = RARITIES[tier];
+    for (;;) {
+      const fuel = items
+        .filter((item) => !item.equippedSlot && item.rarity === rarity)
+        .slice(0, FORGE_COST);
+      if (fuel.length < FORGE_COST) break;
+      items = items.filter((item) => !fuel.includes(item));
+      const slot = SLOTS[Math.floor(Math.random() * SLOTS.length)];
+      const stats = itemStats(slot as never, floor, RARITIES[tier + 1]);
+      items = [
+        ...items,
+        {
+          slot,
+          rarity: RARITIES[tier + 1],
+          power: stats.power,
+          vitality: stats.vitality,
+          goldBonus: stats.goldBonus,
+          affixesJson: "[]",
+          equippedSlot: null,
+        },
+      ];
+    }
+  }
+  return items;
+}
+
 for (let minute = 1; minute <= HOURS * 60; minute++) {
   const stats = derive(items, upgrades, relics, rebirths);
   const result = simulate(
@@ -144,6 +205,16 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
     if (scoreWith(items, upgrades, candidate, relics, rebirths) > combatScore(now)) {
       items = items.filter((item) => item.equippedSlot !== drop.slot);
       items.push({ ...candidate, equippedSlot: drop.slot });
+    }
+  }
+
+  // Once an hour the player tidies up: fuse what can be fused, then dress the
+  // cats that fight for a share.
+  if (minute % 60 === 0) {
+    if (unlocked("forge", rebirths)) items = forgeAll(items, levelInfo(level).floor);
+    if (unlocked("pack", rebirths)) {
+      items = items.filter((item) => !isPackSlot(item.equippedSlot));
+      items = [...items, ...dressEscort(items)];
     }
   }
 
@@ -197,8 +268,12 @@ for (let minute = 1; minute <= HOURS * 60; minute++) {
     rebirths += 1;
     stalledFor = 0;
 
-    level = 1;
-    enemyHp = levelInfo(1).enemyHp;
+    // The Shortcut, the same way the engine spends it: halfway up the record
+    // once a life has paid for it.
+    level = unlocked("shortcut", rebirths)
+      ? (shortcutFloor(levelInfo(highestLevel).floor) - 1) * LEVELS_PER_FLOOR + 1
+      : 1;
+    enemyHp = levelInfo(level).enemyHp;
     hp = 0;
     recoverFor = 0;
     gold = 0;
