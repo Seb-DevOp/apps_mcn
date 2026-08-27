@@ -115,7 +115,7 @@ export const ResourceBar = memo(function ResourceBar({ initial }: { initial: Res
         badge is a badge nobody reads.
       */}
       <Link
-        href="/shop"
+        href="/calendar"
         aria-label={t("calendar.title")}
         className="flex h-8 w-8 items-center justify-center rounded-lg transition"
         style={{

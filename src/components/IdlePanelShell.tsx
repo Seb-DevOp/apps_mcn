@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { IdleState } from "@/lib/engine/idle";
+import { IdleCalendar } from "./IdleCalendar";
 import { IdleRebirth } from "./IdleRebirth";
 import { IdleShop } from "./IdleShop";
 import { LootPrompt, type LootEntry } from "./LootPrompt";
@@ -33,7 +34,7 @@ export function IdlePanelShell({
   panel,
 }: {
   initial: IdleState;
-  panel: "SHOP" | "REBIRTH";
+  panel: "SHOP" | "REBIRTH" | "CALENDAR";
 }) {
   const { t } = useI18n();
   const [state, setState] = useState(initial);
@@ -121,12 +122,20 @@ export function IdlePanelShell({
           of it. */}
       <header className="pt-4 text-center">
         <p className="eyebrow">
-          {t(panel === "SHOP" ? "idle.tabShop" : "idle.tabRebirth")}
+          {t(
+            panel === "SHOP"
+              ? "idle.tabShop"
+              : panel === "CALENDAR"
+                ? "calendar.title"
+                : "idle.tabRebirth",
+          )}
         </p>
       </header>
 
       {panel === "SHOP" ? (
-        <IdleShop state={state} busy={busy} act={act} claim={claim} />
+        <IdleShop state={state} busy={busy} act={act} />
+      ) : panel === "CALENDAR" ? (
+        <IdleCalendar state={state} busy={busy} act={act} claim={claim} />
       ) : (
         <IdleRebirth state={state} busy={busy} act={act} />
       )}

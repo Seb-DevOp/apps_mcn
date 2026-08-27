@@ -36,16 +36,17 @@ export function IdleCalendar({
   const ready = calendar.claimable;
 
   return (
-    <section className="mt-4">
-      <div className="flex items-baseline justify-between">
-        <h2 className="eyebrow">{t("calendar.title")}</h2>
-        <span className="dim tabular text-[0.62rem]">
-          {t("calendar.cycle", { n: calendar.cycle + 1 })}
-        </span>
-      </div>
-      <p className="dim mt-1 text-[0.68rem] italic">{t("calendar.hint")}</p>
+    <section className="mt-2">
+      {/* The page header above already says what this is; repeating it here was
+          the price of the calendar having once been a section of the shop. */}
+      <p className="tabular text-center text-[0.8rem] text-[var(--gold-bright)]">
+        {t("calendar.cycle", { n: calendar.cycle + 1 })}
+      </p>
+      <p className="dim mt-2 text-center text-[0.7rem] italic leading-snug">
+        {t("calendar.hint")}
+      </p>
 
-      <div className="mt-2 grid grid-cols-6 gap-1.5">
+      <div className="mt-4 grid grid-cols-6 gap-1.5">
         {calendar.days.map((door) => {
           const isSkin = door.kind === "SKIN";
           const open = door.next && ready;

@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { RARITY_STYLE, type Rarity } from "@/lib/content/idle";
 import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas } from "./CatCanvas";
-import { IdleCalendar } from "./IdleCalendar";
 import { GemIcon, ItemIcon } from "./ui/Icons";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
@@ -25,13 +24,10 @@ export function IdleShop({
   state,
   busy,
   act,
-  claim,
 }: {
   state: IdleState;
   busy: string | null;
   act: (body: Record<string, unknown>, key: string) => void;
-  /** What the last calendar door reported, when one was just opened. */
-  claim?: Record<string, unknown> | null;
 }) {
   const { t, L } = useI18n();
   const { shop } = state;
@@ -42,9 +38,6 @@ export function IdleShop({
 
   return (
     <div className="pb-4">
-      {/* The daily door comes first: it is the one thing here that expires. */}
-      <IdleCalendar state={state} busy={busy} act={act} claim={claim} />
-
       {/* --- The chest --------------------------------------------------- */}
       <section className="panel panel-gilded mt-4 p-4 text-center">
         <p className="eyebrow">{t("shop.chest")}</p>
