@@ -55,15 +55,21 @@ export function Leaderboards() {
         <h1 className="display gold-text mt-0.5 text-2xl">{t("leaderboard.title")}</h1>
       </header>
 
-      {/* A scrolling row rather than a grid: five labels wrapped onto two lines
-          made the tabs look like content. */}
-      <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+      {/*
+        A grid, not a scrolling row.
+
+        Five tabs scrolled sideways and the fifth was already half off the edge;
+        the sixth was past it entirely, with nothing on screen to suggest there
+        was anything to scroll to. A board nobody can find is a board that does
+        not exist — two rows of three fit the width and are all visible at once.
+      */}
+      <div className="mt-4 grid grid-cols-3 gap-1.5">
         {BOARDS.map((entry) => (
           <button
             key={entry.key}
             type="button"
             onClick={() => setBoard(entry.key)}
-            className="panel shrink-0 whitespace-nowrap px-3 py-2 text-[0.7rem] uppercase tracking-widest transition"
+            className="panel truncate px-1.5 py-1.5 text-[0.62rem] uppercase tracking-[0.08em] transition"
             style={{
               borderColor: board === entry.key ? "rgba(201,162,77,0.6)" : undefined,
               color: board === entry.key ? "var(--gold-bright)" : "var(--text-dim)",

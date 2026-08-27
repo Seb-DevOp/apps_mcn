@@ -15,11 +15,14 @@ const embed = {
   version: "1",
   imageUrl: `${ORIGIN}/share/embed.png`,
   button: {
-    title: "Enter the Vault",
+    title: "Start the descent",
     action: {
       type: "launch_miniapp",
-      url: `${ORIGIN}/vault`,
-      name: "MCN — The Vault",
+      // The entrance, which signs a Farcaster player in and forwards them. It
+      // used to be "/vault" — a route the idle game replaced, so every card
+      // shared in a cast opened a 404.
+      url: ORIGIN,
+      name: "MCN Idle",
       splashImageUrl: `${ORIGIN}/icons/splash-200.png`,
       splashBackgroundColor: "#05080F",
     },

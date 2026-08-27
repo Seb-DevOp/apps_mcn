@@ -239,7 +239,7 @@
   "shop.worn": "porté",
   "shop.wear": "porter",
   "leaderboard.distance": "Distance",
-  "leaderboard.lives": "Renaissances",
+  "leaderboard.lives": "Vies",
   "leaderboard.distance.hint": "Étages parcourus sur toutes les vies. Récompense la persévérance, pas une partie chanceuse.",
   "leaderboard.lives.hint": "Vies dépensées. Chacune était un record battu, sinon elle n'aurait rien valu.",
   "leaderboard.livesValue": "{n} vies",

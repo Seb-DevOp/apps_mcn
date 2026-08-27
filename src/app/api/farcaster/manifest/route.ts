@@ -22,22 +22,34 @@ export async function GET() {
   const signature = process.env.FARCASTER_SIGNATURE;
   const signed = Boolean(header && payload && signature);
 
+  /**
+   * Every string here is a store listing, and the store has limits: 32 for the
+   * name, 30 for the subtitle and the tagline, 170 for the description, 100 for
+   * the OG line, five lowercase tags. Overrunning them does not fail loudly — it
+   * truncates in someone else's client, which is worse.
+   *
+   * The entrance is the home, not the arena. A player arriving from Farcaster is
+   * signed in by the gate at "/" and pushed to the descent; pointing straight at
+   * the descent would send them through a redirect back to the gate and forward
+   * again, to arrive in the same place one round trip later.
+   */
   const manifest: Record<string, unknown> = {
     miniapp: {
       version: "1",
-      name: "MCN — The Vault",
+      name: "MCN Idle",
       iconUrl: `${ORIGIN}/icons/icon-1024.png`,
-      homeUrl: `${ORIGIN}/vault`,
+      homeUrl: ORIGIN,
       splashImageUrl: `${ORIGIN}/icons/splash-200.png`,
       splashBackgroundColor: "#05080F",
-      subtitle: "Six ranks. One chest a day.",
+      subtitle: "Your cat descends alone",
       description:
-        "Return each day, open a chest that improves with your rank, and climb the six ranks of the Guardians. Oria is watching.",
+        "A Maine Coon fights its way down the Vault while you are away. Six slots to fill, eight rarities to find, and a Vault with no bottom.",
       primaryCategory: "games",
-      tags: ["game", "daily", "collection", "mcn", "base"],
-      tagline: "The Vault is filling.",
-      ogTitle: "MCN — The Vault",
-      ogDescription: "Six ranks. One chest a day. Oria is watching.",
+      tags: ["idle", "rpg", "cat", "mcn", "base"],
+      tagline: "It fights while you sleep",
+      ogTitle: "MCN Idle",
+      ogDescription:
+        "A Maine Coon descends the Vault while you are away. Six slots, eight rarities, no bottom.",
       ogImageUrl: `${ORIGIN}/share/embed.png`,
       heroImageUrl: `${ORIGIN}/share/embed.png`,
       noindex: process.env.NODE_ENV !== "production",
