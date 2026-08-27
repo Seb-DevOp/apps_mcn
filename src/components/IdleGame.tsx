@@ -75,7 +75,8 @@ const PUBLISH_MS = 500;
 
 interface Hit {
   id: number;
-  target: "ENEMY" | "CAT" | "GOLD" | "HEAL";
+  /** TAP is the player's own blow, coloured apart so it can be seen landing. */
+  target: "ENEMY" | "CAT" | "GOLD" | "HEAL" | "TAP";
   value: number;
   crit: boolean;
   /** Horizontal offset, so blows that land together stay separately readable. */
@@ -125,6 +126,13 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   });
 
   const [hits, setHits] = useState<Hit[]>([]);
+  /**
+   * How many times the enemy has been tapped this session.
+   *
+   * The invitation to tap disappears after a handful: an affordance that never
+   * goes away has stopped being an affordance and become furniture.
+   */
+  const [taps, setTaps] = useState(0);
   const [catSwings, setCatSwings] = useState(0);
   const [catWounds, setCatWounds] = useState(0);
   const [enemyDeaths, setEnemyDeaths] = useState(0);
@@ -524,6 +532,15 @@ export function IdleGame({ initial }: { initial: IdleState }) {
   );
 
   const spareCount = state.items.filter((item) => !item.equipped && !item.onPack).length;
+  /** Slots where something in the bag beats what the cat is wearing. */
+  const upgradesWaiting = useMemo(() => {
+    const slots = new Set(
+      state.items
+        .filter((item) => !item.equipped && !item.onPack && item.gain > 1.0001)
+        .map((item) => item.slot),
+    );
+    return slots.size;
+  }, [state.items]);
   const breathOpen = state.unlocks.some((entry) => entry.key === "breath" && entry.open);
 
   return (
@@ -542,7 +559,15 @@ export function IdleGame({ initial }: { initial: IdleState }) {
         <TabButton active={tab === "FIGHT"} onClick={() => setTab("FIGHT")}>
           {t("idle.tabFight")}
         </TabButton>
-        <TabButton active={tab === "BAG"} onClick={() => setTab("BAG")} badge={spareCount}>
+        <TabButton
+          active={tab === "BAG"}
+          onClick={() => setTab("BAG")}
+          badge={spareCount}
+          /* Not "you own 139 things" — "3 of them are better than what you are
+             wearing". The first is clutter; the second is a reason to look. */
+          upgrades={upgradesWaiting}
+          icon={<ItemIcon icon="velvet" size={15} />}
+        >
           {t("idle.tabBag")}
         </TabButton>
       </div>
@@ -611,8 +636,9 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                       const blow =
                         stateRef.current.stats.hitDamage * STRIKE_DAMAGE_MULTIPLIER;
                       world.current.enemyHp -= blow;
-                      addHit("ENEMY", blow, false, 0);
+                      addHit("TAP", blow, false, 0);
                       setCatSwings((n) => n + 1);
+                      setTaps((n) => n + 1);
                     }}
                     className="cursor-pointer select-none"
                     initial={{ opacity: 0, x: 34, scale: 0.85 }}
@@ -628,7 +654,44 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                     />
                   </motion.div>
                 </AnimatePresence>
+                {/*
+                  The invitation to tap, on the thing to tap.
+
+                  A tap does twice a normal blow and nothing on screen ever said
+                  the screen could be touched — so the enemy breathes a ring
+                  until the player has hit it a few times, and then stops.
+                */}
+                {taps < 5 && !fallen && (
+                  <motion.div
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                    animate={{ opacity: [0.25, 0.75, 0.25], scale: [0.92, 1.04, 0.92] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    <span
+                      className="rounded-full"
+                      style={{
+                        width: 96,
+                        height: 96,
+                        border: "2px solid rgba(142,240,255,0.75)",
+                        boxShadow: "0 0 18px rgba(142,240,255,0.45)",
+                      }}
+                    />
+                  </motion.div>
+                )}
+                {taps < 5 && !fallen && (
+                  <motion.p
+                    className="pointer-events-none absolute inset-x-0 -bottom-1 text-center text-[0.6rem] uppercase tracking-widest"
+                    style={{ color: "#8ef0ff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    {t("idle.tapHint", { n: STRIKE_DAMAGE_MULTIPLIER })}
+                  </motion.p>
+                )}
                 <HitStream hits={hits} target="ENEMY" tone="#f0d089" />
+                {/* The player's own blows, in the colour of the ring that asked
+                    for them. Mixed in with the cat's they were invisible. */}
+                <HitStream hits={hits} target="TAP" tone="#8ef0ff" />
                 <HitStream hits={hits} target="GOLD" tone="#8fd14f" from="feet" prefix="+" />
               </div>
             </div>
@@ -966,28 +1029,55 @@ const UpgradeGrid = memo(function UpgradeGrid({
 function TabButton({
   active,
   badge,
+  upgrades = 0,
+  icon,
   onClick,
   children,
 }: {
   active: boolean;
   badge?: number;
+  /** Slots with something better waiting. Lights the tab up when there are any. */
+  upgrades?: number;
+  icon?: React.ReactNode;
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  const calling = upgrades > 0 && !active;
   return (
     <button
       type="button"
       onClick={onClick}
-      className="panel relative py-2 text-[0.78rem] uppercase tracking-widest transition"
+      className="panel relative flex items-center justify-center gap-1.5 py-2 text-[0.78rem] uppercase tracking-widest transition"
       style={{
-        borderColor: active ? "rgba(201,162,77,0.6)" : undefined,
-        color: active ? "var(--gold-bright)" : "var(--text-dim)",
-        background: active ? "rgba(201,162,77,0.08)" : undefined,
+        borderColor: active
+          ? "rgba(201,162,77,0.6)"
+          : calling
+            ? "rgba(126,208,143,0.65)"
+            : undefined,
+        color: active ? "var(--gold-bright)" : calling ? "#7ed08f" : "var(--text-dim)",
+        background: active
+          ? "rgba(201,162,77,0.08)"
+          : calling
+            ? "rgba(126,208,143,0.09)"
+            : undefined,
       }}
     >
+      {icon}
       {children}
       {badge !== undefined && badge > 0 && (
-        <span className="tabular ml-1.5 text-[0.68rem] opacity-70">({badge})</span>
+        <span className="tabular text-[0.68rem] opacity-70">({badge})</span>
+      )}
+      {/* A count of what is worth doing, not of what is owned. It pulses because
+          a bag nobody opened is the most common reason a cat stops climbing. */}
+      {calling && (
+        <motion.span
+          className="tabular absolute -right-1 -top-1 rounded-full px-1.5 py-0.5 text-[0.58rem] leading-none"
+          style={{ background: "#7ed08f", color: "#06210f", boxShadow: "0 0 10px #7ed08f" }}
+          animate={{ scale: [1, 1.12, 1] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        >
+          {upgrades}
+        </motion.span>
       )}
     </button>
   );

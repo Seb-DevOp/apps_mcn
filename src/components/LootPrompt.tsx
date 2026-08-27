@@ -142,14 +142,17 @@ function Card({
         />
         <div className="min-w-0 flex-1">
           <p className="dim text-[0.58rem] uppercase tracking-widest">
-            {worn ? t("loot.equipped") : t("loot.found")} · {t(`idle.slot.${entry.slot}`)}
+            {worn ? t("loot.equipped") : t("loot.found")} · {t(`idle.slot.${entry.slot}`)} ·{" "}
+            {t("item.level", { n: entry.floor })}
           </p>
           <p className="truncate text-[0.82rem]" style={{ color: style.color }}>
             {itemName(entry.slot, entry.floor, entry.rarity, locale)}
           </p>
-          <p className="tabular mt-0.5 text-[0.68rem] text-[var(--parchment)]">
-            {formatNumber(item.power)}
+          <p className="tabular mt-0.5 text-[0.68rem]">
+            <span className="dim text-[0.58rem]">{t("item.atk")} </span>
+            <span className="text-[var(--parchment)]">{formatNumber(item.power)}</span>
             <span className="dim"> · </span>
+            <span className="dim text-[0.58rem]">{t("item.hp")} </span>
             <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
           </p>
         </div>

@@ -284,5 +284,10 @@
   "calendar.gotBoost": "One boost added",
   "calendar.gotSkin": "A new coat: {name}",
   "boost.minutes": "{n} min",
-  "boost.running": "Running"
+  "boost.running": "Running",
+  "idle.tapHint": "Tap · x{n}",
+  "item.level": "Lv {n}",
+  "item.atk": "ATK",
+  "item.hp": "HP",
+  "item.gold": "GOLD"
 }

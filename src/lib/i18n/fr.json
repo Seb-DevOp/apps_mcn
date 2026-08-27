@@ -284,5 +284,10 @@
   "calendar.gotBoost": "Un boost ajouté",
   "calendar.gotSkin": "Un nouveau pelage : {name}",
   "boost.minutes": "{n} min",
-  "boost.running": "En cours"
+  "boost.running": "En cours",
+  "idle.tapHint": "Tape · ×{n}",
+  "item.level": "Niv {n}",
+  "item.atk": "ATQ",
+  "item.hp": "VIE",
+  "item.gold": "OR"
 }

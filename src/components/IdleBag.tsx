@@ -308,9 +308,18 @@ export const IdleBag = memo(function IdleBag({
                   >
                     {itemName(item.slot, item.floor, item.rarity, locale)}
                   </p>
-                  <p className="tabular mt-0.5 text-[0.6rem] text-[var(--parchment)]">
-                    {formatNumber(item.power)}
-                    <span className="dim"> · </span>
+                  <p className="dim tabular text-[0.54rem] uppercase tracking-wider">
+                    {t("item.level", { n: item.floor })}
+                  </p>
+                  {/* One line each. Side by side they wrapped, and a label that
+                      ends a line with its number on the next is worse than no
+                      label at all. */}
+                  <p className="tabular mt-0.5 text-[0.6rem] leading-tight">
+                    <span className="dim text-[0.52rem]">{t("item.atk")} </span>
+                    <span className="text-[var(--parchment)]">{formatNumber(item.power)}</span>
+                  </p>
+                  <p className="tabular text-[0.6rem] leading-tight">
+                    <span className="dim text-[0.52rem]">{t("item.hp")} </span>
                     <span className="text-[#7ed08f]">{formatNumber(item.vitality)}</span>
                   </p>
                 </>
@@ -571,8 +580,22 @@ export const IdleBag = memo(function IdleBag({
                     </span>
                     {/* One pip per bonus. A number here would be a second '+3'
                         next to '+18 %' and the two would be read as one. */}
+                    {/*
+                      The level, which is the floor it fell on.
+
+                      Two red helms are not the same helm, and until this was on
+                      the tile there was nothing on screen that said why — the
+                      rarity is the colour, the level is the size of the numbers
+                      inside it, and one of the two was invisible.
+                    */}
+                    <span
+                      className="tabular absolute right-1 top-0.5 text-[0.5rem] leading-none"
+                      style={{ color: style.color, opacity: 0.9 }}
+                    >
+                      {item.floor}
+                    </span>
                     {item.affixes.length > 0 && (
-                      <span className="absolute left-1 top-1 flex gap-0.5">
+                      <span className="absolute bottom-1 left-1 flex gap-0.5">
                         {item.affixes.map((affix, pip) => (
                           <span
                             key={`${affix.key}-${pip}`}
@@ -608,6 +631,8 @@ export const IdleBag = memo(function IdleBag({
                 />
                 <div className="min-w-0 flex-1">
                   <p className="dim text-[0.58rem] uppercase tracking-widest">
+                    {t("item.level", { n: chosen.floor })}
+                    {" · "}
                     {t(`idle.slot.${chosen.slot}`)}
                     {chosen.slot === "HANDS" && ` · ${t(`weapon.${weaponFor(chosen.id)}`)}`}
                   </p>
@@ -617,10 +642,23 @@ export const IdleBag = memo(function IdleBag({
                   >
                     {itemName(chosen.slot, chosen.floor, chosen.rarity, locale)}
                   </p>
-                  <p className="tabular mt-0.5 text-[0.7rem] text-[var(--parchment)]">
-                    {formatNumber(chosen.power)}
+                  {/* Two numbers that were never named. A piece that says
+                      "127 · 258" is a piece whose stats nobody can read. */}
+                  <p className="tabular mt-0.5 text-[0.7rem]">
+                    <span className="dim text-[0.6rem]">{t("item.atk")} </span>
+                    <span className="text-[var(--parchment)]">{formatNumber(chosen.power)}</span>
                     <span className="dim"> · </span>
+                    <span className="dim text-[0.6rem]">{t("item.hp")} </span>
                     <span className="text-[#7ed08f]">{formatNumber(chosen.vitality)}</span>
+                    {chosen.goldBonus > 0 && (
+                      <>
+                        <span className="dim"> · </span>
+                        <span className="dim text-[0.6rem]">{t("item.gold")} </span>
+                        <span className="text-[var(--gold-bright)]">
+                          +{Math.round(chosen.goldBonus * 100)}%
+                        </span>
+                      </>
+                    )}
                   </p>
                   {/* The whole verdict, in the unit the top of the screen uses:
                       what the cat is worth now, and what it would be worth
