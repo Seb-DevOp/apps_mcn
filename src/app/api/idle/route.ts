@@ -47,7 +47,7 @@ const Schema = z.discriminatedUnion("action", [
     cat: z.number().int().min(0).max(2).optional(),
   }),
   z.object({ action: z.literal("unequip"), itemId: z.string().min(1).max(64) }),
-  z.object({ action: z.literal("equipBest") }),
+  z.object({ action: z.literal("equipBest"), cat: z.number().int().min(0).max(2).optional() }),
   z.object({ action: z.literal("sell"), itemId: z.string().min(1).max(64) }),
   z.object({ action: z.literal("sellBelow"), rarity: z.string().min(1).max(20) }),
   z.object({ action: z.literal("sellAll") }),
@@ -64,7 +64,11 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("breath") }),
   z.object({ action: z.literal("autoSell"), rarity: z.string().max(20) }),
   z.object({ action: z.literal("chest") }),
-  z.object({ action: z.literal("skin"), key: z.string().min(1).max(32) }),
+  z.object({
+    action: z.literal("skin"),
+    key: z.string().min(1).max(32),
+    cat: z.number().int().min(0).max(2).optional(),
+  }),
   z.object({ action: z.literal("calendar") }),
   z.object({ action: z.literal("boost"), key: z.string().min(1).max(32) }),
   z.object({ action: z.literal("buyBoost"), key: z.string().min(1).max(32) }),
@@ -100,7 +104,7 @@ function run(userId: string, input: z.infer<typeof Schema>) {
     case "unequip":
       return unequipItem(userId, input.itemId);
     case "equipBest":
-      return equipBest(userId);
+      return equipBest(userId, input.cat ?? 0);
     case "sell":
       return sellItem(userId, input.itemId);
     case "sellBelow":
@@ -124,7 +128,7 @@ function run(userId: string, input: z.infer<typeof Schema>) {
     case "chest":
       return buyChest(userId);
     case "skin":
-      return buySkin(userId, input.key);
+      return buySkin(userId, input.key, input.cat ?? 0);
     case "calendar":
       return claimCalendar(userId);
     case "boost":

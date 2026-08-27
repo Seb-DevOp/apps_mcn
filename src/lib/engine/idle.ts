@@ -131,6 +131,18 @@ export function parseRelics(json: string): Relics {
 
 const NO_RELICS: Relics = { memory: 0, tenacity: 0, greed: 0, luck: 0 };
 
+/** The coats the extra cats wear. Missing entries mean "same as the first". */
+export function parseCatSkins(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, 2).map((entry) => (typeof entry === "string" ? entry : ""));
+  } catch {
+    // A corrupt blob costs the player a colour, not their cats.
+    return [];
+  }
+}
+
 export type Boosts = Record<BoostKey, number>;
 
 /**
@@ -987,6 +999,7 @@ function view(
     chestsOpened: number;
     skinKey: string;
     skinsJson: string;
+    catSkinsJson: string;
   },
   items: (ItemRow & { id: string; floor: number; rarity: string; shape: string; foundAt: Date })[],
   report: TickReport,
@@ -1149,6 +1162,8 @@ function view(
       guaranteedRarity: chestFloorRarity(profile.rebirths),
       pity: CHEST_PITY,
       skinKey: profile.skinKey,
+      /** One entry per extra cat; an empty string means it wears the first's. */
+      catSkins: parseCatSkins(profile.catSkinsJson),
       // A calendar coat appears here only once it has been won: listing one at
       // a price of zero would read as a free coat nobody had bothered to take.
       skins: SKINS.filter(
@@ -1369,7 +1384,7 @@ export async function sellItem(userId: string, itemId: string) {
  * generated from the same floor and rarity, so they never disagree about which
  * piece is the better one.
  */
-export async function equipBest(userId: string) {
+export async function equipBest(userId: string, cat = 0) {
   return prisma.$transaction(async (tx) => {
     const items = await tx.idleItem.findMany({ where: { userId } });
     const profile = await tx.idleProfile.findUnique({ where: { userId } });
@@ -1386,7 +1401,13 @@ export async function equipBest(userId: string) {
     const worn = [...items];
 
     for (const slot of SLOTS) {
-      const forSlot = items.filter((item) => item.slot === slot && !isPackSlot(item.equippedSlot));
+      // What this cat could wear: the spares, plus what it already has on. A
+      // piece on another cat is not a spare — it is busy.
+      const forSlot = items.filter(
+        (item) =>
+          item.slot === slot &&
+          (item.equippedSlot === null || catOfSlot(item.equippedSlot) === cat),
+      );
       if (forSlot.length === 0) continue;
 
       const best = forSlot.reduce((a, b) =>
@@ -1394,19 +1415,22 @@ export async function equipBest(userId: string) {
           ? b
           : a,
       );
-      if (best.equippedSlot) continue;
+      const target = cat > 0 ? packSlot(slot, cat) : slot;
+      if (best.equippedSlot === target) continue;
 
       for (const item of worn) {
-        if (item.slot === slot) item.equippedSlot = item.id === best.id ? slot : null;
+        if (item.slot === slot && catOfSlot(item.equippedSlot) === cat) {
+          item.equippedSlot = item.id === best.id ? target : null;
+        }
       }
 
       // The slot has to be emptied first: the unique index allows exactly one
-      // worn piece per slot, and it is the database that enforces it.
+      // worn piece per slot per cat, and it is the database that enforces it.
       await tx.idleItem.updateMany({
-        where: { userId, equippedSlot: slot },
+        where: { userId, equippedSlot: target },
         data: { equippedSlot: null },
       });
-      await tx.idleItem.update({ where: { id: best.id }, data: { equippedSlot: slot } });
+      await tx.idleItem.update({ where: { id: best.id }, data: { equippedSlot: target } });
       changed += 1;
     }
 
@@ -1976,7 +2000,7 @@ export async function buyChest(userId: string) {
 }
 
 /** Buys a coat, or puts one already owned back on. */
-export async function buySkin(userId: string, key: string) {
+export async function buySkin(userId: string, key: string, cat = 0) {
   const def = SKIN_BY_KEY[key];
   if (!def) return { ok: false as const, error: "NOT_FOUND" as const };
 
@@ -1990,8 +2014,26 @@ export async function buySkin(userId: string, key: string) {
       return { ok: false as const, error: "NOT_FOUND" as const };
     }
 
+    /**
+     * Which cat puts it on.
+     *
+     * A coat is bought once and worn by whichever cat the player is dressing —
+     * paying three times for the same colour would be a gold sink pretending to
+     * be a wardrobe.
+     */
+    const wear = async () => {
+      if (cat === 0) {
+        await tx.idleProfile.update({ where: { userId }, data: { skinKey: key } });
+        return;
+      }
+      const coats = parseCatSkins(profile.catSkinsJson);
+      while (coats.length < 2) coats.push("");
+      coats[cat - 1] = key;
+      await tx.idleProfile.update({ where: { userId }, data: { catSkinsJson: JSON.stringify(coats) } });
+    };
+
     if (owned.includes(key) || def.price === 0) {
-      await tx.idleProfile.update({ where: { userId }, data: { skinKey: key } });
+      await wear();
       return { ok: true as const, worn: true };
     }
 
@@ -1999,14 +2041,17 @@ export async function buySkin(userId: string, key: string) {
       return { ok: false as const, error: "NOT_ENOUGH_GEMS" as const };
     }
 
+    // Buy it, then put it on whichever cat asked. Writing `skinKey` here was
+    // the one path that ignored the cat, so the first time an escort was given
+    // a colour nobody owned yet, the player's own cat wore it instead.
     await tx.idleProfile.update({
       where: { userId },
       data: {
         gems: profile.gems - def.price,
-        skinKey: key,
         skinsJson: JSON.stringify([...owned, key]),
       },
     });
+    await wear();
     return { ok: true as const, worn: true };
   });
 }

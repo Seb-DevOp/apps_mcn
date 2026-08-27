@@ -18,7 +18,7 @@ import type { IdleState } from "@/lib/engine/idle";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
 import { EnemyCanvas } from "./EnemyCanvas";
 import { FloorBackdrop, themeFor } from "./FloorBackdrop";
-import { IdleBag } from "./IdleBag";
+import { IdleBag, coatOf } from "./IdleBag";
 import { LootPrompt, type LootEntry } from "./LootPrompt";
 import { publishResources } from "./ResourceBar";
 import { useI18n } from "./I18nProvider";
@@ -678,7 +678,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
                         worn={worn}
                         size={index === 0 ? 92 : 78}
                         breathing={!fallen}
-                        skin={state.shop.skinKey}
+                        skin={coatOf(state, index + 1)}
                       />
                     </div>
                   ),

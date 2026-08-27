@@ -47,7 +47,7 @@ export const IdleBag = memo(function IdleBag({
   busy: string | null;
   act: (body: Record<string, unknown>, key: string) => void;
 }) {
-  const { t, locale } = useI18n();
+  const { t, L, locale } = useI18n();
 
   // Which cat is being dressed. The selector only appears once there is more
   // than one — a toggle with a single option is a toggle that lies about having
@@ -175,6 +175,9 @@ export const IdleBag = memo(function IdleBag({
     [state.seals.worn],
   );
 
+  /** Coats this player owns, in shop order. The first is always the plain one. */
+  const owned = useMemo(() => state.shop.skins.filter((skin) => skin.owned), [state.shop.skins]);
+
   // The tile that is open, if it still exists — selling one leaves an id behind.
   const chosen = spares.find((item) => item.id === selected) ?? null;
 
@@ -201,8 +204,38 @@ export const IdleBag = memo(function IdleBag({
 
       {/* --- The cat, as it currently stands --------------------------- */}
       <div className="panel panel-sapphire mt-4 flex justify-center py-3">
-        <CatCanvas worn={worn} size={190} skin={state.shop.skinKey} />
+        <CatCanvas worn={worn} size={190} skin={coatOf(state, dressing)} />
       </div>
+
+      {/*
+        The coats this player owns, for whichever cat is being dressed.
+
+        Here rather than in the shop because this is the screen where a cat is
+        dressed: armour and colour are the same decision about the same animal.
+        Buying still happens in the shop; this only says who wears what.
+      */}
+      {owned.length > 1 && (
+        <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+          {owned.map((skin) => {
+            const on = coatOf(state, dressing) === skin.key;
+            return (
+              <button
+                key={skin.key}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => act({ action: "skin", key: skin.key, cat: dressing }, `skin-${skin.key}`)}
+                className="panel px-2 py-1 text-[0.62rem] transition"
+                style={{
+                  borderColor: on ? "rgba(201,162,77,0.7)" : undefined,
+                  color: on ? "var(--gold-bright)" : "var(--text-dim)",
+                }}
+              >
+                {L(skin.nameEn, skin.nameFr)}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* --- What it all comes to ---------------------------------- */}
       <div className="panel mt-3 flex items-center justify-between px-3 py-2">
@@ -338,12 +371,16 @@ export const IdleBag = memo(function IdleBag({
         <button
           type="button"
           className="btn btn-gold w-full py-2 text-[0.8rem] disabled:opacity-40"
-          disabled={upgradesWaiting === 0 || busy !== null || onPack}
-          onClick={() => act({ action: "equipBest" }, "equipBest")}
+          disabled={busy !== null || (dressing === 0 && upgradesWaiting === 0)}
+          onClick={() => act({ action: "equipBest", cat: dressing }, "equipBest")}
         >
-          {upgradesWaiting > 0
-            ? t("idle.equipBestCount", { n: upgradesWaiting })
-            : t("idle.equipBestNone")}
+          {/* For the escorts the count is meaningless — they start bare, and
+              "better than nothing" is every spare in the bag. */}
+          {dressing > 0
+            ? t("idle.equipBestPack")
+            : upgradesWaiting > 0
+              ? t("idle.equipBestCount", { n: upgradesWaiting })
+              : t("idle.equipBestNone")}
         </button>
 
         {sellLots.length > 0 && (
@@ -815,6 +852,17 @@ export const IdleBag = memo(function IdleBag({
     </div>
   );
 });
+
+/**
+ * The coat a given cat wears.
+ *
+ * The escorts fall back to the first cat's colour until they are given one of
+ * their own, so three cats look like one family rather than like a bug.
+ */
+export function coatOf(state: IdleState, cat: number): string {
+  if (cat === 0) return state.shop.skinKey;
+  return state.shop.catSkins[cat - 1] || state.shop.skinKey;
+}
 
 /** One filter pill. The same shape whether it names a slot or a rarity. */
 function Chip({

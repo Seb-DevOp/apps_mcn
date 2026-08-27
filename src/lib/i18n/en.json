@@ -300,5 +300,6 @@
   "forge.title": "The Forge",
   "forge.hint": "The {n} best spares of a colour become one of the colour above, at their floor.",
   "idle.rarity.ASTRAL": "Astral",
-  "idle.rarity.ORIGIN": "Origin"
+  "idle.rarity.ORIGIN": "Origin",
+  "idle.equipBestPack": "Dress this cat from the bag"
 }

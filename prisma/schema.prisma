@@ -159,6 +159,10 @@ model IdleProfile {
   /// rebirth — making a player buy the same colour twice is not a gold sink.
   skinKey      String @default("classic")
   skinsJson    String @default("[]")
+  /// The coats the Pack and the Pride wear, in order. Empty entries fall back
+  /// to the first cat's, so three cats look like one family until told
+  /// otherwise. ["ember", "shadow"] dresses the second and third.
+  catSkinsJson String @default("[]")
 
   /// --- The calendar --------------------------------------------------
   /// Which of the thirty doors is next, and how many calendars have been

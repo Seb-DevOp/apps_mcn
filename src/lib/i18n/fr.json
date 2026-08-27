@@ -300,5 +300,6 @@
   "forge.title": "La Forge",
   "forge.hint": "Les {n} meilleures rechanges d'une couleur en font une du rang au-dessus, à leur étage.",
   "idle.rarity.ASTRAL": "Astral",
-  "idle.rarity.ORIGIN": "Origine"
+  "idle.rarity.ORIGIN": "Origine",
+  "idle.equipBestPack": "Habiller ce chat avec le sac"
 }
