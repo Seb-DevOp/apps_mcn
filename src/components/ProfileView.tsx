@@ -7,6 +7,7 @@ import { LOCALES, LOCALE_LABEL, type Locale } from "@/lib/i18n";
 import type { AccountStatus } from "@/lib/auth/account";
 import { AccountSecurity } from "./AccountSecurity";
 import { CatCanvas, type WornPiece } from "./CatCanvas";
+import { ProfileBackdrop } from "./ProfileBackdrop";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 
@@ -21,6 +22,8 @@ export function ProfileView({
   player,
   stats,
   worn,
+  skin,
+  backdrop,
   account,
 }: {
   player: { handle: string; locale: string };
@@ -33,6 +36,9 @@ export function ProfileView({
     items: number;
   };
   worn: WornPiece[];
+  /** The coat and the wall this player paid for. */
+  skin: string;
+  backdrop: string;
   account: AccountStatus;
 }) {
   const { t } = useI18n();
@@ -66,9 +72,14 @@ export function ProfileView({
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="panel panel-sapphire mt-4 flex justify-center py-3"
+        className="panel panel-sapphire relative mt-4 flex justify-center overflow-hidden py-3"
       >
-        <CatCanvas worn={worn} size={170} />
+        {/* The coat was missing here entirely: this tab drew the plain cat at a
+            player wearing something they had paid for. */}
+        <ProfileBackdrop backdrop={backdrop} />
+        <span className="relative">
+          <CatCanvas worn={worn} size={170} skin={skin} />
+        </span>
       </motion.div>
 
       <section className="mt-4 grid grid-cols-3 gap-2">

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import type { BoardKey, BoardResult, BoardRow } from "@/lib/engine/leaderboard";
 import Link from "next/link";
 import { CatCanvas } from "./CatCanvas";
+import { ProfileBackdrop } from "./ProfileBackdrop";
 import { useI18n } from "./I18nProvider";
 import { formatNumber } from "./format";
 import { TrophyIcon } from "./ui/Icons";
@@ -161,12 +162,20 @@ function Podium({ rows, board }: { rows: BoardRow[]; board: BoardKey }) {
               href={`/player/${encodeURIComponent(row.handle)}`}
               className="flex w-full flex-col items-center"
             >
-            <CatCanvas
-              worn={row.cat?.worn ?? []}
-              size={top ? 96 : 74}
-              breathing={top}
-              skin={row.cat?.skin ?? "classic"}
-            />
+            {/* Each cat on its own wall. Three podium places wearing three
+                different backdrops is the first thing on this screen that says
+                these are people rather than rows. */}
+            <span className="relative block overflow-hidden rounded-xl">
+              <ProfileBackdrop backdrop={row.cat?.backdrop ?? ""} />
+              <span className="relative block">
+                <CatCanvas
+                  worn={row.cat?.worn ?? []}
+                  size={top ? 96 : 74}
+                  breathing={top}
+                  skin={row.cat?.skin ?? "classic"}
+                />
+              </span>
+            </span>
             <div
               className="panel w-full px-1.5 pb-2 text-center"
               style={{

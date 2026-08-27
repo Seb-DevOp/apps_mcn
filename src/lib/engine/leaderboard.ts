@@ -41,6 +41,8 @@ export const BOARDS: BoardKey[] = [
 /** Enough of a player to draw their cat: the coat, and what it is wearing. */
 export interface BoardCat {
   skin: string;
+  /** The wall this player stands against. Empty means the plain one. */
+  backdrop: string;
   worn: { slot: Slot; shape: string; rarity: Rarity; weapon: WeaponKind }[];
 }
 
@@ -104,6 +106,7 @@ interface ProfileShape {
   totalGold: number;
   chestsOpened: number;
   skinKey: string;
+  backdropKey: string;
   user: { handle: string };
 }
 
@@ -116,6 +119,7 @@ const SELECT = {
   totalGold: true,
   chestsOpened: true,
   skinKey: true,
+  backdropKey: true,
   user: { select: { handle: true } },
 } as const;
 
@@ -191,11 +195,15 @@ async function dressPodium(rows: BoardRow[], profiles: ProfileShape[]): Promise<
     select: { id: true, userId: true, slot: true, shape: true, rarity: true, equippedSlot: true },
   });
 
-  const skins = new Map(profiles.map((profile) => [profile.userId, profile.skinKey]));
+  const looks = new Map(
+    profiles.map((profile) => [profile.userId, profile]),
+  );
 
   for (const row of top) {
+    const look = looks.get(row.userId);
     row.cat = {
-      skin: skins.get(row.userId) ?? "classic",
+      skin: look?.skinKey ?? "classic",
+      backdrop: look?.backdropKey ?? "",
       worn: items
         .filter(
           (item) => item.userId === row.userId && !item.equippedSlot?.startsWith("PACK:"),

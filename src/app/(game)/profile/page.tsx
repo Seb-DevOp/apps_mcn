@@ -34,6 +34,8 @@ export default async function ProfilePage() {
           rarity: item.rarity,
           weapon: weaponFor(item.id),
         }))}
+      skin={state.shop.skinKey}
+      backdrop={state.shop.backdropKey}
       account={account}
     />
   );
