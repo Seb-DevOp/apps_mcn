@@ -14,8 +14,8 @@ import { PawIcon, ShopIcon, RebirthIcon, TrophyIcon, ProfileIcon } from "./ui/Ic
  * deciding what the cat wears while it fights.
  */
 const ITEMS = [
-  // The descent leads: it is the game, and the one screen a player returns to.
-  { href: "/descent", labelKey: "nav.descent", Icon: PawIcon },
+  // The climb leads: it is the game, and the one screen a player returns to.
+  { href: "/climb", labelKey: "nav.climb", Icon: PawIcon },
   { href: "/shop", labelKey: "nav.shop", Icon: ShopIcon },
   // "Renaissance" is eleven characters in a slot eighty pixels wide. The screen
   // it opens still calls itself that; only the bar shortens.

@@ -15,7 +15,7 @@ const embed = {
   version: "1",
   imageUrl: `${ORIGIN}/share/embed.png`,
   button: {
-    title: "Start the descent",
+    title: "Start climbing",
     action: {
       type: "launch_miniapp",
       // The entrance, which signs a Farcaster player in and forwards them. It
@@ -38,8 +38,8 @@ export const metadata: Metadata = {
 
 export default async function EntrancePage() {
   const user = await getSessionUser();
-  // The descent is the game; the Vault hub is now what surrounds it.
-  if (user) redirect("/descent");
+  // The climb is the game; the Vault hub is now what surrounds it.
+  if (user) redirect("/climb");
 
   return (
     <FarcasterGate locale="en">

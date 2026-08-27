@@ -4,6 +4,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   experimental: { optimizePackageImports: ["framer-motion"] },
 
+  async redirects() {
+    return [
+      // The game was "the descent" until the Vault became a tower. Anything
+      // already bookmarked or installed still points here.
+      { source: "/descent", destination: "/climb", permanent: true },
+    ];
+  },
+
   async rewrites() {
     return [
       /**

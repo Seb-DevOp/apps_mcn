@@ -444,7 +444,7 @@ const SLOT_NAMES: Record<Slot, { en: string[]; fr: [string, Agreement][] }> = {
 const RARITY_QUALIFIER: Record<Rarity, { en: string; fr: Record<Agreement, string> | string }> = {
   COMMON: { en: "Worn", fr: { ms: "Usé", fs: "Usée", mp: "Usés", fp: "Usées" } },
   UNCOMMON: { en: "Guardian", fr: "du Gardien" },
-  // Deliberately not "Royal": the deepest pieces are already named Royale, and a
+  // Deliberately not "Royal": the highest pieces are already named Royale, and a
   // "Cuirasse Royale Royale" is nobody's idea of a reward.
   RARE: { en: "Noble", fr: { ms: "Noble", fs: "Noble", mp: "Nobles", fp: "Nobles" } },
   EPIC: {
@@ -1207,7 +1207,7 @@ export const SKIN_BY_KEY: Record<string, SkinDef> = Object.fromEntries(
  * currency wiped every life would be a currency nobody spends.
  */
 export function gemsForGuardian(floor: number): number {
-  // Deeper Guardians are rarer — the descent decelerates by design — so each one
+  // Higher Guardians are rarer — the climb decelerates by design — so each one
   // is worth more. Without this the gem rate would fall away exactly when the
   // shop starts having something worth saving for.
   return 1 + Math.floor(floor / 8);

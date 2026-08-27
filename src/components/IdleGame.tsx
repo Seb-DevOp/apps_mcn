@@ -738,7 +738,7 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           <p className="dim mt-2 text-center text-[0.64rem]">
             {t("idle.incomingHere", { n: formatNumber(here.enemyDamage) })}
             {" · "}
-            {t("idle.deepestShort", { n: levelInfo(state.highestLevel).floor })}
+            {t("idle.recordShort", { n: levelInfo(state.highestLevel).floor })}
           </p>
 
           {/* --- Upgrades --------------------------------------------- */}

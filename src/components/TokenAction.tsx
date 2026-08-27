@@ -62,7 +62,7 @@ export function TokenAction({ kind, locale }: { kind: "CONFIRM" | "RESET"; local
       return;
     }
     setState("DONE");
-    router.push("/descent");
+    router.push("/climb");
     router.refresh();
   }
 

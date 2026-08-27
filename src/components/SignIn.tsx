@@ -35,7 +35,7 @@ export function SignIn({ locale, onBack }: { locale: Locale; onBack: () => void 
   }, []);
 
   function done() {
-    router.push("/descent");
+    router.push("/climb");
     router.refresh();
   }
 

@@ -1,8 +1,8 @@
 {
-  "name": "MCN — The Vault",
-  "short_name": "MCN Vault",
-  "description": "Return each day, rise through the six ranks of the Guardians, and discover what the Vault is filling with.",
-  "start_url": "/vault",
+  "name": "MCN Idle",
+  "short_name": "MCN Idle",
+  "description": "A Maine Coon fights its way up the Vault while you are away. Six slots to fill, eight rarities to find, and a tower with no top.",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -37,13 +37,13 @@
       "type": "image/svg+xml"
     }
   ],
-  "id": "/vault",
-  "lang": "fr",
+  "id": "/",
+  "lang": "en",
   "shortcuts": [
     {
-      "name": "Coffre Quotidien",
-      "short_name": "Coffre",
-      "url": "/vault",
+      "name": "Climb",
+      "short_name": "Climb",
+      "url": "/climb",
       "icons": [
         {
           "src": "/icons/icon-192.png",
@@ -52,9 +52,9 @@
       ]
     },
     {
-      "name": "Résonance de Cristal",
-      "short_name": "Jouer",
-      "url": "/play",
+      "name": "Shop",
+      "short_name": "Shop",
+      "url": "/shop",
       "icons": [
         {
           "src": "/icons/icon-192.png",
@@ -63,9 +63,9 @@
       ]
     },
     {
-      "name": "Armurerie",
-      "short_name": "Armurerie",
-      "url": "/armory",
+      "name": "Leaderboards",
+      "short_name": "Ranks",
+      "url": "/leaderboard",
       "icons": [
         {
           "src": "/icons/icon-192.png",

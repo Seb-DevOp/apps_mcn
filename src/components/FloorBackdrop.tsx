@@ -351,7 +351,7 @@ export const FloorBackdrop = memo(function FloorBackdrop({ floor }: { floor: num
   const theme = THEMES[index];
   const cycle = Math.floor((Math.max(1, floor) - 1) / THEMES.length);
 
-  // Each full turn through the sixteen shifts the light. Bounded so the deepest
+  // Each full turn through the sixteen shifts the light. Bounded so the highest
   // floors are strange rather than unreadable.
   const filter = `hue-rotate(${(cycle * 23) % 360}deg) brightness(${Math.max(
     0.6,

@@ -5,7 +5,7 @@ import { IdleGame } from "@/components/IdleGame";
 
 /**
  * Reading the state advances it, so this page must never be cached: a cached
- * descent is a descent that stopped.
+ * climb is a climb that stopped.
  */
 export const dynamic = "force-dynamic";
 

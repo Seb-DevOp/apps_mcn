@@ -82,7 +82,7 @@ export function Onboarding({ suggested }: { suggested: string }) {
         return;
       }
 
-      router.push("/descent");
+      router.push("/climb");
       router.refresh();
     } catch {
       setFormError(t("common.error"));

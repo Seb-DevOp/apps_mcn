@@ -50,7 +50,7 @@ export interface BoardRow {
   handle: string;
   /** The headline number for this board, already in the unit it is displayed in. */
   value: number;
-  /** Deepest floor and lives spent, shown on every board as common context. */
+  /** Highest floor and lives spent, shown on every board as common context. */
   floor: number;
   lives: number;
   isViewer: boolean;

@@ -301,7 +301,7 @@ export function McnCrest({ size = 28, className }: IconProps) {
   );
 }
 
-/** The paw: the descent, where the cat actually is. */
+/** The paw: the climb, where the cat actually is. */
 export function PawIcon({ size = 22, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>

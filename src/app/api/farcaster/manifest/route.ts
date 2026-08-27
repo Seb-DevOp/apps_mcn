@@ -29,8 +29,8 @@ export async function GET() {
    * truncates in someone else's client, which is worse.
    *
    * The entrance is the home, not the arena. A player arriving from Farcaster is
-   * signed in by the gate at "/" and pushed to the descent; pointing straight at
-   * the descent would send them through a redirect back to the gate and forward
+   * signed in by the gate at "/" and pushed to the climb; pointing straight at
+   * the climb would send them through a redirect back to the gate and forward
    * again, to arrive in the same place one round trip later.
    */
   const manifest: Record<string, unknown> = {
@@ -41,15 +41,15 @@ export async function GET() {
       homeUrl: ORIGIN,
       splashImageUrl: `${ORIGIN}/icons/splash-200.png`,
       splashBackgroundColor: "#05080F",
-      subtitle: "Your cat descends alone",
+      subtitle: "Your cat climbs alone",
       description:
-        "A Maine Coon fights its way down the Vault while you are away. Six slots to fill, eight rarities to find, and a Vault with no bottom.",
+        "A Maine Coon fights its way up the Vault while you are away. Six slots to fill, eight rarities to find, and a tower with no top.",
       primaryCategory: "games",
       tags: ["idle", "rpg", "cat", "mcn", "base"],
-      tagline: "It fights while you sleep",
+      tagline: "It climbs while you sleep",
       ogTitle: "MCN Idle",
       ogDescription:
-        "A Maine Coon descends the Vault while you are away. Six slots, eight rarities, no bottom.",
+        "A Maine Coon climbs the Vault while you are away. Six slots, eight rarities, no ceiling.",
       ogImageUrl: `${ORIGIN}/share/embed.png`,
       heroImageUrl: `${ORIGIN}/share/embed.png`,
       noindex: process.env.NODE_ENV !== "production",
