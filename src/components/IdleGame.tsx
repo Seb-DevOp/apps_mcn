@@ -51,6 +51,8 @@ const SYNC_INTERVAL_MS = 10_000;
  * of the whole screen and not just of the maths.
  */
 const STEP_MS = 80;
+/** How often the passive healing is worth saying out loud. */
+const HEAL_TICK_MS = 1600;
 /**
  * However fast the cat gets, blows never land closer together than this.
  *
@@ -167,6 +169,15 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
   /** When the top bar was last told. */
   const lastPublish = useRef(0);
+  /**
+   * Health regained since the last green number, and when that was.
+   *
+   * Regeneration is the quietest thing in the fight and decides most of it — a
+   * cat that heals faster than it is hit cannot lose. It arrived as a bar that
+   * crept upwards and nothing else, so it gets a number like everything else
+   * that moves health.
+   */
+  const healing = useRef({ amount: 0, at: 0 });
 
   const nextHitId = useRef(0);
 
@@ -375,7 +386,9 @@ export function IdleGame({ initial }: { initial: IdleState }) {
 
       if (w.recovering > 0) {
         w.recovering = Math.max(0, w.recovering - dt);
+        const before = w.hp;
         w.hp = Math.min(stats.maxHp, w.hp + stats.regen * dt);
+        healing.current.amount += w.hp - before;
       } else {
         const info = levelInfo(w.level);
         if (w.enemyHp <= 0) w.enemyHp = info.enemyHp;
@@ -469,7 +482,21 @@ export function IdleGame({ initial }: { initial: IdleState }) {
           }
         }
 
+        const beforeRegen = w.hp;
         w.hp = Math.min(stats.maxHp, w.hp + stats.regen * dt);
+        healing.current.amount += w.hp - beforeRegen;
+      }
+
+      // One green number every second and a half, carrying everything healed in
+      // between. Per frame it would be a hundred numbers a second saying nothing,
+      // and at full health it would be a number saying zero.
+      if (
+        healing.current.amount > 0 &&
+        now - healing.current.at > HEAL_TICK_MS &&
+        w.hp < stats.maxHp - 0.5
+      ) {
+        addHit("HEAL", healing.current.amount);
+        healing.current = { amount: 0, at: now };
       }
 
       w.shield = Math.max(0, w.shield - dt);

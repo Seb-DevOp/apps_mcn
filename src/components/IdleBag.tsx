@@ -57,6 +57,7 @@ export const IdleBag = memo(function IdleBag({
   const [slotFilter, setSlotFilter] = useState<Slot | null>(null);
   const [rarityFilter, setRarityFilter] = useState<Rarity | null>(null);
   const [sellingAll, setSellingAll] = useState(false);
+  const [sellingShown, setSellingShown] = useState(false);
   const onPack = packOpen && dressing === "PACK";
 
   const worn = useMemo<WornPiece[]>(
@@ -539,6 +540,66 @@ export const IdleBag = memo(function IdleBag({
               ),
             )}
           </div>
+
+          {/*
+            A broom for the pile the Nose was never going to touch.
+
+            It sells what the two rows of chips above are showing, which is how
+            "all my Epics" and "all my helmets" become one button instead of two
+            features. It only appears once a filter is on: with none, it would be
+            "sell all" wearing a different hat.
+          */}
+          {(slotFilter || rarityFilter) && shown.length > 0 && !sellingShown && (
+            <button
+              type="button"
+              className="btn btn-ghost mt-2 w-full py-1.5 text-[0.7rem]"
+              disabled={busy !== null}
+              onClick={() => setSellingShown(true)}
+            >
+              {t("idle.sellShown", { n: shown.length })}
+            </button>
+          )}
+
+          {sellingShown && shown.length > 0 && (
+            <div className="panel mt-2 p-3" style={{ borderColor: "rgba(224,96,63,0.5)" }}>
+              <p className="text-[0.74rem] leading-snug text-[#ffb0a0]">
+                {t("idle.sellShownAsk", {
+                  n: shown.length,
+                  gold: formatNumber(
+                    shown.reduce((sum, item) => sum + Math.max(1, Math.round(item.power * 4)), 0),
+                  ),
+                })}
+              </p>
+              <div className="mt-2.5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost py-1.5 text-[0.72rem]"
+                  onClick={() => setSellingShown(false)}
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-gold py-1.5 text-[0.72rem]"
+                  disabled={busy !== null}
+                  onClick={() => {
+                    setSellingShown(false);
+                    setSelected(null);
+                    act(
+                      {
+                        action: "sellShown",
+                        ...(slotFilter ? { slot: slotFilter } : {}),
+                        ...(rarityFilter ? { rarity: rarityFilter } : {}),
+                      },
+                      "sellShown",
+                    );
+                  }}
+                >
+                  {t("idle.sellShownGo", { n: shown.length })}
+                </button>
+              </div>
+            </div>
+          )}
 
           {shown.length === 0 ? (
             <p className="dim mt-3 text-center text-[0.72rem] italic">{t("bag.noMatch")}</p>

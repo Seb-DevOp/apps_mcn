@@ -292,5 +292,8 @@
   "item.gold": "OR",
   "shop.boosts": "Boosts",
   "shop.boostsHint": "À usage unique, lancés depuis l'arène. Le calendrier en distribue aussi.",
-  "shop.boostHeld": "{n} en poche"
+  "shop.boostHeld": "{n} en poche",
+  "idle.sellShown": "Vendre les {n} affichées",
+  "idle.sellShownAsk": "Vendre les {n} pièces affichées pour {gold} or ? Rien ne revient.",
+  "idle.sellShownGo": "Vendre {n}"
 }

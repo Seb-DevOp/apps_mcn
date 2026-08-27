@@ -1694,6 +1694,45 @@ export async function useBoost(userId: string, key: string) {
   });
 }
 
+/**
+ * Sells exactly what the bag is showing.
+ *
+ * The Nose only ever stops *new* junk; a bag that has been filling for a week
+ * needs a broom, and the two that existed swept either everything below a rarity
+ * or everything full stop. Neither could take "all my Epics", which is the pile
+ * a player actually wants gone.
+ *
+ * The filters do the choosing and the server does the selecting: the client
+ * sends the slot and the rarity it is looking at, never a list of ids, so there
+ * is nothing to forge and nothing equipped can be caught by it.
+ */
+export async function sellFiltered(userId: string, slot?: string, rarity?: string) {
+  await getIdleState(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const doomed = await tx.idleItem.findMany({
+      where: {
+        userId,
+        equippedSlot: null,
+        ...(slot ? { slot } : {}),
+        ...(rarity ? { rarity } : {}),
+      },
+      select: { id: true, power: true },
+    });
+    if (doomed.length === 0) return { ok: false as const, error: "NOT_FOUND" as const };
+
+    const gold = doomed.reduce((sum, item) => sum + Math.max(1, Math.round(item.power * 4)), 0);
+    await tx.idleItem.deleteMany({ where: { id: { in: doomed.map((item) => item.id) } } });
+    const profile = await tx.idleProfile.update({
+      where: { userId },
+      data: { gold: { increment: gold }, totalGold: { increment: gold } },
+      select: { gold: true },
+    });
+
+    return { ok: true as const, sold: doomed.length, gold, purse: profile.gold };
+  });
+}
+
 /** Chooses what the Nose sells on sight. An empty string keeps everything. */
 export async function setAutoSell(userId: string, rarity: string) {
   const valid = rarity === "" || RARITIES.includes(rarity as Rarity);

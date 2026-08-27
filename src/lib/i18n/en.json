@@ -292,5 +292,8 @@
   "item.gold": "GOLD",
   "shop.boosts": "Boosts",
   "shop.boostsHint": "One use each, started from the arena. The calendar hands them out too.",
-  "shop.boostHeld": "{n} held"
+  "shop.boostHeld": "{n} held",
+  "idle.sellShown": "Sell the {n} shown",
+  "idle.sellShownAsk": "Sell the {n} pieces shown for {gold} gold? Nothing comes back.",
+  "idle.sellShownGo": "Sell {n}"
 }

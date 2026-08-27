@@ -9,6 +9,7 @@ import {
   sellItem,
   sellBelow,
   sellAllSpares,
+  sellFiltered,
   rebirth,
   buyRelic,
   strike,
@@ -48,6 +49,11 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("sell"), itemId: z.string().min(1).max(64) }),
   z.object({ action: z.literal("sellBelow"), rarity: z.string().min(1).max(20) }),
   z.object({ action: z.literal("sellAll") }),
+  z.object({
+    action: z.literal("sellShown"),
+    slot: z.string().max(20).optional(),
+    rarity: z.string().max(20).optional(),
+  }),
   z.object({ action: z.literal("rebirth") }),
   z.object({ action: z.literal("relic"), key: z.string().min(1).max(32) }),
   // The count is a claim, not a fact: the engine clamps it by elapsed time.
@@ -98,6 +104,8 @@ function run(userId: string, input: z.infer<typeof Schema>) {
       return sellBelow(userId, input.rarity);
     case "sellAll":
       return sellAllSpares(userId);
+    case "sellShown":
+      return sellFiltered(userId, input.slot, input.rarity);
     case "rebirth":
       return rebirth(userId);
     case "relic":

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   RARITY_STYLE,
   SKIN_BY_KEY,
+  weaponIconFor,
   type Slot,
   type Rarity,
   type WeaponKind,
@@ -162,11 +163,23 @@ export const CatCanvas = memo(function CatCanvas({
       <ellipse cx="50" cy="201" rx="12" ry="8" fill={FUR} />
       <ellipse cx="150" cy="201" rx="12" ry="8" fill={FUR} />
       {shape("HANDS") && <Hands shape={shape("HANDS")!} colour={colour("HANDS")!} />}
-      {/* A gauntlet and the thing it is holding. The bag shows a photograph of
-          the weapon; drawing the same *kind* here is what stops the two screens
-          from disagreeing about what the cat is carrying. */}
+      {/*
+        The gauntlet is drawn; the weapon in it is the photograph.
+
+        It used to be a drawn stand-in of the same kind, which agreed with the
+        bag about sword-or-staff and about nothing else — so a Sovereign blade
+        was on fire in the bag and a grey stick in the cat's paw. There is one
+        picture of each weapon now and both screens use it.
+      */}
       {bySlot.get("HANDS")?.weapon && (
-        <Weapon kind={bySlot.get("HANDS")!.weapon!} colour={colour("HANDS")!} />
+        <image
+          href={weaponIconFor(bySlot.get("HANDS")!.weapon!, bySlot.get("HANDS")!.rarity)}
+          x="120"
+          y="126"
+          width="86"
+          height="86"
+          preserveAspectRatio="xMidYMid meet"
+        />
       )}
 
       {shape("SHOULDERS") && <Shoulders shape={shape("SHOULDERS")!} colour={colour("SHOULDERS")!} />}
@@ -762,42 +775,6 @@ function Trinket({ shape, colour }: { shape: string; colour: string }) {
   );
 }
 
-/** What the right paw is holding, in the same four kinds the bag shows. */
-function Weapon({ kind, colour }: { kind: WeaponKind; colour: string }) {
-  if (kind === "sword") {
-    return (
-      <g>
-        <path d="M158 196 L158 120" stroke={colour} strokeWidth="7" strokeLinecap="round" />
-        <path d="M158 116 l5 8 h-10 z" fill="url(#cat-gold)" />
-        <path d="M148 190 h20" stroke="url(#cat-gold)" strokeWidth="5" strokeLinecap="round" />
-      </g>
-    );
-  }
-  if (kind === "staff") {
-    return (
-      <g>
-        <path d="M158 214 L158 116" stroke="#6b5540" strokeWidth="6" strokeLinecap="round" />
-        <circle cx="158" cy="110" r="9" fill={colour} stroke="url(#cat-gold)" strokeWidth="2.5" />
-        <path d="M150 122 q8 -6 16 0" stroke="url(#cat-gold)" strokeWidth="2.5" fill="none" />
-      </g>
-    );
-  }
-  if (kind === "bow") {
-    return (
-      <g>
-        <path d="M164 122 C182 150 182 182 164 210" stroke={colour} strokeWidth="6" fill="none" strokeLinecap="round" />
-        <path d="M164 122 L164 210" stroke="url(#cat-gold)" strokeWidth="2" opacity="0.8" />
-      </g>
-    );
-  }
-  return (
-    <g>
-      <path d="M156 148 h30 v26 q0 20 -15 28 q-15 -8 -15 -28 z" fill={colour} />
-      <path d="M156 148 h30 v26 q0 20 -15 28 q-15 -8 -15 -28 z" fill="none" stroke="url(#cat-gold)" strokeWidth="2.5" />
-      <circle cx="171" cy="172" r="5" fill="url(#cat-gold)" />
-    </g>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // The same pieces, on their own

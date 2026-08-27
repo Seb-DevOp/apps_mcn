@@ -1652,5 +1652,16 @@ export function weaponFinish(rarity: Rarity): "plain" | "runed" | "flame" {
 }
 
 export function weaponIcon(id: string, rarity: Rarity): string {
-  return `/weapons/${weaponFor(id)}-${weaponFinish(rarity)}.webp`;
+  return weaponIconFor(weaponFor(id), rarity);
+}
+
+/**
+ * The same picture, from the kind rather than from the id.
+ *
+ * The cat knows what it is holding but not which row it came from — a worn
+ * piece carries its kind, not its identifier — and both screens have to end up
+ * with the same file.
+ */
+export function weaponIconFor(kind: WeaponKind, rarity: Rarity): string {
+  return `/weapons/${kind}-${weaponFinish(rarity)}.webp`;
 }
