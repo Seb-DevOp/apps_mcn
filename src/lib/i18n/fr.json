@@ -298,5 +298,7 @@
   "idle.sellShownGo": "Vendre {n}",
   "pack.third": "La Horde",
   "forge.title": "La Forge",
-  "forge.hint": "Les {n} meilleures rechanges d'une couleur en font une du rang au-dessus, à leur étage."
+  "forge.hint": "Les {n} meilleures rechanges d'une couleur en font une du rang au-dessus, à leur étage.",
+  "idle.rarity.ASTRAL": "Astral",
+  "idle.rarity.ORIGIN": "Origine"
 }

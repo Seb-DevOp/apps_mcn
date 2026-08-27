@@ -32,7 +32,9 @@ export type Rarity =
   | "MYTHIC"
   | "LEGENDARY"
   | "DIAMOND"
-  | "SOVEREIGN";
+  | "SOVEREIGN"
+  | "ASTRAL"
+  | "ORIGIN";
 
 export const RARITIES: Rarity[] = [
   "COMMON",
@@ -43,6 +45,8 @@ export const RARITIES: Rarity[] = [
   "LEGENDARY",
   "DIAMOND",
   "SOVEREIGN",
+  "ASTRAL",
+  "ORIGIN",
 ];
 
 /** How much a rarity multiplies an item's numbers. */
@@ -55,6 +59,8 @@ export const RARITY_MULTIPLIER: Record<Rarity, number> = {
   LEGENDARY: 4.6,
   DIAMOND: 6.2,
   SOVEREIGN: 8.4,
+  ASTRAL: 11.3,
+  ORIGIN: 15.3,
 };
 
 // ---------------------------------------------------------------------------
@@ -468,6 +474,8 @@ const RARITY_QUALIFIER: Record<Rarity, { en: string; fr: Record<Agreement, strin
   },
   DIAMOND: { en: "Adamant", fr: { ms: "Adamantin", fs: "Adamantine", mp: "Adamantins", fp: "Adamantines" } },
   SOVEREIGN: { en: "Sovereign", fr: "du Souverain" },
+  ASTRAL: { en: "Astral", fr: { ms: "Astral", fs: "Astrale", mp: "Astraux", fp: "Astrales" } },
+  ORIGIN: { en: "Origin", fr: "de l'Origine" },
 };
 
 export function itemName(slot: Slot, floor: number, rarity: Rarity, locale: string) {
@@ -503,25 +511,52 @@ export const BASE_DROP_CHANCE = 0.11;
  * thinning the commons. That is what makes a rebirth change what the game *looks*
  * like rather than only how fast its numbers move.
  */
+/** The life a rarity first becomes possible at. Below it, the weight is zero. */
+const RARITY_UNLOCK: Record<Rarity, number> = {
+  COMMON: 0,
+  UNCOMMON: 0,
+  RARE: 0,
+  EPIC: 0,
+  MYTHIC: 0,
+  LEGENDARY: 0,
+  DIAMOND: 2,
+  SOVEREIGN: 4,
+  ASTRAL: 6,
+  ORIGIN: 8,
+};
+
+/** How wide the window is. Roughly three colours fall inside it at once. */
+const RARITY_SPREAD = 2.3;
+
+/**
+ * Rarity odds: a window that slides up, not a set of ceilings.
+ *
+ * The old table capped the middle and thinned only the bottom, which meant the
+ * mode parked on Rare for ever — a bag full of one colour at floor 30 and the
+ * same bag full of the same colour at floor 300. Depth and lives now move the
+ * *centre* of the distribution instead, so what fills the bag is always the
+ * colour of the moment and every colour eventually stops dropping.
+ *
+ * Two tiers were added above Sovereign for the same reason: a window that keeps
+ * sliding needs somewhere to slide to.
+ */
 export function rarityWeights(
   floor: number,
   rebirths = 0,
 ): { rarity: Rarity; weight: number }[] {
   const depth = Math.max(0, floor - 1);
   const lives = Math.max(0, rebirths);
+  // Which rung of the ladder is the most common find right now.
+  const centre = depth * 0.055 + lives * 0.25;
 
-  return [
-    { rarity: "COMMON", weight: Math.max(4, 60 - depth * 3 - lives * 6) },
-    { rarity: "UNCOMMON", weight: Math.max(6, 25 - lives * 2) },
-    { rarity: "RARE", weight: Math.min(30, 10 + depth * 1.5) },
-    { rarity: "EPIC", weight: Math.min(22, 3 + depth * 1.1 + lives) },
-    { rarity: "MYTHIC", weight: Math.min(14, depth * 0.6 + lives * 1.2) },
-    { rarity: "LEGENDARY", weight: Math.min(8, depth * 0.25 + lives * 0.9) },
-    // Nothing at all until the lives that unlock them have been spent, so the
-    // first Diamond is an event rather than a slow drift in the odds.
-    { rarity: "DIAMOND", weight: lives < 2 ? 0 : Math.min(5, (lives - 1) * 0.7 + depth * 0.06) },
-    { rarity: "SOVEREIGN", weight: lives < 4 ? 0 : Math.min(2.5, (lives - 3) * 0.4 + depth * 0.03) },
-  ];
+  return RARITIES.map((rarity, tier) => {
+    if (lives < RARITY_UNLOCK[rarity]) return { rarity, weight: 0 };
+    const distance = tier - centre;
+    return {
+      rarity,
+      weight: 100 * Math.exp(-(distance * distance) / RARITY_SPREAD),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -600,6 +635,10 @@ export const RARITY_STYLE: Record<Rarity, { color: string; glow: string }> = {
   // The one above them all reads as gold rather than as another hue: a ladder
   // that ends on one more colour ends quietly.
   SOVEREIGN: { color: "#ffd76a", glow: "rgba(255,215,106,0.9)" },
+  // Past gold there is nowhere left to go in hue, so the last two go in
+  // brightness instead: white, then the one colour the ladder never used.
+  ASTRAL: { color: "#f2f6ff", glow: "rgba(242,246,255,0.95)" },
+  ORIGIN: { color: "#ff5ce0", glow: "rgba(255,92,224,0.95)" },
 };
 
 // ---------------------------------------------------------------------------
@@ -632,6 +671,10 @@ export const AFFIX_SLOTS: Record<Rarity, number> = {
   LEGENDARY: 3,
   DIAMOND: 4,
   SOVEREIGN: 5,
+  // Six is the ceiling: there are six statistics, and two helpings of one on a
+  // single piece read as one bigger number.
+  ASTRAL: 6,
+  ORIGIN: 6,
 };
 
 const AFFIX_SCALE: Record<Rarity, number> = {
@@ -643,6 +686,8 @@ const AFFIX_SCALE: Record<Rarity, number> = {
   LEGENDARY: 5,
   DIAMOND: 6.8,
   SOVEREIGN: 9,
+  ASTRAL: 12,
+  ORIGIN: 16,
 };
 
 /**
@@ -884,7 +929,7 @@ export const ROAR_DAMAGE_SECONDS = 25;
  * Past the tenth there is no rung left to buy, only relics, so the requirement
  * keeps stepping by four for anyone who wants to keep spending lives.
  */
-const REBIRTH_FLOORS = [15, 27, 39, 51, 63, 70, 73, 76, 78, 80];
+const REBIRTH_FLOORS = [15, 27, 39, 51, 63, 74, 80, 86, 91, 96];
 
 export function rebirthFloorFor(rebirths: number): number {
   const index = Math.max(0, Math.floor(rebirths));
@@ -1221,7 +1266,9 @@ export const CHEST_PITY = 10;
 
 /** What a guaranteed chest floors the roll at, by how many lives were spent. */
 export function chestFloorRarity(rebirths: number): Rarity {
-  if (rebirths >= 4) return "DIAMOND";
+  if (rebirths >= 9) return "ORIGIN";
+  if (rebirths >= 7) return "ASTRAL";
+  if (rebirths >= 4) return "SOVEREIGN";
   if (rebirths >= 2) return "LEGENDARY";
   return "EPIC";
 }

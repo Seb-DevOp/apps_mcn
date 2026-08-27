@@ -298,5 +298,7 @@
   "idle.sellShownGo": "Sell {n}",
   "pack.third": "The Pride",
   "forge.title": "The Forge",
-  "forge.hint": "The {n} best spares of a colour become one of the colour above, at their floor."
+  "forge.hint": "The {n} best spares of a colour become one of the colour above, at their floor.",
+  "idle.rarity.ASTRAL": "Astral",
+  "idle.rarity.ORIGIN": "Origin"
 }
